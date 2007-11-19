@@ -1,0 +1,20 @@
+#!/bin/bash
+
+KEY=173a176
+ADR=2064
+
+DEST=mce@mce-act-a3:das_mod/pci_patches/DMA5
+
+../build_pci_once
+if [ $? != 0 ]; then
+    exit 1
+fi
+
+../diff_lod | \
+    sed "s/$KEY/_GO /" | \
+    awk '($1!=">") {S=0} (S== "1") {print $0} ($1=="_GO") {S=1}' |
+    ../make_patch $ADR > patch_$ADR
+
+cat patch_$ADR
+
+scp patch_$ADR $DEST

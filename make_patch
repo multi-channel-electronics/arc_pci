@@ -1,0 +1,11 @@
+#!/bin/bash
+
+addr=$1
+
+sed 's/> //g' | sed 's/\ *$//g' | sed 's/\ /\n/g' | \
+while read line ; do
+
+	echo WRITE P $addr 0x$line
+	addr=$(( $addr + 1 ))
+
+done

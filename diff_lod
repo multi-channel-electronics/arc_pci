@@ -1,0 +1,13 @@
+
+STD=~/src/scuba2_repository/PCI/DSP_code/Bootcode_RevA/PCI_SCUBA_BOOT_CODE_ONCE.lod
+
+TGT=PCI_SCUBA_BOOT_CODE_ONCE.lod
+
+echo STD!!
+cat -n $STD |grep _DATA
+echo TGT!!
+cat -n $TGT |grep _DATA
+
+sed -i 's/\r//g' $TGT
+
+diff $STD $TGT

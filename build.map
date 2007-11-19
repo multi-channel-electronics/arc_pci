@@ -1,0 +1,668 @@
+
+
+
+DSP Linker  Version 6.3.7   107-11-19  01:15:10  build.map  Page 1
+
+
+                        Section Link Map by Address
+
+
+X Memory (0 - default)
+
+Start    End         Length    Section
+000000   000065         102    GLOBAL            Abs Ovl
+000066   FFFFFF    16777114    UNUSED
+
+
+P Memory (0 - default)
+
+Start    End         Length    Section
+000000   00006A         107    GLOBAL            Abs
+000000   000068         105    GLOBAL            Abs Ovl
+000000   000001           2    GLOBAL            Abs Ovl
+00006B   000071           7    UNUSED
+000072   00008B          26    GLOBAL            Abs Ovl
+000074   00008D          26    GLOBAL            Abs
+00008E   0000FF         114    UNUSED
+000100   000574        1141    GLOBAL            Abs Ovl
+000102   0005DC        1243    GLOBAL            Abs
+0005DD   0007FF         547    UNUSED
+000800   000A22         547    GLOBAL            Abs Ovl
+000802   000A24         547    GLOBAL            Abs
+000A25   FFFFFF    16774619    UNUSED
+
+
+
+                         Section Link Map by Name
+
+
+Section                Memory       Start     End           Length
+GLOBAL           Ovl   X (0)        000000    000065           102
+                 Abs   P (0)        000000    00006A           107
+                 Ovl   P (0)        000000    000068           105
+                 Ovl   P (0)        000000    000001             2
+                 Ovl   P (0)        000072    00008B            26
+                 Abs   P (0)        000074    00008D            26
+                 Ovl   P (0)        000100    000574          1141
+                 Abs   P (0)        000102    0005DC          1243
+                 Ovl   P (0)        000800    000A22           547
+                 Abs   P (0)        000802    000A24           547
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+DSP Linker  Version 6.3.7   107-11-19  01:15:10  build.map  Page 2
+
+
+                          Symbol Listing by Name
+
+
+Name             Type    Value             Section           Attributes
+AAR0.............int     FFFFF9            GLOBAL            ABS GLOBAL
+AAR1.............int     FFFFF8            GLOBAL            ABS GLOBAL
+AAR2.............int     FFFFF7            GLOBAL            ABS GLOBAL
+AAR3.............int     FFFFF6            GLOBAL            ABS GLOBAL
+ADD_HILO_ADDRESS.int   P:0008D4            GLOBAL            ABS GLOBAL OVERLAY
+APER.............int     000005            GLOBAL            ABS GLOBAL
+APPLICATION......int     000800            GLOBAL            ABS GLOBAL
+APPLICATION_LOAD.int     000000            GLOBAL            ABS GLOBAL
+APPLICATION_RUNN.int     00000C            GLOBAL            ABS GLOBAL
+APPL_PARAM.......int     000200            GLOBAL            ABS GLOBAL
+AUX1.............int     000004            GLOBAL            ABS GLOBAL
+BCR..............int     FFFFFB            GLOBAL            ABS GLOBAL
+BDEBUG0..........int   X:00005C            GLOBAL            ABS GLOBAL OVERLAY
+BDEBUG1..........int   X:00005D            GLOBAL            ABS GLOBAL OVERLAY
+BDEBUG2..........int   X:00005E            GLOBAL            ABS GLOBAL OVERLAY
+BDEBUG3..........int   X:00005F            GLOBAL            ABS GLOBAL OVERLAY
+BDEBUG4..........int   X:000060            GLOBAL            ABS GLOBAL OVERLAY
+BDEBUG5..........int   X:000061            GLOBAL            ABS GLOBAL OVERLAY
+BDEBUG6..........int   X:000062            GLOBAL            ABS GLOBAL OVERLAY
+BDEBUG7..........int   X:000063            GLOBAL            ABS GLOBAL OVERLAY
+BDEBUG8..........int   X:000064            GLOBAL            ABS GLOBAL OVERLAY
+BDEBUG9..........int   X:000065            GLOBAL            ABS GLOBAL OVERLAY
+BLOCK_CHECK......int   P:000541            GLOBAL            ABS GLOBAL OVERLAY
+BLOCK_CON........int   P:0002D5            GLOBAL            ABS GLOBAL OVERLAY
+BLOCK_DONE.......int   P:000553            GLOBAL            ABS GLOBAL OVERLAY
+BLOCK_OK.........int   P:00054E            GLOBAL            ABS GLOBAL OVERLAY
+BLOCK_PCI........int   P:00052A            GLOBAL            ABS GLOBAL OVERLAY
+BLOCK_RESTART....int   P:000554            GLOBAL            ABS GLOBAL OVERLAY
+BLOCK_RESUME.....int   P:000555            GLOBAL            ABS GLOBAL OVERLAY
+BLOCK_RESUME1....int   P:00055C            GLOBAL            ABS GLOBAL OVERLAY
+BLOCK_SIZE.......int   X:000042            GLOBAL            ABS GLOBAL OVERLAY
+BLOCK_TRANSFER...int   P:00050C            GLOBAL            ABS GLOBAL OVERLAY
+BLOCK_TRANSFER1..int   P:000517            GLOBAL            ABS GLOBAL OVERLAY
+BLOCK_UPDATE.....int   P:000568            GLOBAL            ABS GLOBAL OVERLAY
+BOOTCODE_END.....int   P:000575            GLOBAL            ABS GLOBAL OVERLAY
+BOOTEND_ADDR.....int     000575            GLOBAL            ABS GLOBAL OVERLAY
+BUFFER_INCR......int   P:000952            GLOBAL            ABS GLOBAL OVERLAY
+BUFFER_INFORM_CH.int   P:00096A            GLOBAL            ABS GLOBAL OVERLAY
+BUFFER_INFORM_OK.int   P:000973            GLOBAL            ABS GLOBAL OVERLAY
+BUFFER_PACKET_DA.int   P:0008EB            GLOBAL            ABS GLOBAL OVERLAY
+BUFFER_PACKET_DO.int   P:00091A            GLOBAL            ABS GLOBAL OVERLAY
+BUFFER_PACKET_DR.int   P:00091B            GLOBAL            ABS GLOBAL OVERLAY
+BUFFER_PACKET_HA.int   P:0008FD            GLOBAL            ABS GLOBAL OVERLAY
+BUFFER_PACKET_MA.int   P:000913            GLOBAL            ABS GLOBAL OVERLAY
+BUFFER_PACKET_RP.int   P:0008EA            GLOBAL            ABS GLOBAL OVERLAY
+BUFFER_PACKET_SE.int   P:00090A            GLOBAL            ABS GLOBAL OVERLAY
+BUFFER_PACKET_SI.int   P:000904            GLOBAL            ABS GLOBAL OVERLAY
+BUFFER_RESET.....int   P:000962            GLOBAL            ABS GLOBAL OVERLAY
+BURST_DEST_HI....int   X:000045            GLOBAL            ABS GLOBAL OVERLAY
+BURST_DEST_LO....int   X:000044            GLOBAL            ABS GLOBAL OVERLAY
+BURST_SIZE.......int   X:000043            GLOBAL            ABS GLOBAL OVERLAY
+BURST_SRC........int   X:000046            GLOBAL            ABS GLOBAL OVERLAY
+BYTE_SWAP........int     000005            GLOBAL            ABS GLOBAL
+CALC_NO_BUFFS....int   P:0003DA            GLOBAL            ABS GLOBAL OVERLAY
+CHECK_COMMAND....int   P:0008C2            GLOBAL            ABS GLOBAL OVERLAY
+CHECK_WD.........int   P:000182            GLOBAL            ABS GLOBAL OVERLAY
+
+
+
+DSP Linker  Version 6.3.7   107-11-19  01:15:10  build.map  Page 3
+
+
+CHK_FIFO.........int   P:00017E            GLOBAL            ABS GLOBAL OVERLAY
+CLEAN_UP_PCI.....int   P:00022A            GLOBAL            ABS GLOBAL OVERLAY
+CLEAR_FIFO.......int   P:000828            GLOBAL            ABS GLOBAL OVERLAY
+CLR0.............int   P:000147            GLOBAL            ABS GLOBAL OVERLAY
+CLR1.............int   P:00014C            GLOBAL            ABS GLOBAL OVERLAY
+CLRT.............int     00000E            GLOBAL            ABS GLOBAL
+CLR_CMD..........int   P:0002CD            GLOBAL            ABS GLOBAL OVERLAY
+CLR_FO_RTS.......int   P:00041F            GLOBAL            ABS GLOBAL OVERLAY
+CONSTORE.........int   X:000041            GLOBAL            ABS GLOBAL OVERLAY
+CON_ERROR........int   P:0002F2            GLOBAL            ABS GLOBAL OVERLAY
+CRA0.............int     FFFFB5            GLOBAL            ABS GLOBAL
+CRB0.............int     FFFFB6            GLOBAL            ABS GLOBAL
+DATA_DLY.........int     000007            GLOBAL            ABS GLOBAL
+DATA_DLY_VAL.....int   X:000040            GLOBAL            ABS GLOBAL OVERLAY
+DATA_WD..........int   X:00003A            GLOBAL            ABS GLOBAL OVERLAY
+DCO0.............int     FFFFED            GLOBAL            ABS GLOBAL
+DCR..............int     FFFFFA            GLOBAL            ABS GLOBAL
+DCR0.............int     FFFFEC            GLOBAL            ABS GLOBAL
+DCTR.............int     FFFFC5            GLOBAL            ABS GLOBAL
+DCTR_HF3.........int     000003            GLOBAL            ABS GLOBAL
+DCTR_HF4.........int     000004            GLOBAL            ABS GLOBAL
+DCTR_HF5.........int     000005            GLOBAL            ABS GLOBAL
+DDR0.............int     FFFFEE            GLOBAL            ABS GLOBAL
+DEBUG............int     000007            GLOBAL            ABS GLOBAL
+DMA_ERRORS.......int   X:000047            GLOBAL            ABS GLOBAL OVERLAY
+DPAR.............int     FFFFC8            GLOBAL            ABS GLOBAL
+DPCR.............int     FFFFC6            GLOBAL            ABS GLOBAL
+DPER.............int     000006            GLOBAL            ABS GLOBAL
+DPMC.............int     FFFFC7            GLOBAL            ABS GLOBAL
+DPSR.............int     FFFFCA            GLOBAL            ABS GLOBAL
+DRXR.............int     FFFFCB            GLOBAL            ABS GLOBAL
+DRXR_WD1.........int   X:000008            GLOBAL            ABS GLOBAL OVERLAY
+DRXR_WD2.........int   X:000009            GLOBAL            ABS GLOBAL OVERLAY
+DRXR_WD3.........int   X:00000A            GLOBAL            ABS GLOBAL OVERLAY
+DRXR_WD4.........int   X:00000B            GLOBAL            ABS GLOBAL OVERLAY
+DSR..............int     FFFFC9            GLOBAL            ABS GLOBAL
+DSR0.............int     FFFFEF            GLOBAL            ABS GLOBAL
+DSR_BUF0.........int     000004            GLOBAL            ABS GLOBAL
+DSR_BUF1.........int     000005            GLOBAL            ABS GLOBAL
+DTXM.............int     FFFFCC            GLOBAL            ABS GLOBAL
+DTXS.............int     FFFFCD            GLOBAL            ABS GLOBAL
+DTXS_WD1.........int   X:00000C            GLOBAL            ABS GLOBAL OVERLAY
+DTXS_WD2.........int   X:00000D            GLOBAL            ABS GLOBAL OVERLAY
+DTXS_WD3.........int   X:00000E            GLOBAL            ABS GLOBAL OVERLAY
+DTXS_WD4.........int   X:00000F            GLOBAL            ABS GLOBAL OVERLAY
+DUMP_BUFF........int     001000            GLOBAL            ABS GLOBAL
+DUMP_FIFO........int   P:000216            GLOBAL            ABS GLOBAL OVERLAY
+EC_APER..........int   X:00004E            GLOBAL            ABS GLOBAL OVERLAY
+EC_DPER..........int   X:00004D            GLOBAL            ABS GLOBAL OVERLAY
+EC_MAB...........int   X:00004C            GLOBAL            ABS GLOBAL OVERLAY
+EC_TAB...........int   X:00004B            GLOBAL            ABS GLOBAL OVERLAY
+EC_TDIS..........int   X:00004A            GLOBAL            ABS GLOBAL OVERLAY
+EC_TO............int   X:000049            GLOBAL            ABS GLOBAL OVERLAY
+EC_TRTY..........int   X:000048            GLOBAL            ABS GLOBAL OVERLAY
+EF...............int     000000            GLOBAL            ABS GLOBAL
+END_ADR..........int   P:000A25            GLOBAL            ABS GLOBAL OVERLAY
+END_BLOCK_CON....int   P:0002E0            GLOBAL            ABS GLOBAL OVERLAY
+END_CLR_CMD......int   P:0002D1            GLOBAL            ABS GLOBAL OVERLAY
+ERROR_APER.......int   P:000502            GLOBAL            ABS GLOBAL OVERLAY
+ERROR_DPER.......int   P:0004F8            GLOBAL            ABS GLOBAL OVERLAY
+
+
+
+DSP Linker  Version 6.3.7   107-11-19  01:15:10  build.map  Page 4
+
+
+ERROR_MAB........int   P:0004EE            GLOBAL            ABS GLOBAL OVERLAY
+ERROR_TAB........int   P:0004E4            GLOBAL            ABS GLOBAL OVERLAY
+ERROR_TDIS.......int   P:0004DA            GLOBAL            ABS GLOBAL OVERLAY
+ERROR_TO.........int   P:0004D0            GLOBAL            ABS GLOBAL OVERLAY
+ERROR_TRTY.......int   P:0004C6            GLOBAL            ABS GLOBAL OVERLAY
+ESCAPE...........int   P:00099A            GLOBAL            ABS GLOBAL OVERLAY
+FATALITY_HANDLER.int   P:000938            GLOBAL            ABS GLOBAL OVERLAY
+FATAL_ERROR......int     000002            GLOBAL            ABS GLOBAL
+FC0..............int     000016            GLOBAL            ABS GLOBAL
+FC1..............int     000017            GLOBAL            ABS GLOBAL
+FIFO_EMPTY.......int   P:000227            GLOBAL            ABS GLOBAL OVERLAY
+FINISH_CON.......int   P:0002E3            GLOBAL            ABS GLOBAL OVERLAY
+FINISH_RCO.......int   P:000291            GLOBAL            ABS GLOBAL OVERLAY
+FINISH_READ_MEMO.int   P:000253            GLOBAL            ABS GLOBAL OVERLAY
+FINISH_RST.......int   P:00032C            GLOBAL            ABS GLOBAL OVERLAY
+FINISH_STP.......int   P:00037F            GLOBAL            ABS GLOBAL OVERLAY
+FINISH_WRITE_MEM.int   P:0003B8            GLOBAL            ABS GLOBAL OVERLAY
+FLUSH_PCI_FIFO...int   P:0004AB            GLOBAL            ABS GLOBAL OVERLAY
+FOUR.............int   X:000035            GLOBAL            ABS GLOBAL OVERLAY
+FO_EMPTY.........int     000003            GLOBAL            ABS GLOBAL
+FO_OVER..........int     000004            GLOBAL            ABS GLOBAL
+FO_RX_ER.........int     000006            GLOBAL            ABS GLOBAL
+FO_UNDER.........int     000005            GLOBAL            ABS GLOBAL
+FO_WRD_RCV.......int     000003            GLOBAL            ABS GLOBAL
+FRAME_COUNT......int   X:000001            GLOBAL            ABS GLOBAL OVERLAY
+FSYNC............int     000003            GLOBAL            ABS GLOBAL
+GET_DAT..........int   P:000463            GLOBAL            ABS GLOBAL OVERLAY
+GET_FO_WRD.......int   P:000409            GLOBAL            ABS GLOBAL OVERLAY
+GO_ERROR.........int   P:000366            GLOBAL            ABS GLOBAL OVERLAY
+HACT.............int     000017            GLOBAL            ABS GLOBAL
+HEAD_W1_0........int   X:00001D            GLOBAL            ABS GLOBAL OVERLAY
+HEAD_W1_1........int   X:00001C            GLOBAL            ABS GLOBAL OVERLAY
+HEAD_W2_0........int   X:00001F            GLOBAL            ABS GLOBAL OVERLAY
+HEAD_W2_1........int   X:00001E            GLOBAL            ABS GLOBAL OVERLAY
+HEAD_W3_0........int   X:000021            GLOBAL            ABS GLOBAL OVERLAY
+HEAD_W3_1........int   X:000020            GLOBAL            ABS GLOBAL OVERLAY
+HEAD_W4_0........int   X:000023            GLOBAL            ABS GLOBAL OVERLAY
+HEAD_W4_1........int   X:000022            GLOBAL            ABS GLOBAL OVERLAY
+HF...............int     000001            GLOBAL            ABS GLOBAL
+HF_FIFO..........int     000200            GLOBAL            ABS GLOBAL
+HOCK_CHECK.......int   P:0009F1            GLOBAL            ABS GLOBAL OVERLAY
+HOCK_DONE........int   P:000A01            GLOBAL            ABS GLOBAL OVERLAY
+HOCK_OK..........int   P:0009FC            GLOBAL            ABS GLOBAL OVERLAY
+HOCK_PCI.........int   P:0009CE            GLOBAL            ABS GLOBAL OVERLAY
+HOCK_RESTART.....int   P:000A02            GLOBAL            ABS GLOBAL OVERLAY
+HOCK_RESUME......int   P:000A03            GLOBAL            ABS GLOBAL OVERLAY
+HOCK_RESUME1.....int   P:000A0A            GLOBAL            ABS GLOBAL OVERLAY
+HOCK_TRANSFER....int   P:00081C            GLOBAL            ABS GLOBAL OVERLAY
+HOCK_TRANSFER1...int   P:0009BB            GLOBAL            ABS GLOBAL OVERLAY
+HOCK_TRANSFER_NO.int   P:0009A8            GLOBAL            ABS GLOBAL OVERLAY
+HOCK_UPDATE......int   P:000A16            GLOBAL            ABS GLOBAL OVERLAY
+HOST_ERROR.......int   P:000314            GLOBAL            ABS GLOBAL OVERLAY
+HST_ACK_REP......int   P:000208            GLOBAL            ABS GLOBAL OVERLAY
+HST_NFYD.........int     000009            GLOBAL            ABS GLOBAL
+IAE..............int     000015            GLOBAL            ABS GLOBAL
+IMAGE_BUFFER.....int     000000            GLOBAL            ABS GLOBAL
+INC_FRAME_COUNT..int   P:0001BA            GLOBAL            ABS GLOBAL OVERLAY
+INFORM_EXIT......int   P:00084C            GLOBAL            ABS GLOBAL OVERLAY
+INIT.............int   P:000000            GLOBAL            ABS GLOBAL OVERLAY
+INIT_PCI.........int   P:000030            GLOBAL            ABS GLOBAL OVERLAY
+
+
+
+DSP Linker  Version 6.3.7   107-11-19  01:15:10  build.map  Page 5
+
+
+INTA.............int     000006            GLOBAL            ABS GLOBAL
+INTERNAL_GO......int     00000D            GLOBAL            ABS GLOBAL
+IPRC.............int     FFFFFF            GLOBAL            ABS GLOBAL
+IPRP.............int     FFFFFE            GLOBAL            ABS GLOBAL
+LEFT_OVERS.......int   P:0001F5            GLOBAL            ABS GLOBAL OVERLAY
+LEFT_OVERS_READ..int   P:000200            GLOBAL            ABS GLOBAL OVERLAY
+LEFT_TO_READ.....int   X:00003D            GLOBAL            ABS GLOBAL OVERLAY
+LEFT_TO_WRITE....int   X:00003E            GLOBAL            ABS GLOBAL OVERLAY
+LE_BLOCK_TRANSFE.int   P:00099C            GLOBAL            ABS GLOBAL OVERLAY
+LE_BLOCK_UPDATE..int   P:00081A            GLOBAL            ABS GLOBAL OVERLAY
+LE_BUFFER_INFORM.int   P:000837            GLOBAL            ABS GLOBAL OVERLAY
+LE_HACK_FESTIVAL.int   P:000832            GLOBAL            ABS GLOBAL OVERLAY
+LE_NEW_PACKET_HA.int   P:0008DF            GLOBAL            ABS GLOBAL OVERLAY
+LE_QUIET_TRANSFE.int   P:00084D            GLOBAL            ABS GLOBAL OVERLAY
+LE_SYSTEM_RESET..int   P:00081E            GLOBAL            ABS GLOBAL OVERLAY
+LOAD_HILO_ADDRES.int   P:0008CE            GLOBAL            ABS GLOBAL OVERLAY
+L_BUFFER.........int   P:0001E6            GLOBAL            ABS GLOBAL OVERLAY
+L_DELAY..........int   P:000290            GLOBAL            ABS GLOBAL OVERLAY
+L_RDFIFO.........int   P:00028F            GLOBAL            ABS GLOBAL OVERLAY
+MAB..............int     000007            GLOBAL            ABS GLOBAL
+MACE.............int     000012            GLOBAL            ABS GLOBAL
+MAIN_LOOP_HACK_F.int   P:000810            GLOBAL            ABS GLOBAL OVERLAY
+MARQ.............int     000004            GLOBAL            ABS GLOBAL
+MAX_DUMP.........int     000200            GLOBAL            ABS GLOBAL
+MCE_PACKET.......int   P:0001C7            GLOBAL            ABS GLOBAL OVERLAY
+MDT..............int     00000E            GLOBAL            ABS GLOBAL
+MPCI_ERROR_RECOV.int   P:0004B2            GLOBAL            ABS GLOBAL OVERLAY
+MRRQ.............int     000002            GLOBAL            ABS GLOBAL
+MTRQ.............int     000001            GLOBAL            ABS GLOBAL
+NEW_PACKET_HANDL.int   P:000814            GLOBAL            ABS GLOBAL OVERLAY
+NEXT_DUMP........int   P:00021C            GLOBAL            ABS GLOBAL OVERLAY
+NUM_DUMPED.......int   X:000007            GLOBAL            ABS GLOBAL OVERLAY
+NUM_LEFTOVER_BLO.int   X:00003F            GLOBAL            ABS GLOBAL OVERLAY
+ONE..............int   X:000034            GLOBAL            ABS GLOBAL OVERLAY
+PACKET_CHOKE.....int     000008            GLOBAL            ABS GLOBAL
+PACKET_IN........int   P:000173            GLOBAL            ABS GLOBAL OVERLAY
+PACKET_INFO......int   P:0001A8            GLOBAL            ABS GLOBAL OVERLAY
+PACKET_SIZE_HIH..int   X:000037            GLOBAL            ABS GLOBAL OVERLAY
+PACKET_SIZE_LOW..int   X:000036            GLOBAL            ABS GLOBAL OVERLAY
+PCIDMA_RESTART...int     00000E            GLOBAL            ABS GLOBAL
+PCIDMA_RESUME....int     00000F            GLOBAL            ABS GLOBAL
+PCIDMA_RETRY.....int     000010            GLOBAL            ABS GLOBAL
+PCI_BURST_NOW....int   P:0004A0            GLOBAL            ABS GLOBAL OVERLAY
+PCI_MESSAGE_TO_H.int   P:000421            GLOBAL            ABS GLOBAL OVERLAY
+PCI_MESSAGE_TO_H.int   P:000425            GLOBAL            ABS GLOBAL OVERLAY
+PCI_WD1_1........int   X:000010            GLOBAL            ABS GLOBAL OVERLAY
+PCI_WD1_2........int   X:000011            GLOBAL            ABS GLOBAL OVERLAY
+PCI_WD2_1........int   X:000012            GLOBAL            ABS GLOBAL OVERLAY
+PCI_WD2_2........int   X:000013            GLOBAL            ABS GLOBAL OVERLAY
+PCI_WD3_1........int   X:000014            GLOBAL            ABS GLOBAL OVERLAY
+PCI_WD3_2........int   X:000015            GLOBAL            ABS GLOBAL OVERLAY
+PCI_WD4_1........int   X:000016            GLOBAL            ABS GLOBAL OVERLAY
+PCI_WD4_2........int   X:000017            GLOBAL            ABS GLOBAL OVERLAY
+PCI_WD5_1........int   X:000018            GLOBAL            ABS GLOBAL OVERLAY
+PCI_WD5_2........int   X:000019            GLOBAL            ABS GLOBAL OVERLAY
+PCI_WD6_1........int   X:00001A            GLOBAL            ABS GLOBAL OVERLAY
+PCI_WD6_2........int   X:00001B            GLOBAL            ABS GLOBAL OVERLAY
+PCRC.............int     FFFFBF            GLOBAL            ABS GLOBAL
+PCRD.............int     FFFFAF            GLOBAL            ABS GLOBAL
+PCRE.............int     FFFF9F            GLOBAL            ABS GLOBAL
+
+
+
+DSP Linker  Version 6.3.7   107-11-19  01:15:10  build.map  Page 6
+
+
+PCTL.............int     FFFFFD            GLOBAL            ABS GLOBAL
+PDRC.............int     FFFFBD            GLOBAL            ABS GLOBAL
+PDRD.............int     FFFFAD            GLOBAL            ABS GLOBAL
+PDRE.............int     FFFF9D            GLOBAL            ABS GLOBAL
+PEND_ADDR........int     000575            GLOBAL            ABS GLOBAL OVERLAY
+PLL_INIT.........int     050003            GLOBAL            ABS GLOBAL
+PREAMB1..........int   X:000038            GLOBAL            ABS GLOBAL OVERLAY
+PREAMB2..........int   X:000039            GLOBAL            ABS GLOBAL OVERLAY
+PREAMBLE_ERROR...int     000006            GLOBAL            ABS GLOBAL
+PREPARE_REPLY....int   P:0008B8            GLOBAL            ABS GLOBAL OVERLAY
+PRE_CORRUPT......int   X:000002            GLOBAL            ABS GLOBAL OVERLAY
+PRE_ERROR........int   P:00019C            GLOBAL            ABS GLOBAL OVERLAY
+PROGRAM_END......int   P:000575            GLOBAL            ABS GLOBAL OVERLAY
+PRRC.............int     FFFFBE            GLOBAL            ABS GLOBAL
+PRRD.............int     FFFFAE            GLOBAL            ABS GLOBAL
+PRRE.............int     FFFF9E            GLOBAL            ABS GLOBAL
+P_CHECKSUM.......int   X:000005            GLOBAL            ABS GLOBAL OVERLAY
+P_MEM_ER.........int     000002            GLOBAL            ABS GLOBAL
+QT_BASE_HI.......int   X:000050            GLOBAL            ABS GLOBAL OVERLAY
+QT_BASE_LO.......int   X:00004F            GLOBAL            ABS GLOBAL OVERLAY
+QT_BUF_HEAD......int   X:000055            GLOBAL            ABS GLOBAL OVERLAY
+QT_BUF_MAX.......int   X:000052            GLOBAL            ABS GLOBAL OVERLAY
+QT_BUF_SIZE......int   X:000051            GLOBAL            ABS GLOBAL OVERLAY
+QT_BUF_TAIL......int   X:000056            GLOBAL            ABS GLOBAL OVERLAY
+QT_DATA_PACKET...int   P:000939            GLOBAL            ABS GLOBAL OVERLAY
+QT_DEST_HI.......int   X:000058            GLOBAL            ABS GLOBAL OVERLAY
+QT_DEST_LO.......int   X:000057            GLOBAL            ABS GLOBAL OVERLAY
+QT_DROPS.........int   X:00005A            GLOBAL            ABS GLOBAL OVERLAY
+QT_ENABLED.......int     000011            GLOBAL            ABS GLOBAL
+QT_FLUSH.........int     000012            GLOBAL            ABS GLOBAL
+QT_FRAME_SIZE....int   X:000053            GLOBAL            ABS GLOBAL OVERLAY
+QT_FSIZE_ERROR...int   P:00099B            GLOBAL            ABS GLOBAL OVERLAY
+QT_INFORM........int   X:000054            GLOBAL            ABS GLOBAL OVERLAY
+QT_INFORM_IDX....int   X:000059            GLOBAL            ABS GLOBAL OVERLAY
+QT_NEW_GRANT.....int     000013            GLOBAL            ABS GLOBAL
+QT_PTYPE_ERROR...int   P:00099B            GLOBAL            ABS GLOBAL OVERLAY
+QUIET_TRANSFER_S.int   P:000816            GLOBAL            ABS GLOBAL OVERLAY
+QUIET_TRANSFER_S.int   P:0008AF            GLOBAL            ABS GLOBAL OVERLAY
+QUIET_TRANSFER_S.int   P:00089D            GLOBAL            ABS GLOBAL OVERLAY
+QUIET_TRANSFER_S.int   P:0008B5            GLOBAL            ABS GLOBAL OVERLAY
+QUIET_TRANSFER_S.int   P:000895            GLOBAL            ABS GLOBAL OVERLAY
+QUIET_TRANSFER_S.int   P:0008AC            GLOBAL            ABS GLOBAL OVERLAY
+RCO_ERROR........int   P:0002A0            GLOBAL            ABS GLOBAL OVERLAY
+RDFIFO...........int     FFFFFF            GLOBAL            ABS GLOBAL
+RDX..............int   P:000248            GLOBAL            ABS GLOBAL OVERLAY
+RDY..............int   P:00024E            GLOBAL            ABS GLOBAL OVERLAY
+RD_DRXR..........int   P:00043C            GLOBAL            ABS GLOBAL OVERLAY
+RD_FO_WD.........int   P:000417            GLOBAL            ABS GLOBAL OVERLAY
+RD_PCI...........int   P:00045A            GLOBAL            ABS GLOBAL OVERLAY
+READ_BLOCKS......int   P:0001F5            GLOBAL            ABS GLOBAL OVERLAY
+READ_BUFFS_END...int   P:0001E7            GLOBAL            ABS GLOBAL OVERLAY
+READ_FROM_PCI....int   P:000449            GLOBAL            ABS GLOBAL OVERLAY
+READ_MEMORY......int   P:000236            GLOBAL            ABS GLOBAL OVERLAY
+READ_MEMORY_ERRO.int   P:000269            GLOBAL            ABS GLOBAL OVERLAY
+READ_MEMORY_ERRO.int   P:000261            GLOBAL            ABS GLOBAL OVERLAY
+READ_MEMORY_ERRO.int   P:000266            GLOBAL            ABS GLOBAL OVERLAY
+REPLY_WD.........int   X:00003B            GLOBAL            ABS GLOBAL OVERLAY
+REP_WD1..........int   X:000024            GLOBAL            ABS GLOBAL OVERLAY
+REP_WD2..........int   X:000025            GLOBAL            ABS GLOBAL OVERLAY
+REP_WD3..........int   X:000026            GLOBAL            ABS GLOBAL OVERLAY
+
+
+
+DSP Linker  Version 6.3.7   107-11-19  01:15:10  build.map  Page 7
+
+
+REP_WD4..........int   X:000027            GLOBAL            ABS GLOBAL OVERLAY
+RESET_CONTROLLER.int   P:000275            GLOBAL            ABS GLOBAL OVERLAY
+RESTORE_HST_REGI.int   P:000475            GLOBAL            ABS GLOBAL OVERLAY
+RESTORE_REGISTER.int   P:000469            GLOBAL            ABS GLOBAL OVERLAY
+REV_DATA.........int   X:000004            GLOBAL            ABS GLOBAL OVERLAY
+REV_NUMBER.......int   X:000003            GLOBAL            ABS GLOBAL OVERLAY
+ROM_FIFO.........int     000002            GLOBAL            ABS GLOBAL
+RS...............int     000002            GLOBAL            ABS GLOBAL
+RST_ERROR........int   P:00034E            GLOBAL            ABS GLOBAL OVERLAY
+RTS_NOW..........int   P:0008CD            GLOBAL            ABS GLOBAL OVERLAY
+SAVE_HILO_ADDRES.int   P:0008D6            GLOBAL            ABS GLOBAL OVERLAY
+SAVE_REGISTERS...int   P:00047E            GLOBAL            ABS GLOBAL OVERLAY
+SB_SPARE1........int     00000A            GLOBAL            ABS GLOBAL
+SB_SPARE2........int     00000B            GLOBAL            ABS GLOBAL
+SCLK.............int     000002            GLOBAL            ABS GLOBAL
+SEND_PACKET_TO_C.int   P:0002B3            GLOBAL            ABS GLOBAL OVERLAY
+SEND_PACKET_TO_H.int   P:000301            GLOBAL            ABS GLOBAL OVERLAY
+SEND_TO_HOST.....int     000001            GLOBAL            ABS GLOBAL
+SET_ERROR........int   P:0008C9            GLOBAL            ABS GLOBAL OVERLAY
+SET_PACKET_DELAY.int   P:0002D3            GLOBAL            ABS GLOBAL OVERLAY
+SMALL_BLK........int     000020            GLOBAL            ABS GLOBAL
+SOFTWARE_RESET...int   P:000325            GLOBAL            ABS GLOBAL OVERLAY
+SRRQ.............int     000002            GLOBAL            ABS GLOBAL
+SSISR0...........int     FFFFB7            GLOBAL            ABS GLOBAL
+START............int   P:000100            GLOBAL            ABS GLOBAL OVERLAY
+START_APPLICATIO.int   P:00035D            GLOBAL            ABS GLOBAL OVERLAY
+STATUS...........int   X:000000            GLOBAL            ABS GLOBAL OVERLAY
+STOP_APPLICATION.int   P:000375            GLOBAL            ABS GLOBAL OVERLAY
+STP_ERROR........int   P:00038E            GLOBAL            ABS GLOBAL OVERLAY
+STRQ.............int     000001            GLOBAL            ABS GLOBAL
+SV_A0............int   X:000028            GLOBAL            ABS GLOBAL OVERLAY
+SV_A1............int   X:000029            GLOBAL            ABS GLOBAL OVERLAY
+SV_A2............int   X:00002A            GLOBAL            ABS GLOBAL OVERLAY
+SV_B0............int   X:00002B            GLOBAL            ABS GLOBAL OVERLAY
+SV_B1............int   X:00002C            GLOBAL            ABS GLOBAL OVERLAY
+SV_B2............int   X:00002D            GLOBAL            ABS GLOBAL OVERLAY
+SV_SR............int   X:000032            GLOBAL            ABS GLOBAL OVERLAY
+SV_X0............int   X:00002E            GLOBAL            ABS GLOBAL OVERLAY
+SV_X1............int   X:00002F            GLOBAL            ABS GLOBAL OVERLAY
+SV_Y0............int   X:000030            GLOBAL            ABS GLOBAL OVERLAY
+SV_Y1............int   X:000031            GLOBAL            ABS GLOBAL OVERLAY
+SYSTEM_RESET.....int   P:000818            GLOBAL            ABS GLOBAL OVERLAY
+S_BUFFER.........int   P:0001F4            GLOBAL            ABS GLOBAL OVERLAY
+TAB..............int     000008            GLOBAL            ABS GLOBAL
+TCF..............int     000015            GLOBAL            ABS GLOBAL
+TCIE.............int     000002            GLOBAL            ABS GLOBAL
+TCPR0............int     FFFF8D            GLOBAL            ABS GLOBAL
+TCPR1............int     FFFF89            GLOBAL            ABS GLOBAL
+TCPR2............int     FFFF85            GLOBAL            ABS GLOBAL
+TCR0.............int     FFFF8C            GLOBAL            ABS GLOBAL
+TCR1.............int     FFFF88            GLOBAL            ABS GLOBAL
+TCR2.............int     FFFF84            GLOBAL            ABS GLOBAL
+TCSR0............int     FFFF8F            GLOBAL            ABS GLOBAL
+TCSR1............int     FFFF8B            GLOBAL            ABS GLOBAL
+TCSR2............int     FFFF87            GLOBAL            ABS GLOBAL
+TDE..............int     000006            GLOBAL            ABS GLOBAL
+TDIS.............int     000009            GLOBAL            ABS GLOBAL
+TE...............int     000000            GLOBAL            ABS GLOBAL
+TEMP_PSIZE.......int   X:00005B            GLOBAL            ABS GLOBAL OVERLAY
+TIMER_ACTION.....int   P:00098E            GLOBAL            ABS GLOBAL OVERLAY
+
+
+
+DSP Linker  Version 6.3.7   107-11-19  01:15:10  build.map  Page 8
+
+
+TIMER_CONFIG.....int   P:000976            GLOBAL            ABS GLOBAL OVERLAY
+TIMER_DISABLE....int   P:000988            GLOBAL            ABS GLOBAL OVERLAY
+TIMER_ENABLE.....int   P:000982            GLOBAL            ABS GLOBAL OVERLAY
+TLR0.............int     FFFF8E            GLOBAL            ABS GLOBAL
+TLR1.............int     FFFF8A            GLOBAL            ABS GLOBAL
+TLR2.............int     FFFF86            GLOBAL            ABS GLOBAL
+TO...............int     00000B            GLOBAL            ABS GLOBAL
+TOF..............int     000014            GLOBAL            ABS GLOBAL
+TOIE.............int     000001            GLOBAL            ABS GLOBAL
+TOTAL_BUFFS......int   X:00003C            GLOBAL            ABS GLOBAL OVERLAY
+TRANSFER_FIFO_DO.int   P:000937            GLOBAL            ABS GLOBAL OVERLAY
+TRANSFER_FIFO_HA.int   P:000934            GLOBAL            ABS GLOBAL OVERLAY
+TRANSFER_FIFO_SI.int   P:000936            GLOBAL            ABS GLOBAL OVERLAY
+TRTY.............int     00000A            GLOBAL            ABS GLOBAL
+TX00.............int     FFFFBC            GLOBAL            ABS GLOBAL
+VAR_TBL..........int     000000            GLOBAL            ABS GLOBAL
+VAR_TBL_END......int   P:0005DB            GLOBAL            ABS GLOBAL OVERLAY
+VAR_TBL_LENGTH...int     000066            GLOBAL            ABS GLOBAL OVERLAY
+VAR_TBL_START....int   P:000575            GLOBAL            ABS GLOBAL OVERLAY
+WAIT_1...........int   P:0001EB            GLOBAL            ABS GLOBAL OVERLAY
+WAIT_2...........int   P:0001F7            GLOBAL            ABS GLOBAL OVERLAY
+WAIT_BUFF........int   P:0001DB            GLOBAL            ABS GLOBAL OVERLAY
+WAIT_FIFO_HALF...int   P:000922            GLOBAL            ABS GLOBAL OVERLAY
+WAIT_FIFO_SINGLE.int   P:00092B            GLOBAL            ABS GLOBAL OVERLAY
+WORD_COUNT.......int   X:000006            GLOBAL            ABS GLOBAL OVERLAY
+WRFIFO...........int     000005            GLOBAL            ABS GLOBAL
+WRITE_MEMORY.....int   P:00039D            GLOBAL            ABS GLOBAL OVERLAY
+WRITE_MEMORY_ERR.int   P:0003CE            GLOBAL            ABS GLOBAL OVERLAY
+WRITE_MEMORY_ERR.int   P:0003C7            GLOBAL            ABS GLOBAL OVERLAY
+WRITE_MEMORY_ERR.int   P:0003CB            GLOBAL            ABS GLOBAL OVERLAY
+WRT_ADD..........int   P:000458            GLOBAL            ABS GLOBAL OVERLAY
+WRX..............int   P:0003AF            GLOBAL            ABS GLOBAL OVERLAY
+WRY..............int   P:0003B4            GLOBAL            ABS GLOBAL OVERLAY
+WT_FIFO..........int   P:000411            GLOBAL            ABS GLOBAL OVERLAY
+WT_HOST..........int   P:000200            GLOBAL            ABS GLOBAL OVERLAY
+XMT_WD_FIBRE.....int   P:00048A            GLOBAL            ABS GLOBAL OVERLAY
+X_MEM_ER.........int     000001            GLOBAL            ABS GLOBAL
+X_WRITE..........int   P:000159            GLOBAL            ABS GLOBAL OVERLAY
+Y_MEM_ER.........int     000000            GLOBAL            ABS GLOBAL
+ZERO.............int   X:000033            GLOBAL            ABS GLOBAL OVERLAY
+
+
+
+                          Symbol Listing by Value
+
+
+Value             Name              Value             Name              Value             Name              
+FFFF84            TCR2              FFFF85            TCPR2             FFFF86            TLR2
+FFFF87            TCSR2             FFFF88            TCR1              FFFF89            TCPR1
+FFFF8A            TLR1              FFFF8B            TCSR1             FFFF8C            TCR0
+FFFF8D            TCPR0             FFFF8E            TLR0              FFFF8F            TCSR0
+FFFF9D            PDRE              FFFF9E            PRRE              FFFF9F            PCRE
+FFFFAD            PDRD              FFFFAE            PRRD              FFFFAF            PCRD
+FFFFB5            CRA0              FFFFB6            CRB0              FFFFB7            SSISR0
+FFFFBC            TX00              FFFFBD            PDRC              FFFFBE            PRRC
+FFFFBF            PCRC              FFFFC5            DCTR              FFFFC6            DPCR
+FFFFC7            DPMC              FFFFC8            DPAR              FFFFC9            DSR
+FFFFCA            DPSR              FFFFCB            DRXR              FFFFCC            DTXM
+FFFFCD            DTXS              FFFFEC            DCR0              FFFFED            DCO0
+FFFFEE            DDR0              FFFFEF            DSR0              FFFFF6            AAR3
+
+
+
+DSP Linker  Version 6.3.7   107-11-19  01:15:10  build.map  Page 9
+
+
+FFFFF7            AAR2              FFFFF8            AAR1              FFFFF9            AAR0
+FFFFFA            DCR               FFFFFB            BCR               FFFFFD            PCTL
+FFFFFE            IPRP              FFFFFF            IPRC              FFFFFF            RDFIFO
+000000            APPLICATION_LOAD  000000            EF                000000            IMAGE_BUFFER
+000000            INIT              000000            STATUS            000000            TE
+000000            VAR_TBL           000000            Y_MEM_ER          000001            FRAME_COUNT
+000001            HF                000001            MTRQ              000001            SEND_TO_HOST
+000001            STRQ              000001            TOIE              000001            X_MEM_ER
+000002            FATAL_ERROR       000002            MRRQ              000002            PRE_CORRUPT
+000002            P_MEM_ER          000002            ROM_FIFO          000002            RS
+000002            SCLK              000002            SRRQ              000002            TCIE
+000003            DCTR_HF3          000003            FO_EMPTY          000003            FO_WRD_RCV
+000003            FSYNC             000003            REV_NUMBER        000004            AUX1
+000004            DCTR_HF4          000004            DSR_BUF0          000004            FO_OVER
+000004            MARQ              000004            REV_DATA          000005            APER
+000005            BYTE_SWAP         000005            DCTR_HF5          000005            DSR_BUF1
+000005            FO_UNDER          000005            P_CHECKSUM        000005            WRFIFO
+000006            DPER              000006            FO_RX_ER          000006            INTA
+000006            PREAMBLE_ERROR    000006            TDE               000006            WORD_COUNT
+000007            DATA_DLY          000007            DEBUG             000007            MAB
+000007            NUM_DUMPED        000008            DRXR_WD1          000008            PACKET_CHOKE
+000008            TAB               000009            DRXR_WD2          000009            HST_NFYD
+000009            TDIS              00000A            DRXR_WD3          00000A            SB_SPARE1
+00000A            TRTY              00000B            DRXR_WD4          00000B            SB_SPARE2
+00000B            TO                00000C            APPLICATION_RUNN  00000C            DTXS_WD1
+00000D            DTXS_WD2          00000D            INTERNAL_GO       00000E            CLRT
+00000E            DTXS_WD3          00000E            MDT               00000E            PCIDMA_RESTART
+00000F            DTXS_WD4          00000F            PCIDMA_RESUME     000010            PCIDMA_RETRY
+000010            PCI_WD1_1         000011            PCI_WD1_2         000011            QT_ENABLED
+000012            MACE              000012            PCI_WD2_1         000012            QT_FLUSH
+000013            PCI_WD2_2         000013            QT_NEW_GRANT      000014            PCI_WD3_1
+000014            TOF               000015            IAE               000015            PCI_WD3_2
+000015            TCF               000016            FC0               000016            PCI_WD4_1
+000017            FC1               000017            HACT              000017            PCI_WD4_2
+000018            PCI_WD5_1         000019            PCI_WD5_2         00001A            PCI_WD6_1
+00001B            PCI_WD6_2         00001C            HEAD_W1_1         00001D            HEAD_W1_0
+00001E            HEAD_W2_1         00001F            HEAD_W2_0         000020            HEAD_W3_1
+000020            SMALL_BLK         000021            HEAD_W3_0         000022            HEAD_W4_1
+000023            HEAD_W4_0         000024            REP_WD1           000025            REP_WD2
+000026            REP_WD3           000027            REP_WD4           000028            SV_A0
+000029            SV_A1             00002A            SV_A2             00002B            SV_B0
+00002C            SV_B1             00002D            SV_B2             00002E            SV_X0
+00002F            SV_X1             000030            INIT_PCI          000030            SV_Y0
+000031            SV_Y1             000032            SV_SR             000033            ZERO
+000034            ONE               000035            FOUR              000036            PACKET_SIZE_LOW
+000037            PACKET_SIZE_HIH   000038            PREAMB1           000039            PREAMB2
+00003A            DATA_WD           00003B            REPLY_WD          00003C            TOTAL_BUFFS
+00003D            LEFT_TO_READ      00003E            LEFT_TO_WRITE     00003F            NUM_LEFTOVER_BLO
+000040            DATA_DLY_VAL      000041            CONSTORE          000042            BLOCK_SIZE
+000043            BURST_SIZE        000044            BURST_DEST_LO     000045            BURST_DEST_HI
+000046            BURST_SRC         000047            DMA_ERRORS        000048            EC_TRTY
+000049            EC_TO             00004A            EC_TDIS           00004B            EC_TAB
+00004C            EC_MAB            00004D            EC_DPER           00004E            EC_APER
+00004F            QT_BASE_LO        000050            QT_BASE_HI        000051            QT_BUF_SIZE
+000052            QT_BUF_MAX        000053            QT_FRAME_SIZE     000054            QT_INFORM
+000055            QT_BUF_HEAD       000056            QT_BUF_TAIL       000057            QT_DEST_LO
+000058            QT_DEST_HI        000059            QT_INFORM_IDX     00005A            QT_DROPS
+00005B            TEMP_PSIZE        00005C            BDEBUG0           00005D            BDEBUG1
+00005E            BDEBUG2           00005F            BDEBUG3           000060            BDEBUG4
+000061            BDEBUG5           000062            BDEBUG6           000063            BDEBUG7
+
+
+
+DSP Linker  Version 6.3.7   107-11-19  01:15:10  build.map  Page 10
+
+
+000064            BDEBUG8           000065            BDEBUG9           000066            VAR_TBL_LENGTH
+000100            START             000147            CLR0              00014C            CLR1
+000159            X_WRITE           000173            PACKET_IN         00017E            CHK_FIFO
+000182            CHECK_WD          00019C            PRE_ERROR         0001A8            PACKET_INFO
+0001BA            INC_FRAME_COUNT   0001C7            MCE_PACKET        0001DB            WAIT_BUFF
+0001E6            L_BUFFER          0001E7            READ_BUFFS_END    0001EB            WAIT_1
+0001F4            S_BUFFER          0001F5            LEFT_OVERS        0001F5            READ_BLOCKS
+0001F7            WAIT_2            000200            APPL_PARAM        000200            HF_FIFO
+000200            LEFT_OVERS_READ   000200            MAX_DUMP          000200            WT_HOST
+000208            HST_ACK_REP       000216            DUMP_FIFO         00021C            NEXT_DUMP
+000227            FIFO_EMPTY        00022A            CLEAN_UP_PCI      000236            READ_MEMORY
+000248            RDX               00024E            RDY               000253            FINISH_READ_MEMO
+000261            READ_MEMORY_ERRO  000266            READ_MEMORY_ERRO  000269            READ_MEMORY_ERRO
+000275            RESET_CONTROLLER  00028F            L_RDFIFO          000290            L_DELAY
+000291            FINISH_RCO        0002A0            RCO_ERROR         0002B3            SEND_PACKET_TO_C
+0002CD            CLR_CMD           0002D1            END_CLR_CMD       0002D3            SET_PACKET_DELAY
+0002D5            BLOCK_CON         0002E0            END_BLOCK_CON     0002E3            FINISH_CON
+0002F2            CON_ERROR         000301            SEND_PACKET_TO_H  000314            HOST_ERROR
+000325            SOFTWARE_RESET    00032C            FINISH_RST        00034E            RST_ERROR
+00035D            START_APPLICATIO  000366            GO_ERROR          000375            STOP_APPLICATION
+00037F            FINISH_STP        00038E            STP_ERROR         00039D            WRITE_MEMORY
+0003AF            WRX               0003B4            WRY               0003B8            FINISH_WRITE_MEM
+0003C7            WRITE_MEMORY_ERR  0003CB            WRITE_MEMORY_ERR  0003CE            WRITE_MEMORY_ERR
+0003DA            CALC_NO_BUFFS     000409            GET_FO_WRD        000411            WT_FIFO
+000417            RD_FO_WD          00041F            CLR_FO_RTS        000421            PCI_MESSAGE_TO_H
+000425            PCI_MESSAGE_TO_H  00043C            RD_DRXR           000449            READ_FROM_PCI
+000458            WRT_ADD           00045A            RD_PCI            000463            GET_DAT
+000469            RESTORE_REGISTER  000475            RESTORE_HST_REGI  00047E            SAVE_REGISTERS
+00048A            XMT_WD_FIBRE      0004A0            PCI_BURST_NOW     0004AB            FLUSH_PCI_FIFO
+0004B2            MPCI_ERROR_RECOV  0004C6            ERROR_TRTY        0004D0            ERROR_TO
+0004DA            ERROR_TDIS        0004E4            ERROR_TAB         0004EE            ERROR_MAB
+0004F8            ERROR_DPER        000502            ERROR_APER        00050C            BLOCK_TRANSFER
+000517            BLOCK_TRANSFER1   00052A            BLOCK_PCI         000541            BLOCK_CHECK
+00054E            BLOCK_OK          000553            BLOCK_DONE        000554            BLOCK_RESTART
+000555            BLOCK_RESUME      00055C            BLOCK_RESUME1     000568            BLOCK_UPDATE
+000575            BOOTCODE_END      000575            BOOTEND_ADDR      000575            PEND_ADDR
+000575            PROGRAM_END       000575            VAR_TBL_START     0005DB            VAR_TBL_END
+000800            APPLICATION       000810            MAIN_LOOP_HACK_F  000814            NEW_PACKET_HANDL
+000816            QUIET_TRANSFER_S  000818            SYSTEM_RESET      00081A            LE_BLOCK_UPDATE
+00081C            HOCK_TRANSFER     00081E            LE_SYSTEM_RESET   000828            CLEAR_FIFO
+000832            LE_HACK_FESTIVAL  000837            LE_BUFFER_INFORM  00084C            INFORM_EXIT
+00084D            LE_QUIET_TRANSFE  000895            QUIET_TRANSFER_S  00089D            QUIET_TRANSFER_S
+0008AC            QUIET_TRANSFER_S  0008AF            QUIET_TRANSFER_S  0008B5            QUIET_TRANSFER_S
+0008B8            PREPARE_REPLY     0008C2            CHECK_COMMAND     0008C9            SET_ERROR
+0008CD            RTS_NOW           0008CE            LOAD_HILO_ADDRES  0008D4            ADD_HILO_ADDRESS
+0008D6            SAVE_HILO_ADDRES  0008DF            LE_NEW_PACKET_HA  0008EA            BUFFER_PACKET_RP
+0008EB            BUFFER_PACKET_DA  0008FD            BUFFER_PACKET_HA  000904            BUFFER_PACKET_SI
+00090A            BUFFER_PACKET_SE  000913            BUFFER_PACKET_MA  00091A            BUFFER_PACKET_DO
+00091B            BUFFER_PACKET_DR  000922            WAIT_FIFO_HALF    00092B            WAIT_FIFO_SINGLE
+000934            TRANSFER_FIFO_HA  000936            TRANSFER_FIFO_SI  000937            TRANSFER_FIFO_DO
+000938            FATALITY_HANDLER  000939            QT_DATA_PACKET    000952            BUFFER_INCR
+000962            BUFFER_RESET      00096A            BUFFER_INFORM_CH  000973            BUFFER_INFORM_OK
+000976            TIMER_CONFIG      000982            TIMER_ENABLE      000988            TIMER_DISABLE
+00098E            TIMER_ACTION      00099A            ESCAPE            00099B            QT_FSIZE_ERROR
+00099B            QT_PTYPE_ERROR    00099C            LE_BLOCK_TRANSFE  0009A8            HOCK_TRANSFER_NO
+0009BB            HOCK_TRANSFER1    0009CE            HOCK_PCI          0009F1            HOCK_CHECK
+0009FC            HOCK_OK           000A01            HOCK_DONE         000A02            HOCK_RESTART
+000A03            HOCK_RESUME       000A0A            HOCK_RESUME1      000A16            HOCK_UPDATE
+000A25            END_ADR           001000            DUMP_BUFF         050003            PLL_INIT
+
+
+
+
+DSP Linker  Version 6.3.7   107-11-19  01:15:10  build.map  Page 11
+
+
+
+
