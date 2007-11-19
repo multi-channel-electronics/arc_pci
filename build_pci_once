@@ -1,0 +1,20 @@
+#!/bin/bash
+
+#DOWNLOAD=ONCE for downloading the file pci.lod from the Motorola OnCE debugger
+#DOWNLOAD=ROM for generating a ROM for installation on the PCI board
+
+DOWNLOAD=ONCE
+
+asm56300 -b -lPCI_SCUBA_build.ls -d DOWNLOAD $DOWNLOAD PCI_SCUBA_build.asm
+if [ "$?" != "0" ]; then exit 1; fi
+
+dsplnk -bPCI_SCUBA_BOOT_CODE_ONCE.cld -v PCI_SCUBA_build.cln
+if [ "$?" != "0" ]; then exit 1; fi
+
+cldlod PCI_SCUBA_BOOT_CODE_ONCE.cld > PCI_SCUBA_BOOT_CODE_ONCE.lod
+if [ "$?" != "0" ]; then exit 1; fi
+
+
+mv PCI_SCUBA_build.cln PCI_boot_download.cln
+
+exit 0
