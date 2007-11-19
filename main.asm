@@ -43,11 +43,12 @@ PACKET_IN
 ; check some bits in status....
 		JSET	#FATAL_ERROR,X:<STATUS,START		       ; fatal error?  Go to initialisation.
 		JSET	#APPLICATION_LOADED,X:<STATUS,APPLICATION      ; application loaded?  Execute in appl space.
+
+
 ; 		JSET	#INTERNAL_GO,X:<STATUS,APPLICATION	       ; internal GO to process?  PCI bus master write test.
+		JSR	MAIN_LOOP_HACK_FESTIVAL
 
 	
-		JSR	MAIN_LOOP_HACK_FESTIVAL
-						
 CHK_FIFO	JSR	<GET_FO_WRD		      		       ; see if there's a 16-bit word in Fibre FIFO from MCE 
 						      
 						
