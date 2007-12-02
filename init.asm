@@ -137,10 +137,10 @@ INIT_PCI
 
 ; Interrupt locations for 7 available commands on PCI board
 ; Each JSR takes up 2 locations in the table
-	JSR	WRITE_MEMORY			; $78
-	JSR	READ_MEMORY			; $7A
-	JSR	START_APPLICATION		; $7C
-	JSR	STOP_APPLICATION		; $7E
+	JSR	NEW_WRITE_MEMORY		; $78
+	JSR	NEW_READ_MEMORY			; $7A
+	JSR	NEW_START_APPLICATION		; $7C
+	JSR	NEW_STOP_APPLICATION		; $7E
 ; software reset is the same as cleaning up the PCI - use same routine
 ; when HOST does a RESET then this routine is run
 	JSR	SOFTWARE_RESET			; $80
@@ -357,7 +357,3 @@ X_WRITE
 ;-----------------------------------------------------------------------------
 ; Here endth the initialisation code run after power up.
 ; ----------------------------------------------------------------------------
-
-
-
-
