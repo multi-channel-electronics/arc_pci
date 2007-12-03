@@ -102,18 +102,9 @@ PACKET_INFO                                            ; packet preamble valid
 	JSR	<WT_FIFO	
 	MOVE	X0,X:<HEAD_W4_1		; packet size hi
 		
-; 	MOVE    X:<HEAD_W3_0,X0		; get data header word 3 (low 2 bytes)
-; 	MOVE    X:<REPLY_WD,A		; $5250
-; 	CMP	X0,A			; is it a reply packet?
-; 	JEQ	MCE_PACKET              ; yes - go process it.
-
-; 	MOVE    X:<DATA_WD,A		; $4441
-; 	CMP	X0,A			; is it a data packet?
-; 	JNE	<PACKET_IN              ; no?  Not a valid packet type.  Go back to start and resync to next preamble.
-
+;;; Case (packet type) of
 	MOVE	X:HEAD_W3_0,A
 
-;;; Case (packet type) of
 	CMP	#>'RP',A
 	JEQ	BUFFER_PACKET_RP
 	
@@ -268,15 +259,9 @@ LEFT_OVERS_READ
 WT_HOST		JSET	#FATAL_ERROR,X:<STATUS,START		; if fatal error - run initialisation code...
 		JCLR	#SEND_TO_HOST,X:<STATUS,WT_HOST		; wait for host to reply - which it does with 'send_packet_to_host' ISR
 
-; we now have 32 bit address in accumulator B
-; from send-packet_to_host (HST COMMAND) which should of been issued during data collection.
-
-; Write all data to host.
-
-;;; MFH - All data is buffered.  DMA it.
+;;; All data is buffered and destination address is in BURST_ADDR_HI/LO.
 
 		JSR	PCI_BURST_NOW
-	
 		JSET	#FATAL_ERROR,X:<STATUS,START
 
 ; ----------------------------------------------------------------------------------------------------------
