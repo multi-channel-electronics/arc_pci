@@ -1,4 +1,4 @@
- COMMENT *
+	COMMENT *
 
 This is the main section of the pci card code. 
 
@@ -32,142 +32,125 @@ PACKET_IN
 ; R1 used as pointer for data written to y:memory            FO --> (Y)
 ; R2 used as pointer for date in y mem to be writen to host  (Y) --> HOST
 
-		MOVE	#<IMAGE_BUFFER,R1		; pointer for Fibre ---> Y mem
-		MOVE	#<IMAGE_BUFFER,R2		; pointer for Y mem ---> PCI BUS	
+	MOVE	#<IMAGE_BUFFER,R1		; pointer for Fibre ---> Y mem
+	MOVE	#<IMAGE_BUFFER,R2		; pointer for Y mem ---> PCI BUS	
 
 ; initialise some bits in status..	
-		BCLR	#SEND_TO_HOST,X:<STATUS		; clear send to host flag
-		BCLR	#HST_NFYD,X:<STATUS		; clear flag to indicate host has been notified.
-		BCLR	#FO_WRD_RCV,X:<STATUS		; clear Fiber Optic flag
+	BCLR	#SEND_TO_HOST,X:<STATUS		; clear send to host flag
+	BCLR	#HST_NFYD,X:<STATUS		; clear flag to indicate host has been notified.
+	BCLR	#FO_WRD_RCV,X:<STATUS		; clear Fiber Optic flag
 
-; check some bits in status....
-		JSET	#FATAL_ERROR,X:<STATUS,START		       ; fatal error?  Go to initialisation.
-		JSET	#APPLICATION_LOADED,X:<STATUS,APPLICATION      ; application loaded?  Execute in appl space.
 
-;;; MFH - HACK
-; 		JSET	#INTERNAL_GO,X:<STATUS,APPLICATION	       ; internal GO to process?  PCI bus master write test.
-		JSR	MAIN_LOOP_HACK_FESTIVAL
-;;; MFH - done
+;;; Have we run into trouble or been reprogrammed?
+	JSET	#FATAL_ERROR,X:<STATUS,START		       ; fatal error?  Go to initialisation.
+	JSET	#APPLICATION_LOADED,X:<STATUS,APPLICATION      ; application loaded?  Execute in appl space.
+
+;;; Do we have actions to perform?
+	JSSET	#TCF,X:TCSR0,TIMER_ACTION 
+	JSSET	#QT_FLUSH,X:STATUS,BUFFER_INFORM
+	NOP				; For expansion!
+	NOP
 	
-CHK_FIFO	JSR	<GET_FO_WRD		      		       ; see if there's a 16-bit word in Fibre FIFO from MCE 
-						      
-						
-		JSET	#FO_WRD_RCV,X:<STATUS,CHECK_WD	               ; there is a word - check if it's preamble
-		JMP	<PACKET_IN				       ; else go back and repeat
-
-; check that we preamble sequence
-
-CHECK_WD	JSET	#PACKET_CHOKE,X:<STATUS,PACKET_IN	; IF MCE Packet choke on - just keep clearing FIFO.
-		MOVE	X0,X:<HEAD_W1_0				;store received word
-		MOVE	X:PREAMB1,A
-		CMP	X0,A					; check it is correct
-		JNE	<PRE_ERROR				; if not go to start
+CHK_FIFO
+	JSR	<GET_FO_WRD		; check for 16-bit word in fibre FIFO from MCE 
+	JCLR	#FO_WRD_RCV,X:STATUS,PACKET_IN ; loop
 
 
-		JSR	<WT_FIFO		; wait for next preamble 16-bit word
-		MOVE	X0,X:<HEAD_W1_1		;store received word
-		MOVE	X:PREAMB1,A
-		CMP	X0,A			; check it is correct
-		JNE	<PRE_ERROR		; if not go to start
+;;; Fibre data detected; process it
 
+CHECK_WD
+	JSET	#PACKET_CHOKE,X:<STATUS,PACKET_IN	; IF MCE Packet choke on - just keep clearing FIFO.
+	MOVE	X0,X:<HEAD_W1_0				;store received word
+	MOVE	X:PREAMB1,A
+	CMP	X0,A					; check it is correct
+	JNE	<PRE_ERROR				; if not go to start
 
-		JSR	<WT_FIFO		; wait for next preamble 16-bit word
-		MOVE	X0,X:<HEAD_W2_0		;store received word
-		MOVE	X:PREAMB2,A
-		CMP	X0,A			; check it is correct
-		JNE	<PRE_ERROR		; if not go to start
+	JSR	<WT_FIFO		; wait for next preamble 16-bit word
+	MOVE	X0,X:<HEAD_W1_1		;store received word
+	MOVE	X:PREAMB1,A
+	CMP	X0,A			; check it is correct
+	JNE	<PRE_ERROR		; if not go to start
 
-		JSR	<WT_FIFO		; wait for next preamble 16-bit word
-		MOVE	X0,X:<HEAD_W2_1		;store received word
-		MOVE	X:PREAMB2,A
-		CMP	X0,A			; check it is correct
-		JNE	<PRE_ERROR		; if not go to start
-		JMP	<PACKET_INFO		; get packet info
+	JSR	<WT_FIFO		; wait for next preamble 16-bit word
+	MOVE	X0,X:<HEAD_W2_0		;store received word
+	MOVE	X:PREAMB2,A
+	CMP	X0,A			; check it is correct
+	JNE	<PRE_ERROR		; if not go to start
 
+	JSR	<WT_FIFO		; wait for next preamble 16-bit word
+	MOVE	X0,X:<HEAD_W2_1		;store received word
+	MOVE	X:PREAMB2,A
+	CMP	X0,A			; check it is correct
+	JNE	<PRE_ERROR		; if not go to start
+	JMP	<PACKET_INFO		; get packet info
 	
 PRE_ERROR	
-		BSET	#PREAMBLE_ERROR,X:<STATUS	; indicate a preamble error
-                MOVE	X0,X:<PRE_CORRUPT		; store corrupted word
-
-; preampble error so clear out both FIFOs using reset line
-; - protects against an odd number of bytes having been sent 
-; (byte swapping on - so odd byte being would end up in 
-; the FIFO without the empty flag)
-
-		MOVEP	#%011000,X:PDRD			; clear FIFO RESET* for 2 ms
-		MOVE	#200000,X0
-		DO	X0,*+3
-		NOP
-		MOVEP	#%011100,X:PDRD
-
-		JMP	<PACKET_IN			; wait for next packet
-
+	BSET	#PREAMBLE_ERROR,X:<STATUS	; indicate a preamble error
+        MOVE	X0,X:<PRE_CORRUPT	; store corrupted word
+	JSR	CLEAR_FIFO		; empty the fifo (2 ms!)
+	JMP	<PACKET_IN		; back to main loop
 
 PACKET_INFO                                            ; packet preamble valid
 
-; Packet preamle is valid so....
-; now get next two 32bit words.  i.e. $20205250 $00000004, or $20204441 $xxxxxxxx
-; note that these are received little endian (and byte swapped)
-; i.e. for RP receive 50 52 20 20  04 00 00 00
-; but byte swapped on arrival
-; 5250
-; 2020
-; 0004
-; 0000
+	JSR	<WT_FIFO	
+	MOVE	X0,X:<HEAD_W3_0		; RP or DA
+	JSR	<WT_FIFO	
+	MOVE	X0,X:<HEAD_W3_1		; $2020
 
-		JSR	<WT_FIFO	
-		MOVE	X0,X:<HEAD_W3_0		; RP or DA
-		JSR	<WT_FIFO	
-		MOVE	X0,X:<HEAD_W3_1		; $2020
-
-		JSR	<WT_FIFO	
-		MOVE	X0,X:<HEAD_W4_0		; packet size lo
-		JSR	<WT_FIFO	
-		MOVE	X0,X:<HEAD_W4_1		; packet size hi
+	JSR	<WT_FIFO	
+	MOVE	X0,X:<HEAD_W4_0		; packet size lo
+	JSR	<WT_FIFO	
+	MOVE	X0,X:<HEAD_W4_1		; packet size hi
 		
-		MOVE    X:<HEAD_W3_0,X0		; get data header word 3 (low 2 bytes)
-		MOVE    X:<REPLY_WD,A		; $5250
-		CMP	X0,A			; is it a reply packet?
-		JEQ	MCE_PACKET              ; yes - go process it.
+; 	MOVE    X:<HEAD_W3_0,X0		; get data header word 3 (low 2 bytes)
+; 	MOVE    X:<REPLY_WD,A		; $5250
+; 	CMP	X0,A			; is it a reply packet?
+; 	JEQ	MCE_PACKET              ; yes - go process it.
 
-		MOVE    X:<DATA_WD,A		; $4441
-		CMP	X0,A			; is it a data packet?
-		JNE	<PACKET_IN              ; no?  Not a valid packet type.  Go back to start and resync to next preamble.
+; 	MOVE    X:<DATA_WD,A		; $4441
+; 	CMP	X0,A			; is it a data packet?
+; 	JNE	<PACKET_IN              ; no?  Not a valid packet type.  Go back to start and resync to next preamble.
 
+	MOVE	X:HEAD_W3_0,A
 
-; It's a data packet....
-; check if it's the first packet after the GO command has been issued...
-
-                JCLR  	#DATA_DLY,X:STATUS,INC_FRAME_COUNT        ; do we need to add a delay since first frame?
-
-;;; MFH - I need this area, please be quiet.
+;;; Case (packet type) of
+	CMP	#>'RP',A
+	JEQ	BUFFER_PACKET_RP
 	
-; ; yes first frame after GO reply packet so add a delay.
-; PACKET_DELAY 
-; 		MOVE	X:DATA_DLY_VAL,X0
-; 		DO	X0,*+3			; 10ns x DATA_DLY_VAL
-; 		NOP
-;                 NOP
-;                 BCLR 	#DATA_DLY,X:STATUS	; clear so delay isn't added next time.
+	CMP	#>'DA',A
+	JEQ	BUFFER_PACKET_DA
 
-		
+	JMP	QT_PTYPE_ERROR
 
 
-INC_FRAME_COUNT					; increment frame count 
-		CLR	A
-		MOVE	X:<FRAME_COUNT,A0
-		INC	A
-		NOP
-		MOVE	A0,X:<FRAME_COUNT
+BUFFER_PACKET_RP
 
-		JMP	NEW_PACKET_HANDLER
-		NOP
-		NOP
-		NOP
-		NOP
-		NOP
-		NOP
+	JMP	MCE_PACKET		; Process in the usual way
 	
+BUFFER_PACKET_DA
+
+	;; Do we need to add a delay since first frame?
+ 	JSCLR  	#DATA_DLY,X:STATUS,PACKET_DELAY
+	
+	;; Increment frame count
+	MOVE	X:FRAME_COUNT,A
+	ADD	#>1,A
+	NOP
+	MOVE	A,X:<FRAME_COUNT
+
+	;; If not quiet mode, do normal processing
+	JCLR	#QT_ENABLED,X:STATUS,MCE_PACKET
+
+	JMP	QUIET_TRANSFER_NOW
+
+
+PACKET_DELAY 
+	MOVE	X:DATA_DLY_VAL,X0
+	DO	X0,*+3			; 10ns x DATA_DLY_VAL
+	NOP
+	NOP
+	BCLR 	#DATA_DLY,X:STATUS	; clear so delay isn't added next time.
+	RTS	
 	
 ; -------------------------------------------------------------------------------------------
 ; ----------------------------------- IT'S A PACKET FROM MCE --------------------------------
@@ -341,116 +324,364 @@ FIFO_EMPTY	MOVE	R2,X:NUM_DUMPED		; store number of words dumped after HST timeou
 ; ---------------------------------------------------------------------------------------------
 
 
+;----------------------------------------------;
+;  ALTERNATIVE PACKET HANDLING CODE            ;
+;----------------------------------------------;
+	
+
+QUIET_TRANSFER_NOW
+	;; Ok, we're QT.  Buffer the packet.
+
+; 	;; This won't work until you re-order HEAD * 0,1
+; 	MOVE	#HEAD_W4_1,R2		; Note W4_0 is *after* W4_1 in memory
+; 	JSR	LOAD_HILO_ADDRESS	; Packet size, in word32
+; 	ASL	#2,A,A			; Convert to bytes
+; 	ADD	#0,B			; Clear carry
+; 	ASL	#14,A,B			; B1 = size in bytes / 2^10
+; 	MOVE	#0,X0
+; 	INSERT	#$0E000A,X0,A		; A0 = size in word32 % 2^10
+
+	;; This is sort of the same thing.
+	CLR	A
+	MOVE	X:HEAD_W4_0,A0
+	MOVE	X:HEAD_W4_1,X0
+ 	INSERT	#$010010,X0,A	
+
+	NOP
+	MOVE	A0,X:TEMP_PSIZE
+
+	ADD	#0,B		; Clear carry
+	ASL	#1,A,A		        ;  * 2
+	ASL	#15,A,B			; B1 = size in bytes / 2^10
+	MOVE	#0,X0
+	INSERT	#$00E009,X0,A		; A0 = (size in bytes % 2^10) / 2
+
+	MOVE	B1,X:TOTAL_BUFFS
+	MOVE	A0,X:LEFT_TO_READ
+
+BUFFER_PACKET_HALFS
+	MOVE	#IMAGE_BUFFER,R1
+	DO	X:TOTAL_BUFFS,BUFFER_PACKET_SINGLES
+	JSR	WAIT_FIFO_HALF
+	JSR	TRANSFER_FIFO_HALF
+	
+BUFFER_PACKET_SINGLES
+	DO	X:LEFT_TO_READ,BUFFER_PACKET_SEND
+	JSR	WAIT_FIFO_SINGLE
+	JSR	TRANSFER_FIFO_SINGLE
+
+BUFFER_PACKET_SEND
+	MOVE	X:QT_BUF_HEAD,A
+	ADD	#1,A
+	MOVE	X:QT_BUF_MAX,B
+	CMP	A,B
+	JGE	BUFFER_PACKET_MATH
+	MOVE	#0,A
+BUFFER_PACKET_MATH
+	MOVE	X:QT_BUF_TAIL,B
+	CMP	A,B
+	JEQ	BUFFER_PACKET_DROP	; If yes, drop packet
+
+	JSR	QT_DATA_PACKET		; and transfer
+
+BUFFER_PACKET_DONE
+	JMP	PACKET_IN
+	
+BUFFER_PACKET_DROP
+	MOVE	X:QT_DROPS,A
+	ADD	#1,A
+	NOP
+	MOVE	A,X:QT_DROPS
+	
+	JMP	BUFFER_PACKET_DONE
+
+WAIT_FIFO_HALF
+	JSET	#FATAL_ERROR,X:<STATUS,FATALITY_HANDLER
+	JSET	#HF,X:PDRD,WAIT_FIFO_HALF	; Wait for half full+1
+	NOP
+	NOP
+	JSET	#HF,X:PDRD,WAIT_FIFO_HALF	; Protect against metastability
+	RTS
+
+WAIT_FIFO_SINGLE
+	JSET	#FATAL_ERROR,X:<STATUS,DUMP_FIFO
+	JCLR	#EF,X:PDRD,WAIT_FIFO_SINGLE
+	NOP
+	NOP
+	JCLR	#EF,X:PDRD,WAIT_FIFO_SINGLE	; Protect against metastability
+	RTS	
+	
+TRANSFER_FIFO_HALF
+	;; Copies 512 16-bit words from FIFO into Y:R1
+	DO	#512,TRANSFER_FIFO_DONE
+TRANSFER_FIFO_SINGLE
+	MOVEP	Y:RDFIFO,Y:(R1)+
+TRANSFER_FIFO_DONE
+	RTS
+		
+FATALITY_HANDLER	
+	JMP	START			; What could possibly go wrong?
+
+	
+QT_PTYPE_ERROR		
+QT_FSIZE_ERROR
+	;; Prepare error message, and notify?
+
+	RTS
+	
+	
+QT_DATA_PACKET
+	;; Copy packet to next buffer address, check inform count and notify
+	;;  PC if elapsed.
+
+	;; Load packet size
+; 	MOVE	#HEAD_W4_1,R2		; Note W4_0 is *after* W4_1 in memory
+; 	JSR	LOAD_HILO_ADDRESS	; Size, in word32
+	CLR	A
+	MOVE	X:TEMP_PSIZE,A0
+	
+	ADD	#0,B			; Clear carry
+	ASL	#2,A,A			; Size, in bytes
+
+	;; Check packet size
+	CLR	B
+	MOVE	X:QT_FRAME_SIZE,B0
+	CMP	A,B
+	JNE	QT_FSIZE_ERROR
+
+	;; Prepare burst variables
+	MOVE	B0,X:BLOCK_SIZE
+	MOVE	B1,X:BURST_SRC		; Y:0
+
+	MOVE	#QT_DEST_LO,R2
+	JSR	LOAD_HILO_ADDRESS
+	MOVE	#BURST_DEST_LO,R2
+	JSR	SAVE_HILO_ADDRESS
+
+	;; Send
+	JSR	BLOCK_TRANSFER
+
+	;; Next buffer
+	JSR	BUFFER_INCR
+
+	;; Check if it's time to inform PC
+	JSR	BUFFER_INFORM_CHECK
+
+
+	RTS
+
+	
 ; -------------------------------------------------------------------------------------
 ;
 ;                              INTERRUPT SERVICE ROUTINES 
 ;
 ; ---------------------------------------------------------------------------------------
 
-;--------------------------------------------------------------------
-CLEAN_UP_PCI
-;--------------------------------------------------------------------
-; Clean up the PCI board from wherever it was executing
 
-	MOVEP	#$0001C0,X:IPRC		; Disable HF* FIFO interrupt
-	MOVE	#$200,SR		; mask for reset interrupts only
+;;; VCOM_* - routines:	 utility functions for vector command communication.
 
-	MOVEC	#1,SP			; Point stack pointer to the top	
-	MOVEC	#$000200,SSL		; SR = zero except for interrupts
-	MOVEC	#0,SP			; Writing to SSH preincrements the SP
-	MOVEC	#START,SSH		; Set PC to for full initialization
+	
+VCOM_PREPARE_REPLY
+	;; Prepare the reply packet for command in X0.
+	;; A0 is trashed, X0 is preserved.
+	MOVE	#'REP',A0
+	MOVE	X0,X:DTXS_WD2		; Command
+	MOVE	A0,X:DTXS_WD1
+
+	MOVE	#'ACK',A		; Note this sets A0 = 0
 	NOP
-	RTI
+	MOVE	A1,X:DTXS_WD3		; ACK
+	MOVE	A0,X:DTXS_WD4		; no comment
+	RTS
 
-; ---------------------------------------------------------------------------
+	
+VCOM_CHECK
+	;; Compare DRXR_WD1 to X0; if not equal then set-up the error reply.
+	;; Z flag will be clear if DRXR_WD1==X0.
+	;; Trashes A and B always and X0 on error.
+
+	MOVE	X0,A
+	MOVE	X:DRXR_WD1,B
+	CMP	A,B
+	JEQ	VCOM_RTS
+
+	MOVE	#'CNE',X0	; Command Name Error
+	MOVE	#'ERR',A0
+	MOVE	X0,X:DTXS_WD4
+	MOVE	A0,X:DTXS_WD3
+VCOM_RTS
+	RTS
+
+
+VCOM_INTRO
+	;; X1 is vector command name
+	JSR	RD_DRXR			; Loads DRXR_WD*
+	MOVE	X1,X0
+	JSR	VCOM_PREPARE_REPLY
+	JSR	VCOM_CHECK
+	RTS
+
+VCOM_EXIT_ERROR_X0
+	MOVE	#'ERR',A0
+ 	NOP
+	MOVE	A0,X:DTXS_WD3
+VCOM_EXIT_X0	
+	MOVE	X0,X:DTXS_WD4
+VCOM_EXIT
+	JSR	RESTORE_REGISTERS
+	JSR	PCI_MESSAGE_TO_HOST
+	RTI
+	
+
+	
+
+; ----------------------------------------------------------------------------
 READ_MEMORY
-;--------------------------------------------------------------------------
+;-----------------------------------------------------------------------------
+;Read command: 
 ; word 1 = command = 'RDM'
 ; word 2 = memory type, P=$00'_P', X=$00_'X' or Y=$00_'Y'
 ; word 3 = address in memory
 ; word 4 = not used
+;Version query:
+; word 1 = 'VER'
+; word 2-4 unused
+	
+	JSR	SAVE_REGISTERS
+	JSR	RD_DRXR			; Loads DRXR_WD*
 
-	JSR	<SAVE_REGISTERS		; save working registers
-
-	JSR	<RD_DRXR		; read words from host write to HTXR
-	MOVE	X:DRXR_WD1,A		; read command
 	MOVE	#'RDM',X0
-	CMP	X0,A			; ensure command is 'RDM'
-	JNE	<READ_MEMORY_ERROR_CNE	; error, command NOT HCVR address
-	MOVE	X:<DRXR_WD2,A		; Memory type (X, Y, P)
-	MOVE	X:<DRXR_WD3,B
-	NOP				; pipeline restriction
-	MOVE	B1,R0			; get address to write to
-	CMP	#$005F50,A		; $00'_P'
-        JNE	<RDX	
-        MOVE	P:(R0),X0		; Read from P memory
-	MOVE	X0,A			; 
-        JMP     <FINISH_READ_MEMORY
-RDX
-	CMP	#$005F58,A		; $00'_X'
-        JNE	<RDY
-	MOVE	X:(R0),X0		; Read from P memory
-	MOVE	X0,A	
-        JMP     <FINISH_READ_MEMORY
-RDY
-	CMP	#$005F59,A		; $00'_Y'
-        JNE	<READ_MEMORY_ERROR_MTE	; not a valid memory type	
-	MOVE	Y:(R0),X0		; Read from P memory
-	MOVE	X0,A	
+	JSR	VCOM_PREPARE_REPLY
+	JSR	VCOM_CHECK
+	JEQ	READ_MEMORY_XYP
 
-; when completed successfully then PCI needs to reply to Host with
-; word1 = reply/data = reply
-FINISH_READ_MEMORY
-	MOVE	#'REP',X0
-	MOVE	X0,X:<DTXS_WD1		; REPly
-	MOVE	#'RDM',X0
-	MOVE	X0,X:<DTXS_WD2		; echo command sent
-	MOVE	#'ACK',X0
-	MOVE	X0,X:<DTXS_WD3		;  im command
-	MOVE	A,X0
-	MOVE	X0,X:<DTXS_WD4		; write to PCI memory error
-	JSR	<RESTORE_REGISTERS	; restore registers 
-	JSR	<PCI_MESSAGE_TO_HOST	; interrupt host with message (x0 restored here)
-	RTI
+	;; Version read command!
+	MOVE	#'VER',X0
+	JSR	VCOM_PREPARE_REPLY
+	JSR	VCOM_CHECK
+	JNE	VCOM_EXIT
 
-READ_MEMORY_ERROR_CNE
-	MOVE	#'CNE',X0		
-	MOVE	X0,X:<DTXS_WD4		; Command Name Error - command name in DRXR does not match
-	JMP	READ_MEMORY_ERROR	; fill in rest of reply
-READ_MEMORY_ERROR_MTE
-	MOVE	#'MTE',X0				
-	MOVE	X0,X:<DTXS_WD4		;  Memory Type Error - not a valid memory type
+	MOVE	X:REV_NUMBER,X0
+	JMP	VCOM_EXIT_X0
 
-READ_MEMORY_ERROR
-	MOVE	#'REP',X0
-	MOVE	X0,X:<DTXS_WD1		; REPly
-	MOVE	#'RDM',X0
-	MOVE	X0,X:<DTXS_WD2		; echo command sent
-	MOVE	#'ERR',X0
-	MOVE	X0,X:<DTXS_WD3		; ERRor.
-	JSR	<RESTORE_REGISTERS	; restore working registers	
-	JSR	<PCI_MESSAGE_TO_HOST 	; interrupt host with message (x0 restored here)
-	RTI
+READ_MEMORY_XYP
 		
+	;; Args: mem, address, <unused>
+	MOVE	X:DRXR_WD2,A
+	MOVE	X:DRXR_WD3,R0
+	
+	CMP	#'_X',A
+	JEQ	READ_MEMORY_X
+
+	CMP	#'_Y',A
+	JEQ	READ_MEMORY_Y
+
+	CMP	#'_P',A
+	JEQ	READ_MEMORY_P
+
+	MOVE	#'MTE',X0
+	JMP	VCOM_EXIT_ERROR_X0
+
+READ_MEMORY_X
+	MOVE	X:(R0),X0
+	JMP	VCOM_EXIT_X0
+READ_MEMORY_Y
+	MOVE	Y:(R0),X0
+	JMP	VCOM_EXIT_X0
+READ_MEMORY_P
+	MOVE	P:(R0),X0
+	JMP	VCOM_EXIT_X0
+	
+
+;--------------------------------------------------------------	
+WRITE_MEMORY
+;---------------------------------------------------------------
+; word 1 = command = 'WRM'
+; word 2 = memory type, P=$00'_P', X=$00'_X' or Y=$00'_Y'
+; word 3 = address in memory
+; word 4 = value 
+
+	JSR	SAVE_REGISTERS
+	MOVE	#'WRM',X1
+	JSR	VCOM_INTRO
+	JNE	VCOM_EXIT
+
+	;; Args: mem, address, data
+	MOVE	X:DRXR_WD2,A
+	MOVE	X:DRXR_WD3,R0
+	MOVE	X:DRXR_WD4,X0
+	
+	CMP	#'_X',A
+	JEQ	WRITE_MEMORY_X
+
+	CMP	#'_Y',A
+	JEQ	WRITE_MEMORY_Y
+
+	CMP	#'_P',A
+	JEQ	WRITE_MEMORY_P
+
+	MOVE	#'MTE',X0
+	JMP	VCOM_EXIT_ERROR_X0
+
+WRITE_MEMORY_X
+	MOVE	X0,X:(R0)
+	JMP	VCOM_EXIT_X0
+WRITE_MEMORY_Y
+	MOVE	X0,Y:(R0)
+	JMP	VCOM_EXIT_X0
+WRITE_MEMORY_P
+	MOVE	X0,P:(R0)
+	JMP	VCOM_EXIT_X0
+
+
+;-----------------------------------------------------------------------------
+START_APPLICATION
+; an application should already have been downloaded to the PCI memory.
+; this command will execute it.
+; ----------------------------------------------------------------------
+; word 1 = command = 'GOA'
+; word 2-4 unused
+	
+	JSR	SAVE_REGISTERS
+	MOVE	#'GOA',X1
+
+	JSR	VCOM_INTRO
+	JNE	VCOM_EXIT
+
+	BSET	#APPLICATION_LOADED,X:STATUS
+	RTI			; Application will reply.
+
+	
+; ---------------------------------------------------------
+STOP_APPLICATION
+; this command stops an application that is currently running
+; used for applications that once started run contiunually
+;-----------------------------------------------------------
+; word 1 = command = ' STP'
+; word 2-4 unused
+
+	JSR	SAVE_REGISTERS
+	MOVE	#'STP',X1
+
+	JSR	VCOM_INTRO
+	JNE	VCOM_EXIT
+
+	BCLR	#APPLICATION_LOADED,X:STATUS
+	BCLR	#APPLICATION_RUNNING,X:STATUS
+	JMP	VCOM_EXIT
+
+	
 ;-----------------------------------------------------------------------------
 RESET_CONTROLLER
 ; Reset the controller by sending a special code byte $0B with SC/nData = 1
-;---------------------------------------------------------------------------
+;-----------------------------------------------------------------------------
 ; word 1 = command = 'RCO'
-; word 2 = not used but read
-; word 3 = not used but read
-; word 4 = not used but read
-
-	JSR	<SAVE_REGISTERS		; save working registers
-	JSR	<RD_DRXR		; read words from host write to HTXR
-	MOVE	X:<DRXR_WD1,A		; read command
-	MOVE	#'RCO',X0
-	CMP	X0,A			; ensure command is 'RCO'
-	JNE	<RCO_ERROR		; error, command NOT HCVR address
-
-; if we get here then everything is fine and we can send reset to controller    
-
-; 250MHZ CODE....
+; word 2-4 unused
+	
+	JSR	SAVE_REGISTERS
+	MOVE	#'RCO',X1
+	JSR	VCOM_INTRO
+	JNE	VCOM_EXIT
 
 	BSET	#SCLK,X:PDRE		; Enable special command mode
 	NOP
@@ -472,38 +703,144 @@ L_RDFIFO
 	NOP
 L_DELAY
 	NOP	
-
-; when completed successfully then PCI needs to reply to Host with
-; word1 = reply/data = reply
-FINISH_RCO
-	MOVE	#'REP',X0
-	MOVE	X0,X:<DTXS_WD1		; REPly
-	MOVE	#'RCO',X0
-	MOVE	X0,X:<DTXS_WD2		; echo command sent
-	MOVE	#'ACK',X0
-	MOVE	X0,X:<DTXS_WD3		; ACKnowledge okay
-	MOVE	#'000',X0
-	MOVE	X0,X:<DTXS_WD4		; read data
-	JSR	<RESTORE_REGISTERS	; restore working registers
-	JSR	<PCI_MESSAGE_TO_HOST    ; interrupt host with message (x0 restored here)
-	RTI				; return from ISR
-
-; when there is a failure in the host to PCI command then the PCI
-; needs still to reply to Host but with an error message
-RCO_ERROR
-	MOVE	#'REP',X0
-	MOVE	X0,X:DTXS_WD1		; REPly
-	MOVE	#'RCO',X0
-	MOVE	X0,X:DTXS_WD2		; echo command sent
-	MOVE	#'ERR',X0
-	MOVE	X0,X:DTXS_WD3		; ERRor im command
-	MOVE	#'CNE',X0		
-	MOVE	X0,X:DTXS_WD4		; Command Name Error - command name in DRXR does not match
-	JSR	<RESTORE_REGISTERS      ; restore wroking registers
-	JSR	<PCI_MESSAGE_TO_HOST    ; interrupt host with message (x0 restored here)
-	RTI				; return from ISR
-
 	
+	MOVE	#'000',X0
+	JMP	VCOM_EXIT_X0
+	
+;-----------------------------------------------------------------------------
+QUIET_TRANSFER_SET
+;-----------------------------------------------------------------------------
+;Quiet transfer mode configuration
+; word 1 = command = 'QTS'
+; word 2 = parameter to set
+; word 3-4 = arguments
+
+	JSR	SAVE_REGISTERS		; standard opening
+	MOVE	#'QTS',X1
+	JSR	VCOM_INTRO
+	JNE	VCOM_EXIT
+
+	MOVE	X:DRXR_WD2,A		; Parameter id
+	MOVE	X:DRXR_WD3,X0		; First arg
+	MOVE	X:DRXR_WD4,X1		; Second arg
+
+	CMP	#'BAS',A
+	JEQ	QUIET_TRANSFER_SET_BASE
+
+	CMP	#'DEL',A
+	MOVE	#QT_BUF_SIZE,R2
+	JEQ	QUIET_TRANSFER_SET_R2
+
+	CMP	#'NUM',A
+	MOVE	#QT_BUF_MAX,R2
+	JEQ	QUIET_TRANSFER_SET_R2
+
+	CMP	#'INF',A
+	MOVE	#QT_INFORM,R2	
+	JEQ	QUIET_TRANSFER_SET_R2
+
+	CMP	#'SIZ',A
+	MOVE	#QT_FRAME_SIZE,R2	
+	JEQ	QUIET_TRANSFER_SET_R2
+
+	CMP	#'TAI',A
+	MOVE	#QT_BUF_TAIL,R2
+	JEQ	QUIET_TRANSFER_SET_R2
+
+	CMP	#'HEA',A
+	MOVE	#QT_BUF_HEAD,R2
+	JEQ	QUIET_TRANSFER_SET_R2
+
+	CMP	#'DRO',A
+	MOVE	#QT_DROPS,R2
+	JEQ	QUIET_TRANSFER_SET_R2
+
+	CMP	#'PER',A
+	MOVE	#TCPR0,R2
+	JEQ	QUIET_TRANSFER_SET_R2
+
+	CMP	#'FLU',A
+	JEQ	QUIET_TRANSFER_SET_FLUSH
+
+	CMP	#'SET',A
+	JEQ	QUIET_TRANSFER_SET_ENABLED
+
+	MOVE	#'MTE',X0
+	JMP	VCOM_EXIT_ERROR_X0
+	
+QUIET_TRANSFER_SET_FLUSH
+	BCLR	#QT_FLUSH,X:STATUS
+	MOVE	X0,A
+	TST	A
+	JEQ	VCOM_EXIT
+	BSET	#QT_FLUSH,X:STATUS
+	JMP	VCOM_EXIT
+
+QUIET_TRANSFER_SET_ENABLED
+	BCLR	#QT_ENABLED,X:STATUS
+	JSR	TIMER_DISABLE
+	MOVE	X0,A
+	TST	A
+	JEQ	VCOM_EXIT
+	MOVE	#0,A0
+	BSET	#QT_ENABLED,X:STATUS
+	MOVE	A0,X:TLR0
+	JSR	TIMER_ENABLE
+	JMP	VCOM_EXIT
+	
+QUIET_TRANSFER_SET_R2
+	MOVE	X0,X:(R2)
+	JMP	VCOM_EXIT
+
+QUIET_TRANSFER_SET_BASE
+	MOVE	X0,X:QT_BASE_LO
+	MOVE	X1,X:QT_BASE_HI
+
+	JSR	BUFFER_RESET
+
+	JMP	VCOM_EXIT
+
+
+;-----------------------------------------------------------------------------
+SYSTEM_RESET
+;-----------------------------------------------------------------------------
+;Responseless system reset, including fifo empty
+	
+	;; Empty incoming fifo
+
+	JSR	CLEAR_FIFO
+
+	;; Reset stack, except to jump back to START
+
+; 	MOVEP	#$0001C0,X:IPRC		; Disable HF* FIFO interrupt
+; 	MOVE	#$200,SR		; Mask set up for reset switch only.
+
+	MOVEC	#1,SP			; Point stack pointer to the top	
+	MOVEC	#$000200,SSL		; SSL holds SR return state
+					; set to zero except for interrupts
+	MOVEC	#0,SP			; Writing to SSH preincrements the SP
+					; so first set to 0
+	MOVEC	#START,SSH		; SSH holds return address of PC
+					; therefore,return to initialization
+	NOP
+	RTI				; return from ISR - to START
+
+
+;--------------------------------------------------------------------
+CLEAN_UP_PCI
+;--------------------------------------------------------------------
+; Clean up the PCI board from wherever it was executing
+
+	MOVEP	#$0001C0,X:IPRC		; Disable HF* FIFO interrupt
+	MOVE	#$200,SR		; mask for reset interrupts only
+
+	MOVEC	#1,SP			; Point stack pointer to the top	
+	MOVEC	#$000200,SSL		; SR = zero except for interrupts
+	MOVEC	#0,SP			; Writing to SSH preincrements the SP
+	MOVEC	#START,SSH		; Set PC to for full initialization
+	NOP
+	RTI
+
 ;----------------------------------------------------------------------
 SEND_PACKET_TO_CONTROLLER
 
@@ -536,12 +873,6 @@ SEND_PACKET_TO_CONTROLLER
 	CLR	B
 	MOVE	X:<DRXR_WD2,X0		; MS 16bits of address
 	MOVE	X:<DRXR_WD3,B0		; LS 16bits of address
-	NOP
-	NOP
-	NOP
-	NOP
-; ;;; MFH - done
-	
 	INSERT	#$010010,X0,B		; convert to 32 bits and put in B
 
 	MOVE	X:<DRXR_WD4,A		; read word 4 - GO command?
@@ -645,74 +976,38 @@ SEND_PACKET_TO_HOST
 ; save some registers but not B
 
 	JSR	<SAVE_REGISTERS		; save working registers
+	MOVE	#'HST',X1
+	JSR	VCOM_INTRO
+	JNE	VCOM_EXIT
 
-	JSR	<RD_DRXR		; read words from host write to HTXR
-	CLR	B
-	MOVE	X:<DRXR_WD1,A		; read command
-	MOVE	#'HST',X0
-	CMP	X0,A			; ensure command is 'HST'
-	JNE	<HOST_ERROR		; error, command NOT HCVR address
+	;; Args are hi/lo PCI dest'n address
 	MOVE	X:<DRXR_WD2,X0		; high 16 bits of address 
 	MOVE	X:<DRXR_WD3,B0		; low 16 bits of adderss
 
-;;; MFH - this is where PC RAM dest'n address is obtained
 	MOVE	X0,X:BURST_DEST_HI
 	MOVE	B0,X:BURST_DEST_LO
-;;; MFH END
-	
-	INSERT	#$010010,X0,B		; convert to 32 bits and put in B
 
 	BSET	#SEND_TO_HOST,X:<STATUS	 ; tell main program to write packet to host memory
-	JSR	<RESTORE_HST_REGISTERS	 ; restore registers for HST .... B not restored..
-	RTI
 
-; !!NOTE!!!
-; successful reply to this command is sent after packet has been send to host.
-; Not here unless error.
+	RTI			; Main loop will reply after packet transfer!
 
-; when there is a failure in the host to PCI command then the PCI
-; needs still to reply to Host but with an error message
-HOST_ERROR
-	BCLR	#SEND_TO_HOST,X:STATUS
-	MOVE	#'REP',X0
-	MOVE	X0,X:<DTXS_WD1		; REPly
-	MOVE	#'HST',X0
-	MOVE	X0,X:<DTXS_WD2		; echo command sent
-	MOVE	#'ERR',X0
-	MOVE	X0,X:<DTXS_WD3		; ERRor im command
-	MOVE	#'CNE',X0
-	MOVE	X0,X:<DTXS_WD4		; Command Name Error - command name in DRXR does not match
-	JSR	<RESTORE_REGISTERS	; restore working registers
-	JSR	<PCI_MESSAGE_TO_HOST	; interrupt host with message (x0 restored here)
-	RTI
-
+	
 ; --------------------------------------------------------------------
 SOFTWARE_RESET
 ;----------------------------------------------------------------------
 ; word 1 = command = 'RST'
-; word 2 = not used but read
-; word 3 = not used but read
-; word 4 = not used but read
+; word 2-4 unused
 
-	JSR	<SAVE_REGISTERS
-
-	JSR	<RD_DRXR		; read words from host write to HTXR
-	MOVE	X:<DRXR_WD1,A		; read command
-	MOVE	#'RST',X0
-	CMP	X0,A			; ensure command is 'RST'
-	JNE	<RST_ERROR		; error, command NOT HCVR address
+	JSR	SAVE_REGISTERS
+	MOVE	#'RST',X1
+	JSR	VCOM_INTRO
+	JNE	VCOM_EXIT
 
 ; RST command OK so reply to host
 FINISH_RST
-	MOVE	#'REP',X0
-	MOVE	X0,X:<DTXS_WD1		; REPly
-	MOVE	#'RST',X0
-	MOVE	X0,X:<DTXS_WD2		; echo command sent
-	MOVE	#'ACK',X0
-	MOVE	X0,X:<DTXS_WD3		; ACKnowledge okay
 	MOVE	#'000',X0
-	MOVE	X0,X:<DTXS_WD4		; read data
-	JSR	<PCI_MESSAGE_TO_HOST
+	MOVE	X0,X:DTXS_WD4
+	JSR	PCI_MESSAGE_TO_HOST
 
 	JSET	#DCTR_HF3,X:DCTR,*
 	
@@ -743,186 +1038,6 @@ FINISH_RST
 					; therefore,return to initialization
 	NOP
 	RTI				; return from ISR - to START
-
-; when there is a failure in the host to PCI command then the PCI
-; needs still to reply to Host but with an error message
-RST_ERROR
-	MOVE	#'REP',X0
-	MOVE	X0,X:<DTXS_WD1		; REPly
-	MOVE	#'RST',X0
-	MOVE	X0,X:<DTXS_WD2		; echo command sent
-	MOVE	#'ERR',X0
-	MOVE	X0,X:<DTXS_WD3		; ERRor im command
-	MOVE	#'CNE',X0
-	MOVE	X0,X:<DTXS_WD4		; Command Name Error - command name in DRXR does not match
-	JSR	<RESTORE_REGISTERS	; restore working registers
-	JSR	<PCI_MESSAGE_TO_HOST 	; interrupt host with message (x0 restored here)
-	RTI				; return from ISR
-
-
-;-----------------------------------------------------------------------------
-START_APPLICATION
-; an application should already have been downloaded to the PCI memory.
-; this command will execute it.
-; ----------------------------------------------------------------------
-; word 1 = command = 'GOA'
-; word 2 = not used but read by RD_DRXR
-; word 3 = not used but read by RD_DRXR
-; word 4 = not used but read by RD_DRXR
-	
-	JSR	<SAVE_REGISTERS		; save working registers
-
-	JSR	<RD_DRXR		; read words from host write to HTXR
-	MOVE	X:<DRXR_WD1,A		; read command
-	MOVE	#'GOA',X0
-	CMP	X0,A			; ensure command is 'RDM'
-	JNE	<GO_ERROR		; error, command NOT HCVR address
-
-; if we get here then everything is fine and we can start the application
-; set bit in status so that main fibre servicing code knows to jump
-; to application space after returning from this ISR
-
-; reply after application has been executed.
-	BSET	#APPLICATION_LOADED,X:<STATUS	
-	RTI				; return from ISR
-	
-
-; when there is a failure in the host to PCI command then the PCI
-; needs still to reply to Host but with an error message
-GO_ERROR
-	MOVE	#'REP',X0
-	MOVE	X0,X:<DTXS_WD1	; REPly
-	MOVE	#'GOA',X0
-	MOVE	X0,X:<DTXS_WD2	; echo command sent
-	MOVE	#'ERR',X0
-	MOVE	X0,X:<DTXS_WD3	; ERRor im command
-	MOVE	#'CNE',X0
-	MOVE	X0,X:<DTXS_WD4		; Command Name Error - command name in DRXR does not match
-	JSR	<RESTORE_REGISTERS	; restore working registers
-	JSR	<PCI_MESSAGE_TO_HOST	; interrupt host with message (x0 restored here)
-	RTI				; return from ISR
-
-; ---------------------------------------------------------
-STOP_APPLICATION
-; this command stops an application that is currently running
-; used for applications that once started run contiunually
-;-----------------------------------------------------------
-
-; word 1 = command = ' STP'
-; word 2 = not used but read
-; word 3 = not used but read
-; word 4 = not used but read
-
-	JSR	<SAVE_REGISTERS
-
-	JSR	<RD_DRXR		; read words from host write to HTXR
-	MOVE	X:<DRXR_WD1,A		; read command
-	MOVE	#'STP',X0
-	CMP	X0,A			; ensure command is 'RDM'
-	JNE	<STP_ERROR		; error, command NOT HCVR address
-
-	BCLR	#APPLICATION_LOADED,X:<STATUS
-	BCLR	#APPLICATION_RUNNING,X:STATUS	
-
-; when completed successfully then PCI needs to reply to Host with
-; word1 = reply/data = reply
-FINISH_STP
-	MOVE	#'REP',X0
-	MOVE	X0,X:<DTXS_WD1		; REPly
-	MOVE	#'STP',X0
-	MOVE	X0,X:<DTXS_WD2		; echo command sent
-	MOVE	#'ACK',X0
-	MOVE	X0,X:<DTXS_WD3		; ACKnowledge okay
-	MOVE	#'000',X0
-	MOVE	X0,X:<DTXS_WD4		; read data
-	JSR	<RESTORE_REGISTERS	; restore working registers.
-	JSR	<PCI_MESSAGE_TO_HOST	; interrupt host with message (x0 restored here)
-	RTI
-
-; when there is a failure in the host to PCI command then the PCI
-; needs still to reply to Host but with an error message
-STP_ERROR
-	MOVE	#'REP',X0
-	MOVE	X0,X:<DTXS_WD1		; REPly
-	MOVE	#'STP',X0
-	MOVE	X0,X:<DTXS_WD2		; echo command sent
-	MOVE	#'ERR',X0
-	MOVE	X0,X:<DTXS_WD3		; ERRor im command
-	MOVE	#'CNE',X0
-	MOVE	X0,X:<DTXS_WD4		; Command Name Error - command name in DRXR does not match
-	JSR	<RESTORE_REGISTERS	; restore working registers
-	JSR	<PCI_MESSAGE_TO_HOST	; interrupt host with message (x0 restored here)
-	RTI	
-
-;--------------------------------------------------------------	
-WRITE_MEMORY
-;---------------------------------------------------------------
-; word 1 = command = 'WRM'
-; word 2 = memory type, P=$00'_P', X=$00'_X' or Y=$00'_Y'
-; word 3 = address in memory
-; word 4 = value 
-
-	JSR	<SAVE_REGISTERS		; save working registers
-
-	JSR	<RD_DRXR		; read words from host write to HTXR
-	MOVE	X:DRXR_WD1,A		; read command
-	MOVE	#'WRM',X0
-	CMP	X0,A			; ensure command is 'WRM'
-	JNE	<WRITE_MEMORY_ERROR_CNE	; error, command NOT HCVR address
-	MOVE	X:<DRXR_WD2,A		; Memory type (X, Y, P)
-	MOVE	X:<DRXR_WD3,B
-	NOP				; pipeline restriction
-	MOVE	B1,R0			; get address to write to
-	MOVE	X:<DRXR_WD4,X0		; get data to write
-	CMP	#$005F50,A		; $00'_P'
-        JNE	<WRX	
-        MOVE	X0,P:(R0)		; Write to Program memory
-        JMP     <FINISH_WRITE_MEMORY
-WRX
-	CMP	#$005F58,A		; $00'_X'
-        JNE	<WRY
-        MOVE    X0,X:(R0)		; Write to X: memory
-        JMP     <FINISH_WRITE_MEMORY
-WRY
-	CMP	#$005F59,A		; $00'_Y'
-        JNE	<WRITE_MEMORY_ERROR_MTE	
-        MOVE    X0,Y:(R0)		; Write to Y: memory
-
-; when completed successfully then PCI needs to reply to Host with
-; word1 = reply/data = reply
-FINISH_WRITE_MEMORY
-	MOVE	#'REP',X0
-	MOVE	X0,X:<DTXS_WD1		; REPly
-	MOVE	#'WRM',X0
-	MOVE	X0,X:<DTXS_WD2		; echo command sent
-	MOVE	#'ACK',X0
-	MOVE	X0,X:<DTXS_WD3		; ACKnowledge okay
-	MOVE	#'000',X0
-	MOVE	X0,X:<DTXS_WD4		; no error
-	JSR	<RESTORE_REGISTERS	; restore working registers
-	JSR	<PCI_MESSAGE_TO_HOST	; interrupt host with message (x0 restored here)
-	RTI
-
-; 
-WRITE_MEMORY_ERROR_CNE
-	MOVE	#'CNE',X0
-	MOVE	X0,X:<DTXS_WD4		; Command Name Error - command name in DRXR does not match
-	JMP	<WRITE_MEMORY_ERROR	; fill in rest of reply
-
-WRITE_MEMORY_ERROR_MTE
-	MOVE	#'MTE',X0
-	MOVE	X0,X:<DTXS_WD4		; Memory Type Error - memory type not valid
-
-WRITE_MEMORY_ERROR
-	MOVE	#'REP',X0
-	MOVE	X0,X:<DTXS_WD1		; REPly
-	MOVE	#'WRM',X0
-	MOVE	X0,X:<DTXS_WD2		; echo command sent
-	MOVE	#'ERR',X0
-	MOVE	X0,X:<DTXS_WD3		; ERRor im command
-	JSR	<RESTORE_REGISTERS	; restore working registers
-	JSR	<PCI_MESSAGE_TO_HOST	; interrupt host with message (x0 restored here)
-	RTI
 
 
 ;---------------------------------------------------------------
@@ -1187,24 +1302,6 @@ RESTORE_REGISTERS
 	MOVE	X:<SV_Y1,Y1
 
 	RTS
-;------------------------------------------------------------------------------------
-RESTORE_HST_REGISTERS
-;-------------------------------------------------------------------------------------
-; B not restored after HST as it now contains address.
-
-	MOVEC	X:<SV_SR,SR
-
-	MOVE	X:<SV_A0,A0		
-	MOVE	X:<SV_A1,A1
-	MOVE	X:<SV_A2,A2
-
-	MOVE	X:<SV_X0,X0	
-	MOVE	X:<SV_X1,X1
-
-	MOVE	X:<SV_Y0,Y0
-	MOVE	X:<SV_Y1,Y1
-	
-	RTS
 
 ;-------------------------------------------------------------------------------------
 SAVE_REGISTERS
@@ -1304,8 +1401,18 @@ FLUSH_PCI_FIFO
 	JSET	#CLRT,X:DPCR,*
 	RTS	
 
+	
+CLEAR_FIFO			
+	MOVEP	#%011000,X:PDRD			; clear FIFO RESET* for 2 ms
+	MOVE	#200000,X0
+	DO	X0,*+3
+	NOP
+	MOVEP	#%011100,X:PDRD
+	RTS
+
+	
 ;-----------------------------------------------
-MPCI_ERROR_RECOVERY
+PCI_ERROR_CLEAR
 ;-----------------------------------------------
 	;; Increments a counter associated with each kind of error and sets
 	;;  either STATUS[PCIDMA_RESTART] or STATUS[PCIDMA_RESUME] bit
@@ -1378,7 +1485,7 @@ ERROR_APER
 	RTS
 
 
-;---------------------------------------------
+;----------------------------------------------
 BLOCK_TRANSFER
 ;----------------------------------------------
 ;   In:
@@ -1391,23 +1498,21 @@ BLOCK_TRANSFER
 ;   - BLOCK_SRC will be incremented by BLOCK_SIZE/2
 ;  Trashes:
 ;   - A and B
-
-
-	JMP	HOCK_TRANSFER
-	NOP
-			
+	
 	;; DSP PCI burst limit is 256 bytes.
-;	MOVE	X:BLOCK_SIZE,A	        ; A1 = BLOCK_SIZE
-		
-; 	CMP	#0,A
- 	JEQ	BLOCK_DONE
+	MOVE	X:BLOCK_SIZE,A	        ; A1 = BLOCK_SIZE
+	
+	CMP	#0,A
+	JEQ	BLOCK_DONE
 
-	MOVE	#$0100,B		; B1 = 256
-	NOP
+	;; Careful here, force long (24-bit) literal.
+
+	CLR	B
+	MOVE	X:PCI_BURST_SIZE,B1
 	
 	CMP	B,A			; A ? B
 	JGE	<BLOCK_TRANSFER1	; jump if A >= B
-	MOVE	A,B			;    B=A
+	MOVE	A,B	
 BLOCK_TRANSFER1
 	SUB	B,A			; A -= B
 	ADD	#0,B			; Clear carry bit
@@ -1429,17 +1534,18 @@ BLOCK_TRANSFER1
 	MOVEP	#$8EFA51,X:DCR0
 
 BLOCK_PCI
-	;; Setup PCI burst - number of dwords is in B
+	;; Setup PCI burst using BURST_SIZE
 	CLR	A
 	CLR	B
-	MOVE	X:BURST_SIZE,B0
-	DEC	B
+	MOVE	X:BURST_SIZE,B0		; B = n8
+	DEC	B			; n8 - 1
 	ADD	#0,B			; Clear carry
-	ASR	#2,B,B			; BURST_SIZE / 4
+	ASR	#2,B,B			; (n8 - 1)/4 = n32 - 1
 	ADD	#0,B			; Clear carry
 	ASL	#16,B,B			; B[23:16] = " "
 	
 	MOVE	X:BURST_DEST_HI,A0
+
 	ADD	B,A
 	NOP
 	MOVE	A0,X:DPMC		; PCI burst length and HI address
@@ -1461,7 +1567,7 @@ BLOCK_CHECK
 	;; Check for error
 	JSET	#MDT,X:DPSR,BLOCK_OK
 
-	JSR	MPCI_ERROR_RECOVERY
+	JSR	PCI_ERROR_CLEAR
 
 	BCLR	#PCIDMA_RESTART,X:STATUS ; Test and clear
 	JCS	<BLOCK_RESTART
@@ -1470,7 +1576,7 @@ BLOCK_CHECK
 	JCS	<BLOCK_RESUME
 
 BLOCK_OK
-	MOVE	X:BURST_SIZE,A0
+	MOVE	X:BURST_SIZE,A0		; Pass # of words written to updater
 	JSR	BLOCK_UPDATE
 	JMP	BLOCK_TRANSFER		; Finish the block
 BLOCK_DONE
@@ -1485,10 +1591,10 @@ BLOCK_RESUME
 	MOVEP	X:DPSR,A0		; Get words left to write
 	JCLR	#15,X:DPSR,BLOCK_RESUME1
 	
-	CLR	B
 	INC	B
 	
 BLOCK_RESUME1
+
 	INC	B			; We want N, not N-1.
 	ADD	#0,B			; Clear carry
 	ASR	#16,A,A
@@ -1508,19 +1614,189 @@ BLOCK_UPDATE
 	;;  BURST_DEST_HI:LO and BURST_SIZE
 
 	MOVE	A0,X1			; Save A
-	MOVE	A,B			; Save A again...
-
-	MOVE	X:BURST_DEST_LO,R2 ; WRONG!!
+ 	MOVE	A0,B0			; Save A again...
+ 	MOVE	A1,B1			; Save A again...
+	NOP
+	
+	MOVE	#BURST_DEST_LO,R2
 	JSR	ADD_HILO_ADDRESS	; This updates BURST_DEST
 
 	MOVE	X:BURST_SIZE,B
-	SUB	X1,B
- 	NOP
+	SUB	X1,B			; Zero flag must be preserved!
+	NOP
 	MOVE	B1,X:BURST_SIZE
 
 	RTS
+
 	
+;----------------------------------------------;
+;  TIMER HANDLING                              ;
+;----------------------------------------------;
 	
+; Start value is TLR, count is in TCR, int occurs at TCPR
+; Must set TCSR[TCIE] to enable int
+; Must set TCSR[T] for timer to restart
+
+TIMER_ENABLE
+	MOVE	#$000201,X0		; Enable
+	NOP
+	MOVE	X0,X:TCSR0
+	RTS
+
+TIMER_DISABLE
+	MOVE	#$300200,X0		; Clear TOF, TCF, disable timer.
+	NOP
+	MOVE	X0,X:TCSR0
+	RTS
+
+;;; Timer action is called from the main loop when counter flag is detected.
+TIMER_ACTION
+ 	MOVE	X:QT_INFORM_IDX,A
+	MOVE	#$300201,X0		; Clear TOF, TCF, leave timer enabled.
+	NOP
+	MOVE	X0,X:TCSR0
+ 	CMP	#>0,A			; If inform_idx != 0
+ 	JEQ	TIMER_ACTION_OK
+	BSET	#QT_FLUSH,X:STATUS	;	schedule inform
+TIMER_ACTION_OK
+	RTS
+
+
+
+;----------------------------------------------;
+;  CIRCULAR BUFFER HANDLING                    ;
+;----------------------------------------------;
+
+BUFFER_INCR
+	
+	MOVE	X:QT_BUF_HEAD,A		; If head + 1 == max
+	ADD	#1,A			; 
+	MOVE	X:QT_BUF_MAX,B		;	
+	CMP	A,B			; 
+	JLE	BUFFER_RESET		;	head = 0
+					; else
+	MOVE	A,X:QT_BUF_HEAD		;	head = head + 1
+
+	CLR	B
+	MOVE	X:QT_BUF_SIZE,B0
+	MOVE	#QT_DEST_LO,R2
+	JSR	ADD_HILO_ADDRESS	; QT_DEST += QT_BUF_SIZE	
+		
+	RTS
+
+	
+BUFFER_RESET
+	MOVE	#QT_BASE_LO,R2
+	JSR	LOAD_HILO_ADDRESS
+	MOVE	#QT_DEST_LO,R2
+	JSR	SAVE_HILO_ADDRESS	; QT_DEST_LO = QT_BASE_LO
+
+	MOVE	#0,X0
+	MOVE	X0,X:QT_BUF_HEAD	; HEAD = 0
+	RTS
+
+	
+BUFFER_INFORM_CHECK
+	MOVE	X:QT_INFORM_IDX,A
+	ADD	#1,A
+	MOVE	X:QT_INFORM,B
+	CMP	A,B
+	JGT	BUFFER_INFORM_OK	; If inform_idx + 1 <= inform
+	BSET	#QT_FLUSH,X:STATUS	;	schedule inform
+
+BUFFER_INFORM_OK
+	MOVE	A,X:QT_INFORM_IDX	; inform_idx = inform_idx + 1
+	RTS
+
+	
+;---------------------------------------------------------------
+BUFFER_INFORM
+;---------------------------------------------------------------
+; Informs host of current buffer status
+
+	MOVE	#'QTI',X0		; Quiet Transfer Inform
+	MOVE	X0,X:<DTXS_WD1
+
+	MOVE	X:QT_BUF_HEAD,X0	; Next write index
+	MOVE	X0,X:<DTXS_WD2
+
+	MOVE	X:QT_BUF_TAIL,X0	; Forbidden write index
+	MOVE	X0,X:<DTXS_WD3
+
+	MOVE	X:QT_DROPS,X0		; Dropped packet count
+	MOVE	X0,X:<DTXS_WD4
+
+
+	JSET	#DCTR_HF3,X:DCTR,INFORM_EXIT
+	JCLR	#STRQ,X:DSR,INFORM_EXIT
+
+	JSR	PCI_MESSAGE_TO_HOST_NOW
+
+	BCLR	#QT_FLUSH,X:STATUS
+	MOVE	#0,X0			; Reset inform index
+	MOVE	X0,X:QT_INFORM_IDX
+INFORM_EXIT
+	RTS
+
+
+
+;----------------------------------------------;
+;  ADDRESS HANDLING                            ;
+;----------------------------------------------;
+	
+;;; Here, "HILO" format refers to the storage of a 32 bit address addr into
+;;; two consecutive 24-bit words in X memory, mem0 and mem1.
+;;; mem0[15..0] = addr[15..0] and mem1[15..0] = addr[31..16].
+	
+LOAD_HILO_ADDRESS
+	;; Load the 32 bit address stored in [ R2+1 : R2 ] into A
+	;; Trashes X0.
+	CLR	A
+	MOVE	X:(R2)+,A0
+	MOVE	X:(R2)-,X0
+	INSERT	#$010010,X0,A
+	RTS
+
+ADD_HILO_ADDRESS
+	;; Adds B to the hilo address stored at [ R2+1 : R2 ]
+	;; Trashes X0 and A and B.
+
+	JSR	LOAD_HILO_ADDRESS
+	ADD	B,A
+
+SAVE_HILO_ADDRESS
+	;; Save the low 32 bits of A into [ R2+1 : R2 ]
+	;; Trashes X0 and B, preserves A.
+
+	MOVE	X0,X:(R2)+		; pre-increment
+	MOVE	#0,X0
+	ASL	#8,A,B
+	INSERT	#$008010,X0,A
+	MOVE	B1,X:(R2)-		; store hi16
+	MOVE	A0,X:(R2)
+	ASR	#8,B,A
+	RTS
+	
+		
+; TEST_ROUTINES			; Passed.
+
+; 	MOVE	#$01,A1
+; 	MOVE	#$020304,A0
+; 	MOVE	#BDEBUG0,R2
+
+; 	JSR     SAVE_HILO_ADDRESS
+
+; 	JSR	LOAD_HILO_ADDRESS
+; 	MOVE	#BDEBUG2,R2
+; 	JSR	SAVE_HILO_ADDRESS
+
+; 	MOVE	#$02,B1
+; 	MOVE	#$000203,B0
+; 	MOVE	#BDEBUG0,R2
+; 	JSR	ADD_HILO_ADDRESS
+
+; 	RTS
+
 
 BOOTCODE_END
 BOOTEND_ADDR	EQU	@CVI(BOOTCODE_END)
@@ -1554,7 +1830,7 @@ PRE_CORRUPT	DC	0
 REV_NUMBER	DC	$550104		; byte 0 = minor revision #
 					; byte 1 = major revision #
 					; byte 2 = release Version (ascii letter)
-REV_DATA	DC	$250507		; data: day-month-year
+REV_DATA	DC	$000000		; data: day-month-year
 P_CHECKSUM	DC	$2EF490         ;**** DO NOT CHANGE
 ; -------------------------------------------------
 WORD_COUNT		DC	0	; word count.  Number of words successfully writen to host in last packet.	
@@ -1669,7 +1945,7 @@ QT_INFORM_IDX		DC	0	; Number of packets since last inform
 QT_DROPS		DC	0	; Dropped packets
 
 ;;; Bus latency timer
-; PCI_BURST_SIZE		DC	$40	; Should be < 4*latency assigned by OS
+PCI_BURST_SIZE		DC	$40	; Should be < 4*latency assigned by OS
 	
 TEMP_PSIZE		DC	0
 
@@ -1733,848 +2009,8 @@ VAR_TBL_LENGTH EQU	VAR_TBL_END-VAR_TBL_START
 
 ;;; MFH -- HACKING AREA
 
-;;; Start of protected addresses
-	
-MAIN_LOOP_HACK_FESTIVAL
-	JMP	LE_HACK_FESTIVAL
-	JSR	LE_BUFFER_INFORM      ; BLAH
 
-; BUFFER_INFORM
-; 	;; Note that this must JMP back to main loop!
-; 	JSR	LE_BUFFER_INFORM
-; 	JMP	PACKET_IN
-	
-NEW_PACKET_HANDLER
-	JMP	LE_NEW_PACKET_HANDLER
-QUIET_TRANSFER_SET
-	JMP	LE_QUIET_TRANSFER_SET
-SYSTEM_RESET
-	JMP	LE_SYSTEM_RESET
-LE_BLOCK_UPDATE
-	NOP
-	NOP
-; 	JMP	LE_BLOCK_UPDATE		; Done with this...
-HOCK_TRANSFER
-	JMP	LE_BLOCK_TRANSFER
-	
-;;; End protected addresses
 
 	
-		
-
-LE_SYSTEM_RESET
-	;; Empty incoming fifo
-
-	JSR	CLEAR_FIFO
-
-	;; Reset stack, except to jump back to START
-
-; 	MOVEP	#$0001C0,X:IPRC		; Disable HF* FIFO interrupt
-; 	MOVE	#$200,SR		; Mask set up for reset switch only.
-
-	MOVEC	#1,SP			; Point stack pointer to the top	
-	MOVEC	#$000200,SSL		; SSL holds SR return state
-					; set to zero except for interrupts
-	MOVEC	#0,SP			; Writing to SSH preincrements the SP
-					; so first set to 0
-	MOVEC	#START,SSH		; SSH holds return address of PC
-					; therefore,return to initialization
-	NOP
-	RTI				; return from ISR - to START
-
-CLEAR_FIFO			
-	MOVEP	#%011000,X:PDRD			; clear FIFO RESET* for 2 ms
-	MOVE	#200000,X0
-	DO	X0,*+3
-	NOP
-	MOVEP	#%011100,X:PDRD
-	RTS
-
-		
-LE_HACK_FESTIVAL
-	JSSET	#TCF,X:TCSR0,TIMER_ACTION
-	JSSET	#QT_FLUSH,X:STATUS,LE_BUFFER_INFORM
-	RTS
-
-LE_BUFFER_INFORM
-
-	MOVE	#'QTI',X0		; Quiet Transfer Inform
-	MOVE	X0,X:<DTXS_WD1
-
-	MOVE	X:QT_BUF_HEAD,X0	; Next write index
-	MOVE	X0,X:<DTXS_WD2
-
-	MOVE	X:QT_BUF_TAIL,X0	; Forbidden write index
-	MOVE	X0,X:<DTXS_WD3
-
-	MOVE	X:QT_DROPS,X0		; Dropped packet count
-	MOVE	X0,X:<DTXS_WD4
-
-
-	JSET	#DCTR_HF3,X:DCTR,INFORM_EXIT
-	JCLR	#STRQ,X:DSR,INFORM_EXIT
-
-	JSR	PCI_MESSAGE_TO_HOST_NOW
-
-	BCLR	#QT_FLUSH,X:STATUS
-	MOVE	#0,X0			; Reset inform index
-	MOVE	X0,X:QT_INFORM_IDX
-INFORM_EXIT
-	RTS
-
-LE_QUIET_TRANSFER_SET
-	JSR	SAVE_REGISTERS		; save working registers
-	JSR	RD_DRXR			; read words from host write to HTXR
-
-	MOVE	#'QTS',X0
-	JSR	PREPARE_REPLY
-	JSR	CHECK_COMMAND		; verify syntax
-	JNE	QUIET_TRANSFER_SET_EXIT
-
-	MOVE	X:DRXR_WD2,A		; Parameter id
-	MOVE	X:DRXR_WD3,X0		; First arg
-	MOVE	X:DRXR_WD4,X1		; Second arg
-
-	CMP	#'BAS',A
-	JEQ	QUIET_TRANSFER_SET_BASE
-
-	CMP	#'DEL',A
-	MOVE	#QT_BUF_SIZE,R2
-	JEQ	QUIET_TRANSFER_SET_R2
-
-	CMP	#'NUM',A
-	MOVE	#QT_BUF_MAX,R2
-	JEQ	QUIET_TRANSFER_SET_R2
-
-	CMP	#'INF',A
-	MOVE	#QT_INFORM,R2	
-	JEQ	QUIET_TRANSFER_SET_R2
-
-	CMP	#'SIZ',A
-	MOVE	#QT_FRAME_SIZE,R2	
-	JEQ	QUIET_TRANSFER_SET_R2
-
-	CMP	#'TAI',A
-	MOVE	#QT_BUF_TAIL,R2
-	JEQ	QUIET_TRANSFER_SET_R2
-
-	CMP	#'HEA',A
-	MOVE	#QT_BUF_HEAD,R2
-	JEQ	QUIET_TRANSFER_SET_R2
-
-	CMP	#'DRO',A
-	MOVE	#QT_DROPS,R2
-	JEQ	QUIET_TRANSFER_SET_R2
-
-	CMP	#'PER',A
-	MOVE	#TCPR0,R2
-	JEQ	QUIET_TRANSFER_SET_R2
-
-	CMP	#'FLU',A
-	JEQ	QUIET_TRANSFER_SET_FLUSH
-
-	CMP	#'SET',A
-	JEQ	QUIET_TRANSFER_SET_ENABLED
-
-	MOVE	#'MTE',X0
-	JSR	SET_ERROR
-	JMP	QUIET_TRANSFER_SET_EXIT	
-	
-QUIET_TRANSFER_SET_FLUSH
-	BCLR	#QT_FLUSH,X:STATUS
-	MOVE	X0,A
-	TST	A
-	JEQ	QUIET_TRANSFER_SET_EXIT
-	BSET	#QT_FLUSH,X:STATUS
-	JMP	QUIET_TRANSFER_SET_EXIT
-
-QUIET_TRANSFER_SET_ENABLED
-	BCLR	#QT_ENABLED,X:STATUS
-	JSR	TIMER_DISABLE
-	MOVE	X0,A
-	TST	A
-	JEQ	QUIET_TRANSFER_SET_EXIT
-	MOVE	#0,A0
-	BSET	#QT_ENABLED,X:STATUS
-	MOVE	A0,X:TLR0
-	JSR	TIMER_ENABLE
-	JMP	QUIET_TRANSFER_SET_EXIT
-	
-QUIET_TRANSFER_SET_R2
-	MOVE	X0,X:(R2)
-	JMP	QUIET_TRANSFER_SET_EXIT
-
-QUIET_TRANSFER_SET_BASE
-	MOVE	X0,X:QT_BASE_LO
-	MOVE	X1,X:QT_BASE_HI
-
-	JSR	BUFFER_RESET
-;fall through
-; 	JMP	QUIET_TRANSFER_SET_EXIT
-
-QUIET_TRANSFER_SET_EXIT
-	JSR	RESTORE_REGISTERS
-	JSR	PCI_MESSAGE_TO_HOST
-	RTI
-
-
-PREPARE_REPLY
-	;; Prepare the reply packet for command in X0.
-	;; A0 is trashed, X0 is preserved.
-	MOVE	#'REP',A0
-	MOVE	X0,X:DTXS_WD2		; Command
-	MOVE	A0,X:DTXS_WD1
-
-	MOVE	#'ACK',A		; Note this sets A0 = 0
-	NOP
-	MOVE	A1,X:DTXS_WD3		; ACK
-	MOVE	A0,X:DTXS_WD4		; no comment
-	RTS
-
-	
-CHECK_COMMAND
-	;; Compare DRXR_WD1 to X0; if not equal then set-up the error reply.
-	;; Z flag will be clear if DRXR_WD1==X0.
-	;; Trashes A and B always and X0 on error.
-
-	MOVE	X0,A
-	MOVE	X:DRXR_WD1,B
-	CMP	A,B
-	JEQ	RTS_NOW
-	MOVE	#'CNE',X0	; Command Name Error
-;fall through
-; 	JMP	SET_ERROR
-	
-SET_ERROR
-	;; Modify the reply packet to reflect the error code in X0.
-	;; A0 is trashed, X0 is preserved.
-	MOVE	#'ERR',A0
-	MOVE	X0,X:DTXS_WD4
-	MOVE	A0,X:DTXS_WD3
-RTS_NOW
-	RTS
-
-
-VCOM_INTRO
-	;; X1 is vector command name
-	JSR	RD_DRXR			; Loads DRXR_WD*
-	MOVE	X1,X0
-	JSR	PREPARE_REPLY
-	JSR	CHECK_COMMAND
-	RTS
-
-	
-;;; Replacement routines!!!
-
-NEW_READ_MEMORY
-	JSR	SAVE_REGISTERS
-	JSR	RD_DRXR			; Loads DRXR_WD*
-
-	MOVE	#'RDM',X0
-	JSR	PREPARE_REPLY
-	JSR	CHECK_COMMAND
-	JEQ	NEW_READ_MEMORY_XYP
-
-	;; Version read command!
-	MOVE	#'VER',X0
-	JSR	PREPARE_REPLY
-	JSR	CHECK_COMMAND
-	JNE	VCOM_EXIT
-
-	MOVE	X:REV_NUMBER,X0
-	JMP	VCOM_EXIT_X0
-
-NEW_READ_MEMORY_XYP
-		
-	;; Args: mem, address, <unused>
-	MOVE	X:DRXR_WD2,A
-	MOVE	X:DRXR_WD3,R0
-	
-	CMP	#'_X',A
-	JEQ	READ_MEMORY_X
-
-	CMP	#'_Y',A
-	JEQ	READ_MEMORY_Y
-
-	CMP	#'_P',A
-	JEQ	READ_MEMORY_P
-
-	JSR	SET_ERROR
-	MOVE	#'MTE',X0		; This is cheating...
-	JMP	VCOM_EXIT_X0
-
-READ_MEMORY_X
-	MOVE	X:(R0),X0
-	JMP	VCOM_EXIT_X0
-READ_MEMORY_Y
-	MOVE	Y:(R0),X0
-	JMP	VCOM_EXIT_X0
-READ_MEMORY_P
-	MOVE	P:(R0),X0
-	JMP	VCOM_EXIT_X0
-	
-
-NEW_WRITE_MEMORY
-	JSR	SAVE_REGISTERS
-	MOVE	#'WRM',X1
-	JSR	VCOM_INTRO
-	JNE	VCOM_EXIT
-
-	;; Args: mem, address, data
-	MOVE	X:DRXR_WD2,A
-	MOVE	X:DRXR_WD3,R0
-	MOVE	X:DRXR_WD4,X0
-	
-	CMP	#'_X',A
-	JEQ	WRITE_MEMORY_X
-
-	CMP	#'_Y',A
-	JEQ	WRITE_MEMORY_Y
-
-	CMP	#'_P',A
-	JEQ	WRITE_MEMORY_P
-
-	JSR	SET_ERROR
-	MOVE	#'MTE',X0		; This is cheating...
-	JMP	VCOM_EXIT_X0
-
-WRITE_MEMORY_X
-	MOVE	X0,X:(R0)
-	JMP	VCOM_EXIT_X0
-WRITE_MEMORY_Y
-	MOVE	X0,Y:(R0)
-	JMP	VCOM_EXIT_X0
-WRITE_MEMORY_P
-	MOVE	X0,P:(R0)
-	JMP	VCOM_EXIT_X0
-
-VCOM_EXIT_X0	
-	MOVE	X0,X:DTXS_WD4
-VCOM_EXIT
-	JSR	RESTORE_REGISTERS
-	JSR	PCI_MESSAGE_TO_HOST
-	RTI
-
-
-NEW_START_APPLICATION
-	JSR	SAVE_REGISTERS
-	MOVE	#'GOA',X1
-
-	JSR	VCOM_INTRO
-	JNE	VCOM_EXIT
-
-	BSET	#APPLICATION_LOADED,X:STATUS
-	RTI				; Application will reply.
-	
-NEW_STOP_APPLICATION
-	JSR	SAVE_REGISTERS
-	MOVE	#'STP',X1
-
-	JSR	VCOM_INTRO
-	JNE	VCOM_EXIT
-
-	BCLR	#APPLICATION_LOADED,X:STATUS
-	RTI				; Application will reply.
-	
-;;; Here, "HILO" format refers to the storage of a 32 bit address addr into
-;;; two consecutive 24-bit words in X memory, mem0 and mem1.
-;;; mem0[15..0] = addr[15..0] and mem1[15..0] = addr[31..16].
-	
-LOAD_HILO_ADDRESS
-	;; Load the 32 bit address stored in [ R2+1 : R2 ] into A
-	;; Trashes X0.
-	CLR	A
-	MOVE	X:(R2)+,A0
-	MOVE	X:(R2)-,X0
-	INSERT	#$010010,X0,A
-	RTS
-
-ADD_HILO_ADDRESS
-	;; Adds B to the hilo address stored at [ R2+1 : R2 ]
-	;; Trashes X0 and A and B.
-
-	JSR	LOAD_HILO_ADDRESS
-	ADD	B,A
-
-SAVE_HILO_ADDRESS
-	;; Save the low 32 bits of A into [ R2+1 : R2 ]
-	;; Trashes X0 and B, preserves A.
-
-	MOVE	X0,X:(R2)+		; pre-increment
-	MOVE	#0,X0
-	ASL	#8,A,B
-	INSERT	#$008010,X0,A
-	MOVE	B1,X:(R2)-		; store hi16
-	MOVE	A0,X:(R2)
-	ASR	#8,B,A
-	RTS
-	
-		
-; TEST_ROUTINES			; Passed.
-
-; 	MOVE	#$01,A1
-; 	MOVE	#$020304,A0
-; 	MOVE	#BDEBUG0,R2
-
-; 	JSR     SAVE_HILO_ADDRESS
-
-; 	JSR	LOAD_HILO_ADDRESS
-; 	MOVE	#BDEBUG2,R2
-; 	JSR	SAVE_HILO_ADDRESS
-
-; 	MOVE	#$02,B1
-; 	MOVE	#$000203,B0
-; 	MOVE	#BDEBUG0,R2
-; 	JSR	ADD_HILO_ADDRESS
-
-; 	RTS
-
-	
-LE_NEW_PACKET_HANDLER
-	;; Starts acting after the PACKET_INFO has been read into HEAD_W**
-	
-	;; Copy data into Y memory.  Check for DA/RP, and call QT routine
-	;;  if activated
-
-	;; Check DA vs. RP packet
-
-	MOVE	X:HEAD_W3_0,A
-
-	CMP	#'RP',A
-	JEQ	BUFFER_PACKET_RP
-	CMP	#'DA',A
-	JEQ	BUFFER_PACKET_DA
-
-	JMP	QT_PTYPE_ERROR
-
-BUFFER_PACKET_RP
-
-	JMP	MCE_PACKET		; Process in the usual way
-	
-BUFFER_PACKET_DA
-
-	BTST	#QT_ENABLED,X:STATUS
-	JCC	MCE_PACKET		; Process in the usual way
-
-	;; Ok, we're QT.  Buffer the packet.
-
-; 	;; This won't work until you re-order HEAD * 0,1
-; 	MOVE	#HEAD_W4_1,R2		; Note W4_0 is *after* W4_1 in memory
-; 	JSR	LOAD_HILO_ADDRESS	; Packet size, in word32
-; 	ASL	#2,A,A			; Convert to bytes
-; 	ADD	#0,B			; Clear carry
-; 	ASL	#14,A,B			; B1 = size in bytes / 2^10
-; 	MOVE	#0,X0
-; 	INSERT	#$0E000A,X0,A		; A0 = size in word32 % 2^10
-
-	;; This is sort of the same thing.
-	CLR	A
-	MOVE	X:HEAD_W4_0,A0	; 0x54c
-	MOVE	X:HEAD_W4_1,X0	; 0     ok
- 	INSERT	#$010010,X0,A	; 
-
-	NOP
-	MOVE	A0,X:TEMP_PSIZE
-
-	ADD	#0,B		; Clear carry
-	ASL	#1,A,A		        ;  * 2
-	ASL	#15,A,B			; B1 = size in bytes / 2^10
-	MOVE	#0,X0
-	INSERT	#$00E009,X0,A		; A0 = (size in bytes % 2^10) / 2
-
-	MOVE	B1,X:TOTAL_BUFFS
-	MOVE	A0,X:LEFT_TO_READ
-
-BUFFER_PACKET_HALFS
-	MOVE	#IMAGE_BUFFER,R1
-	DO	X:TOTAL_BUFFS,BUFFER_PACKET_SINGLES
-	JSR	WAIT_FIFO_HALF
-	JSR	TRANSFER_FIFO_HALF
-	
-BUFFER_PACKET_SINGLES
-	DO	X:LEFT_TO_READ,BUFFER_PACKET_SEND
-	JSR	WAIT_FIFO_SINGLE
-	JSR	TRANSFER_FIFO_SINGLE
-
-BUFFER_PACKET_SEND
-	MOVE	X:QT_BUF_HEAD,A
-	ADD	#1,A
-	MOVE	X:QT_BUF_MAX,B
-	CMP	A,B
-	JGE	BUFFER_PACKET_MATH
-	MOVE	#0,A
-BUFFER_PACKET_MATH
-	MOVE	X:QT_BUF_TAIL,B
-	CMP	A,B
-	JEQ	BUFFER_PACKET_DROP	; If yes, drop packet
-
-	JSR	QT_DATA_PACKET		; and transfer
-
-BUFFER_PACKET_DONE
-	JMP	PACKET_IN
-	
-BUFFER_PACKET_DROP
-	MOVE	X:QT_DROPS,A
-	ADD	#1,A
-	NOP
-	MOVE	A,X:QT_DROPS
-	
-	JMP	BUFFER_PACKET_DONE
-
-	
-
-WAIT_FIFO_HALF
-	JSET	#FATAL_ERROR,X:<STATUS,FATALITY_HANDLER
-	JSET	#HF,X:PDRD,WAIT_FIFO_HALF	; Wait for half full+1
-	NOP
-	NOP
-	JSET	#HF,X:PDRD,WAIT_FIFO_HALF	; Protect against metastability
-	RTS
-
-WAIT_FIFO_SINGLE
-	JSET	#FATAL_ERROR,X:<STATUS,DUMP_FIFO
-	JCLR	#EF,X:PDRD,WAIT_FIFO_SINGLE
-	NOP
-	NOP
-	JCLR	#EF,X:PDRD,WAIT_FIFO_SINGLE	; Protect against metastability
-	RTS	
-	
-TRANSFER_FIFO_HALF
-	;; Copies 512 16-bit words from FIFO into Y:R1
-	DO	#512,TRANSFER_FIFO_DONE
-TRANSFER_FIFO_SINGLE
-	MOVEP	Y:RDFIFO,Y:(R1)+
-TRANSFER_FIFO_DONE
-	RTS
-		
-FATALITY_HANDLER	
-	JMP	START			; What could possibly go wrong?
-	
-	
-QT_DATA_PACKET
-	;; Copy packet to next buffer address, check inform count and notify
-	;;  PC if elapsed.
-
-	;; Load packet size
-; 	MOVE	#HEAD_W4_1,R2		; Note W4_0 is *after* W4_1 in memory
-; 	JSR	LOAD_HILO_ADDRESS	; Size, in word32
-	CLR	A
-	MOVE	X:TEMP_PSIZE,A0
-	
-	ADD	#0,B			; Clear carry
-	ASL	#2,A,A			; Size, in bytes
-
-	;; Check packet size
-	CLR	B
-	MOVE	X:QT_FRAME_SIZE,B0
-	CMP	A,B
-	JNE	QT_FSIZE_ERROR
-
-	;; Prepare burst variables
-	MOVE	B0,X:BLOCK_SIZE
-	MOVE	B1,X:BURST_SRC		; Y:0
-
-	MOVE	#QT_DEST_LO,R2
-	JSR	LOAD_HILO_ADDRESS
-	MOVE	#BURST_DEST_LO,R2
-	JSR	SAVE_HILO_ADDRESS
-
-	;; Send
-	JSR	BLOCK_TRANSFER
-
-	;; Next buffer
-	JSR	BUFFER_INCR
-
-	;; Check if it's time to inform PC
-	JSR	BUFFER_INFORM_CHECK
-
-	
-	RTS
-	
-		
-BUFFER_INCR
-	
-	MOVE	X:QT_BUF_HEAD,A
-	ADD	#1,A
-	MOVE	X:QT_BUF_MAX,B
-	CMP	A,B
-	JLE	BUFFER_RESET
-	
-	MOVE	A,X:QT_BUF_HEAD
-
-	CLR	B
-	MOVE	X:QT_BUF_SIZE,B0
-	MOVE	#QT_DEST_LO,R2
-	JSR	ADD_HILO_ADDRESS	
-		
-	RTS
-
-BUFFER_RESET
-	MOVE	#QT_BASE_LO,R2
-	JSR	LOAD_HILO_ADDRESS
-	MOVE	#QT_DEST_LO,R2
-	JSR	SAVE_HILO_ADDRESS
-
-	MOVE	#0,X0
-	MOVE	X0,X:QT_BUF_HEAD
-	RTS
-
-BUFFER_INFORM_CHECK
-	MOVE	X:QT_INFORM_IDX,A
-	ADD	#1,A
-	MOVE	X:QT_INFORM,B
-	CMP	A,B
-	JGT	BUFFER_INFORM_OK
-	BSET	#QT_FLUSH,X:STATUS
-BUFFER_INFORM_OK
-	MOVE	A,X:QT_INFORM_IDX
-	RTS
-
-	
-;;; TIMERS
-
-	;; Configuration
-TIMER_CONFIG
-	;; Start value is TLR, count is in TCR, int occurs at TCPR
-
-	;; Must set TCSR[TCIE] to enable int
-	;; Must set TCSR[T] for timer to restart
-
-	MOVE	#$000200,X0 	        ; 'Reload' mode
-	CLR	A
-	MOVE	X0,X:TCSR0
-	MOVEP	A0,X:TLR0
-	MOVE	#10000000,A0		; This is 5 Hz, apparently.
-	NOP
-	MOVE	A0,X:TCPR0
-
-	RTS
-
-TIMER_ENABLE
-	MOVE	#$000201,X0	; Enable
-	NOP
-	MOVE	X0,X:TCSR0
-	RTS
-
-TIMER_DISABLE
-	MOVE	#$300200,X0	; Clear TOF, TCF, disable timer.
-	NOP
-	MOVE	X0,X:TCSR0
-	RTS
-	
-TIMER_ACTION
- 	MOVE	X:QT_INFORM_IDX,A
-	MOVE	#$300201,X0    	; Clear TOF, TCF, leave timer enabled.
-	NOP
-	MOVE	X0,X:TCSR0
- 	CMP	#>0,A
- 	JEQ	ESCAPE
-	BSET	#QT_FLUSH,X:STATUS
-ESCAPE
-	RTS
-
-
-QT_PTYPE_ERROR		
-QT_FSIZE_ERROR
-	;; Prepare error message, and notify
-
-	RTS
-
-	
-;----------------------------------------------
-LE_BLOCK_TRANSFER
-;----------------------------------------------
-;   In:
-;   - BLOCK_DEST_HI:BLOCK_DEST_LO is PC RAM address
-;   - BLOCK_SIZE is packet size, in bytes
-;   - BLOCK_SRC is start of data in Y memory
-;  Out:
-;   - BLOCK_SIZE will be decremented to zero.
-;   - BLOCK_DEST_HI:LO will be incremented by BLOCK_SIZE
-;   - BLOCK_SRC will be incremented by BLOCK_SIZE/2
-;  Trashes:
-;   - A and B
-	
-	MOVE	#'HEY',X0		; Information
-	MOVE	X0,X:<DTXS_WD1
-
-	MOVE	X:BLOCK_SIZE,X0
-	MOVE	X0,X:<DTXS_WD2
-
-	MOVE	X:BURST_SRC,X0
-	MOVE	X0,X:<DTXS_WD3
-
- 	MOVE	X:BURST_DEST_LO,X0
-	MOVE	X0,X:<DTXS_WD4
-		
-;  	JSR	PCI_MESSAGE_TO_HOST	; notify host of packet	
-
-HOCK_TRANSFER_NONOTE
-		
-	;; DSP PCI burst limit is 256 bytes.
-	MOVE	X:BLOCK_SIZE,A	        ; A1 = BLOCK_SIZE
-	
-	CMP	#0,A
-	JEQ	HOCK_DONE
-
-	;; Careful here, force long (24-bit) literal.
-
-; 	CLR	B
-; 	MOVE	X:PCI_BURST_SIZE,B1
- 	MOVE	#>$000040,B
-	
-	MOVE	#'HEY',X0		; Information
-	MOVE	X0,X:<DTXS_WD1
-	MOVE	#$aa0000,X0
-	MOVE	X0,X:<DTXS_WD2
-	MOVE	A1,X0
-	MOVE	X0,X:<DTXS_WD3
- 	MOVE	B1,X0
-	MOVE	X0,X:<DTXS_WD4
-;  	JSR	PCI_MESSAGE_TO_HOST	; notify host of packet	
-
-	CMP	B,A			; A ? B
-	JGE	<HOCK_TRANSFER1	; jump if A >= B
-	MOVE	A,B	
-HOCK_TRANSFER1
-	SUB	B,A			; A -= B
-	ADD	#0,B			; Clear carry bit
-	MOVE	A,X:BLOCK_SIZE		; Updated BLOCK_SIZE
-	MOVE	B,X:BURST_SIZE		; BURST_SIZE ;= round32(min(BLOCK_SIZE,$100))
-	ASR	#25,B,B			; B0 = # of 16 bit words
-
-	;; Setup DMA from BURST_SRC to PCI tx
-	MOVEP	#DTXM,X:DDR0		; DMA dest'n
-	MOVE	X:BURST_SRC,A0
-	MOVEP	A0,X:DSR0		; DMA source
-	ADD	B,A
-	DEC	B
-	MOVE	A0,X:BURST_SRC		; BURST_SRC += BURST_SIZE/2
-	
-	MOVEP	B0,X:DCO0		; DMA length = BURST_SIZE/2 - 1
-
-	;; DMA go
-	MOVEP	#$8EFA51,X:DCR0
-
-HOCK_PCI
-	;; Setup PCI burst using BURST_SIZE
-	CLR	A
-	CLR	B
-	MOVE	X:BURST_SIZE,B0		; B = n8
-	DEC	B			; n8 - 1
-	ADD	#0,B			; Clear carry
-	ASR	#2,B,B			; (n8 - 1)/4 = n32 - 1
-	ADD	#0,B			; Clear carry
-	ASL	#16,B,B			; B[23:16] = " "
-	
-	MOVE	X:BURST_DEST_HI,A0
-
-	MOVE	B0,X:BDEBUG0
-	MOVE	B1,X:BDEBUG1
-	MOVE	A0,X:BDEBUG2
-	MOVE	A1,X:BDEBUG3
-	
-	ADD	B,A
-	NOP
-	MOVE	A0,X:DPMC		; PCI burst length and HI address
-
-	MOVE	A0,X:BDEBUG4
-	MOVE	A1,X:BDEBUG5
-	
-	MOVE	#$07,A0
-	ADD	#0,B			; Clear carry
-	ASL	#16,A,A
-	MOVE	X:BURST_DEST_LO,B0
-	ADD	B,A
-	NOP
-	
-	MOVEP	A0,X:DPAR		; PCI LO address and GO
-
-HOCK_CHECK
-	NOP
-	NOP
-	JCLR	#MARQ,X:DPSR,*		; Wait for burst termination
-
-	;; Check for error
-	JSET	#MDT,X:DPSR,HOCK_OK
-
-	JSR	MPCI_ERROR_RECOVERY
-
-	BCLR	#PCIDMA_RESTART,X:STATUS ; Test and clear
-	JCS	<HOCK_RESTART
-
-	BCLR	#PCIDMA_RESUME,X:STATUS	; Test and clear
-	JCS	<HOCK_RESUME
-
-HOCK_OK
-	MOVE	X:BURST_SIZE,A0		; Pass # of words written to updater
-	JSR	HOCK_UPDATE
-	JMP	HOCK_TRANSFER_NONOTE	; Finish the block
-HOCK_DONE
-	RTS				; Done	
-	
-HOCK_RESTART
-	JMP	HOCK_PCI		; Recalculate pci and resend
-
-HOCK_RESUME
-	CLR	A
-	CLR	B
-	MOVEP	X:DPSR,A0		; Get words left to write
-
-	JCLR	#15,X:DPSR,HOCK_RESUME1
-	
-	CLR	B
-	INC	B
-	
-HOCK_RESUME1
-
-	INC	B			; We want N, not N-1.
-	ADD	#0,B			; Clear carry
-	ASR	#16,A,A
-	ADD	A,B			; B is words remaining
-	ADD	#0,B			; Clear carry
-	ASL	#2,B,B			; Number of bytes left to transfer
-	MOVE	X:BURST_SIZE,A0
-	SUB	B,A			; A is words written
-
-	JSR	HOCK_UPDATE
-	JMP	HOCK_PCI		; Recalculate pci and resend
-
-;;; Subroutine:	subtract A from BURST_SIZE and add A to BURST_DEST_LO
-;;;  Caller can check Z flag to see if BURST_SIZE is 0 now.
-HOCK_UPDATE
-	;; Use A (number of bytes bursted) to update
-	;;  BURST_DEST_HI:LO and BURST_SIZE
-
-; 	MOVE	X:BURST_SIZE,X0
-; 	MOVE	X0,X:<DTXS_WD3
-
-	MOVE	A0,X1			; Save A
- 	MOVE	A0,B0			; Save A again...
- 	MOVE	A1,B1			; Save A again...
-	NOP
-; 	MOVE	B0,X:BDEBUG0
-; 	MOVE	A0,X:BDEBUG1
-	
-	MOVE	#BURST_DEST_LO,R2
-	JSR	ADD_HILO_ADDRESS	; This updates BURST_DEST
-
-	MOVE	X:BURST_SIZE,B
-	SUB	X1,B
-	NOP
-	MOVE	B1,X:BURST_SIZE
-
-; 	MOVE	#'HEY',X0		; Information
-; 	MOVE	X0,X:<DTXS_WD1
-
-; 	MOVE	#$FF0000,X0
-; 	MOVE	X0,X:<DTXS_WD2
-
-; 	MOVE	X:BURST_SIZE,X0
-; 	MOVE	X0,X:<DTXS_WD4
-		
-;  	JSR	PCI_MESSAGE_TO_HOST	; notify host of packet	
-	
-	RTS
 		
 END_ADR	EQU	@LCV(L)		; End address of P: code written to ROM

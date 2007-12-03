@@ -137,10 +137,10 @@ INIT_PCI
 
 ; Interrupt locations for 7 available commands on PCI board
 ; Each JSR takes up 2 locations in the table
-	JSR	NEW_WRITE_MEMORY		; $78
-	JSR	NEW_READ_MEMORY			; $7A
-	JSR	NEW_START_APPLICATION		; $7C
-	JSR	NEW_STOP_APPLICATION		; $7E
+	JSR	WRITE_MEMORY			; $78
+	JSR	READ_MEMORY			; $7A
+	JSR	START_APPLICATION		; $7C
+	JSR	STOP_APPLICATION		; $7E
 ; software reset is the same as cleaning up the PCI - use same routine
 ; when HOST does a RESET then this routine is run
 	JSR	SOFTWARE_RESET			; $80
@@ -345,6 +345,9 @@ X_WRITE
 	BCLR	#BYTE_SWAP,X:<STATUS	; flag to let host know byte swapping off
 	BCLR	#AUX1,X:PDRC		; enable disable
 
+;;; Clear the fibre fifo!
+	JSR	CLEAR_FIFO
+		
 ;----------------------------------------------------------------------------
 ; Initialize PCI controller again, after booting, to make sure it sticks
         BCLR	#20,X:DCTR		; Terminate and reset mode 
