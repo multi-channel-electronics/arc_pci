@@ -345,6 +345,9 @@ X_WRITE
 	BCLR	#BYTE_SWAP,X:<STATUS	; flag to let host know byte swapping off
 	BCLR	#AUX1,X:PDRC		; enable disable
 
+;;; Clear the fibre fifo!
+	JSR	CLEAR_FIFO
+		
 ;----------------------------------------------------------------------------
 ; Initialize PCI controller again, after booting, to make sure it sticks
         BCLR	#20,X:DCTR		; Terminate and reset mode 
@@ -357,7 +360,3 @@ X_WRITE
 ;-----------------------------------------------------------------------------
 ; Here endth the initialisation code run after power up.
 ; ----------------------------------------------------------------------------
-
-
-
-
