@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# This outputs patch code, with addresses, for passing to make_patch.
+
+SRC=build.lod
+COMP=../releases/U0104/build.lod
+
+function look_up {
+    # Determines the address of line $1
+    export line=0
+    addr=-1
+    cat $SRC | grep -n '^_DATA P' | sed 's/:_DATA\ P/\ /g' |sed 's/\ 0/\ 0x/g' | \
+	awk '{printf "%i %i\n", $1, $2}' |\
+	awk "END {print A+8*($1 - L - 1) - 2} (\$1 > $1) {print A+8*($1 - L - 1) - 2; exit} (\$1 <= $1) {L=\$1; A=\$2}"
+}
+
+
+off=0
+export L=0
+diff $COMP $SRC | sed 's/[,c]/\ /g' | while read -a A; do
+    if [ "$off" != "0" ]; then continue ; fi
+    w=${A[0]}
+    [ "$w" == "<" ] && continue
+    [ "$w" == "---" ] && continue
+    [ "${A[3]}" == "I" ] && off=1
+
+    export L=$(( $L + 1 ))
+    if [ "${A[1]}" == "_DATA" ]; then
+	echo Match `look_up $L`
+	continue
+    fi
+    if [ "$w" == ">" ]; then
+	echo ${A[@]:1:8}
+	continue
+    fi
+    export L=${A[0]}
+    echo Match `look_up ${A[0]}`
+done

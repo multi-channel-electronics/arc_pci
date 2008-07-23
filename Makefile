@@ -12,7 +12,7 @@ ASM_FLAGS=-dDOWNLOAD ROM
 
 default: $(TARGET).s
 
-build.clb: header.asm init.asm main.asm build.asm
+build.clb: header.asm init.asm main.asm build.asm vars.asm app.asm info.asm
 
 %s : %lod
 	$(LOD) $< $@ UBC_MCE_PCI 4
@@ -31,3 +31,7 @@ clean:	tidy
 
 tidy:
 	-rm *.cld *.clb *.ls *~
+
+.PHONY: clean tidy
+
+.SECONDARY: $(TARGET).lod

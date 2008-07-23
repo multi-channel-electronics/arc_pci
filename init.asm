@@ -1,23 +1,12 @@
-      COMMENT *
+	COMMENT *
 
-This is the code which is executed first after power-up etc. 
-It sets all the internal registers to their operating values,
-sets up the ISR vectors and inialises the hardware etc.
-
-Project:     SCUBA 2 
-Author:      DAVID ATKINSON
-Target:      250MHz SDSU PCI card - DSP56301
-Controller:  For use with SCUBA 2 Multichannel Electronics 
-
-Assembler directives:
-	DOWNLOAD=EEPROM => EEPROM CODE
-	DOWNLOAD=ONCE => ONCE CODE
-
+Initial configuration, and ISR vector definitions.
+	
+See info.asm for versioning and authors.
+	
 	*
 	PAGE    132     ; Printronix page width - 132 columns
 	OPT	CEX	; print DC evaluations
-
-	MSG ' INCLUDE PCI_initialisation.asm HERE  '
 
 ; The EEPROM boot code expects first to read 3 bytes specifying the number of
 ; program words, then 3 bytes specifying the address to start loading the 
@@ -151,6 +140,18 @@ INIT_PCI
 ; QT - set command
 	JSR	QUIET_TRANSFER_SET              ; $88
 	JSR	SYSTEM_RESET                    ; $8A
+
+; Quiet RP mode, clear buffer full flag
+	BCLR	#RP_BUFFER_FULL,X:<STATUS	; $8C
+	NOP
+
+; Disable PCI interrupts
+	BCLR	#MODE_IRQ,X:<MODE		; $8E
+	NOP
+
+; Enable PCI interrupts
+	BSET	#MODE_IRQ,X:<MODE		; $90
+	NOP
 
 ; ***********************************************************************
 ; For now have boot code starting from P:$100
@@ -296,13 +297,11 @@ CLR1
 ;-----------------------------------------------------------------------------
 ; copy parameter table from P memory into X memory
 
-; but not word_count and num_dumped - don't want these reset by fatal error....
+; but not frame_count and num_dumped - don't want these reset by fatal error...
 ; they will be reset by new packet or pci_reset ISR
 
-
-	MOVE	X:WORD_COUNT,Y0		; store packet word count
-	MOVE	X:NUM_DUMPED,Y1		; store number dumped (after HST TO)
-	MOVE	X:FRAME_COUNT,X1	; store frame count
+	MOVE	X:NUM_DUMPED,Y1			; store number dumped (after HST TO)
+	MOVE	X:FRAME_COUNT,X1		; store frame count
 
 ; Move the table of constants from P: space to X: space
 	MOVE	#VAR_TBL_START,R1 		; Start of parameter table in P 
@@ -312,42 +311,19 @@ CLR1
 	MOVE	X0,X:(R0)+			; Write the constants to X:
 X_WRITE
 
-
-	MOVE	Y0,X:WORD_COUNT			; restore packet word count
 	MOVE	Y1,X:NUM_DUMPED			; restore number dumped (after HST TO)
 	MOVE	X1,X:FRAME_COUNT		; restore frame count
 
 ;-------------------------------------------------------------------------------
-; initialise some bits in STATUS
-
-	BCLR	#APPLICATION_LOADED,X:<STATUS	  ; clear application loaded flag
-	BCLR	#APPLICATION_RUNNING,X:<STATUS    ; clear appliaction running flag 
-						  ; (e.g. not running diagnostic application 
-						  ;      in self_test_mode)	
-
-	BCLR	#FATAL_ERROR,X:<STATUS		; initialise fatal error flag.
-	BSET	#PACKET_CHOKE,X:<STATUS		; enable MCE packet choke
-						; HOST not informed of anything from MCE until 
-						; comms are opened by host with first CON command
-
-	BCLR	#PREAMBLE_ERROR,X:<STATUS ; flag to let host know premable error 
+; initialise MODE; packet choke and PCI interrupts are ON.
+	BSET	#MODE_CHOKE,X:MODE
+	BSET	#MODE_IRQ,X:MODE
 	
-;------------------------------------------------------------------------------
-; disable FIFO HF* intererupt...not used anymore.
-
-	MOVEP	#$0001C0,X:IPRC		; Disable FIFO HF* interrupt
-	MOVEC	#$200,SR		; Mask level 1 interrupts
-
 ;----------------------------------------------------------------------------
-; Disable Byte swapin - enabled after first command to MCE.
+; Disable byte swapping - enabled after first command to MCE.
 ; i.e after first 'CON'
+	BCLR	#AUX1,X:PDRC
 
-	BCLR	#BYTE_SWAP,X:<STATUS	; flag to let host know byte swapping off
-	BCLR	#AUX1,X:PDRC		; enable disable
-
-;;; Clear the fibre fifo!
-	JSR	CLEAR_FIFO
-		
 ;----------------------------------------------------------------------------
 ; Initialize PCI controller again, after booting, to make sure it sticks
         BCLR	#20,X:DCTR		; Terminate and reset mode 
@@ -357,6 +333,9 @@ X_WRITE
         BSET    #20,X:DCTR              ; HI32 mode = 1 => PCI
         NOP
         JSET    #12,X:DPSR,*		; Host data transfer not in progress
-;-----------------------------------------------------------------------------
-; Here endth the initialisation code run after power up.
-; ----------------------------------------------------------------------------
+
+	;; Configure our code
+	JSR	CLEAR_FO_FIFO		; Clear the fibre fifo!
+	JSR	TIMER_DISABLE		; Disable NFY timer
+
+;;; Fall-through to main.asm

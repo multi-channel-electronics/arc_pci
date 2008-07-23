@@ -216,3 +216,8 @@ MOVES ARE MESSED UP!  e.g. MOVE #$0100,A puts $100 in A but MOVE
 #$0040,A puts $400000 in A!!  You must force short (8bit) or long
 (24bit) literals like this: MOVE #>$40,B will treat $40 as 24 bits and
 store it in B1.
+
+Wide accumulators:
+
+MOVE A,B doesn't copy all 48 bits all the time.  A better approach is
+  ASL #0,A,B

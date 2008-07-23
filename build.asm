@@ -1,13 +1,15 @@
- COMMENT *
+	COMMENT *
 
-Compile this to build all files together.
+Main source file.
 
-Project:     SCUBA 2 
-Author:      DAVID ATKINSON
+Project:     UBC Multi-Channel Electronics
 Target:      250MHz SDSU PCI card - DSP56301
-Controller:  For use with SCUBA 2 Multichannel Electronics 
 
-Modified:    MATTHEW HASSELFIELD
+Original code by Bob Leach (Astro-cam) and David Atkinson (ATC).
+Versions U0101+ maintained by Matthew Hasselfield (UBC)
+	
+Version:     Release Version U (1.5)
+
 
 Assembler directives:
 	DOWNLOAD=EEPROM => EEPROM CODE
@@ -17,9 +19,9 @@ Assembler directives:
 	PAGE    132     ; Printronix page width - 132 columns
 	OPT	CEX	; print DC evaluations
 
+	INCLUDE 'info.asm'
 	INCLUDE 'header.asm'
 	INCLUDE	'init.asm'
 	INCLUDE 'main.asm'
-
-
-
+	INCLUDE 'vars.asm'
+	INCLUDE 'app.asm'

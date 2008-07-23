@@ -1,23 +1,12 @@
       COMMENT *
 
-PCI code header file.
+Defines for DSP register addresses.
 
-Project:     SCUBA 2 
-Author:      DAVID ATKINSON
-Target:      250MHz SDSU PCI card - DSP56301
-Controller:  For use with SCUBA 2 Multichannel Electronics 
-
-Modified:    MATTHEW HASSELFIELD
-	
-Assembler directives:
-	DOWNLOAD=0 => EEPROM CODE
-	DOWNLOAD=1 => DOWNLOAD CODE
+See info.asm for versioning and authors.
 
 	*
 	PAGE    132     ; Printronix page width - 132 columns
 	OPT	CEX	; print DC evaluations
-
-	MSG ' INCLUDE PCI_header.asm HERE  '
 
 ; Equates to define the X: memory tables
 VAR_TBL		EQU	0	; Variables and constants table
@@ -36,44 +25,12 @@ APPL_PARAM	EQU	$200 	; application parameters in x memory start here.
 
 HF_FIFO		EQU	512	; number of 16 bit words in a half full FIFO
 SMALL_BLK	EQU	32	; small block burst size for < 512 pixels
-IMAGE_BUFFER	EQU	0	; location in y memory of image buffer....
 
+;;; Y memory (buffer) mapping	
+IMAGE_BUFFER	EQU	0	; Data frame buffer offset.
+REPLY_BUFFER	EQU     $100000	; Buffer MCE replies at 1M
+COMMAND_BUFFER	EQU	$200000	; Buffer MCE commands at 2M
 
-;Status bits
-
-APPLICATION_LOADED	EQU	0   ; set if PCI application to run
-SEND_TO_HOST		EQU	1   ; set in HST ISR when host ready for packet (stays set until after HST reply)
-FATAL_ERROR		EQU	2   ; PCI message to host error detected by driver....
-FO_WRD_RCV		EQU	3   ; set when packet detected in FIFO - stays set till packet processed
-
-;INTA_FLAG		EQU	4   ; used for interupt handshaking with host
-BYTE_SWAP		EQU	5   ; flag to show byte swapping enabled
-PREAMBLE_ERROR		EQU	6   ; set if preamble error detected
-DATA_DLY		EQU	7   ; set in CON ISR if MCE command is 'GO'.  USed to add delay to first returned data packet 
-
-PACKET_CHOKE		EQU	8   ;  don't let any packets from MCE through to host....
-HST_NFYD		EQU	9   ; set after host notified (NFY message) of packet (stays set until after HST reply)
-SB_SPARE1		EQU	10
-SB_SPARE2		EQU	11
-
-
-APPLICATION_RUNNING	EQU	12   ; can be set by an application to indicate its still running
-				     ; e.g. set by diagnostic application
-				     ; indicates in a 'self_test_mode'
-				     ; subsequnet GO commands (for MCE) will be handelled internally. 
-				     ; disable with PCI STOP_APPLICATION command.
-
-INTERNAL_GO		EQU	13   ; GO command received while diagnostic application still running 
-				     ; tests DMA bursts as bus master
-
-;;; MFH - PCI burst error recovery
-PCIDMA_RESTART		EQU	14
-PCIDMA_RESUME		EQU	15
-PCIDMA_RETRY		EQU	16
-
-QT_ENABLED		EQU	17
-QT_FLUSH		EQU	18
-QT_NEW_GRANT		EQU	19
 	
 ; HST timeout recovery....
 
@@ -226,3 +183,8 @@ TOIE		EQU	1
 TCIE		EQU	2
 TOF		EQU	20
 TCF		EQU	21
+
+
+;;; FO transmitter memory-mapped location
+
+FO_SEND		EQU	$FFF000

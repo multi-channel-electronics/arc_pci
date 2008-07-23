@@ -1,65 +1,55 @@
 	COMMENT *
 
-This is the main section of the pci card code. 
+Main section of the pci card code.
 
-Project:     SCUBA 2 
-Author:      DAVID ATKINSON
-Target:      250MHz SDSU PCI card - DSP56301
-Controller:  For use with SCUBA 2 Multichannel Electronics 
-
-Modified:    MATTHEW HASSELFIELD
-	
-Version:     Release Version U (1.4)
-
-
-Assembler directives:
-	DOWNLOAD=EEPROM => EEPROM CODE
-	DOWNLOAD=ONCE => ONCE CODE
+See info.asm for versioning and authors.
 
 	*
 	PAGE    132     ; Printronix page width - 132 columns
 	OPT	CEX	; print DC evaluations
 
-	MSG ' INCLUDE PCI_main.asm HERE  '
-
-; --------------------------------------------------------------------------
-; --------------------- MAIN PACKET HANDLING CODE --------------------------
-; --------------------------------------------------------------------------
-
-; initialse buffer pointers	
+;;;
+;;; Start main loop
+;;;
+	
 PACKET_IN
 
-; R1 used as pointer for data written to y:memory            FO --> (Y)
-; R2 used as pointer for date in y mem to be writen to host  (Y) --> HOST
+	;; Reinitialize if a serious error has been detected
+	JSET	#FATAL_ERROR,X:<STATUS,START
 
-	MOVE	#<IMAGE_BUFFER,R1		; pointer for Fibre ---> Y mem
-	MOVE	#<IMAGE_BUFFER,R2		; pointer for Y mem ---> PCI BUS	
+	;; Jump to special application area if signalled to do so
+	JSET	#MODE_APPLICATION,X:<MODE,APPLICATION
 
-; initialise some bits in status..	
-	BCLR	#SEND_TO_HOST,X:<STATUS		; clear send to host flag
-	BCLR	#HST_NFYD,X:<STATUS		; clear flag to indicate host has been notified.
-	BCLR	#FO_WRD_RCV,X:<STATUS		; clear Fiber Optic flag
-
-
-;;; Have we run into trouble or been reprogrammed?
-	JSET	#FATAL_ERROR,X:<STATUS,START		       ; fatal error?  Go to initialisation.
-	JSET	#APPLICATION_LOADED,X:<STATUS,APPLICATION      ; application loaded?  Execute in appl space.
-
-;;; Do we have actions to perform?
+	;; Check for timer expiry and branch to the handler
 	JSSET	#TCF,X:TCSR0,TIMER_ACTION 
+
+	;; If it's time to signal the PC of buffer state, do so.
 	JSSET	#QT_FLUSH,X:STATUS,BUFFER_INFORM
-	NOP				; For expansion!
+	
+	;; Check for data in fibre-optic FIFO
+	JSR	<GET_FO_WRD
+ 	JSSET	#FO_WRD_RCV,X:STATUS,HANDLE_FIFO
+
+	;; New CON code, only run if the fifo isn't hot.
+	JSSET	#CON_DEMAND,X:STATUS,CON_NOW
+
+	;; Hackers, welcome.
+	NOP
 	NOP
 	
-CHK_FIFO
-	JSR	<GET_FO_WRD		; check for 16-bit word in fibre FIFO from MCE 
-	JCLR	#FO_WRD_RCV,X:STATUS,PACKET_IN ; loop
+	;; Loop
+	JMP	PACKET_IN
+
+;;; 
+;;; End of main loop.
+;;; 
 
 
-;;; Fibre data detected; process it
 
-CHECK_WD
-	JSET	#PACKET_CHOKE,X:<STATUS,PACKET_IN	; IF MCE Packet choke on - just keep clearing FIFO.
+;;; Fibre data detected; process it and return to main loop.
+
+HANDLE_FIFO
+	JSET	#MODE_CHOKE,X:<MODE,RETURN_NOW	; IF MCE Packet choke on - just keep clearing FIFO.
 	MOVE	X0,X:<HEAD_W1_0				;store received word
 	MOVE	X:PREAMB1,A
 	CMP	X0,A					; check it is correct
@@ -82,13 +72,6 @@ CHECK_WD
 	MOVE	X:PREAMB2,A
 	CMP	X0,A			; check it is correct
 	JNE	<PRE_ERROR		; if not go to start
-	JMP	<PACKET_INFO		; get packet info
-	
-PRE_ERROR	
-	BSET	#PREAMBLE_ERROR,X:<STATUS	; indicate a preamble error
-        MOVE	X0,X:<PRE_CORRUPT	; store corrupted word
-	JSR	CLEAR_FIFO		; empty the fifo (2 ms!)
-	JMP	<PACKET_IN		; back to main loop
 
 PACKET_INFO                                            ; packet preamble valid
 
@@ -101,28 +84,108 @@ PACKET_INFO                                            ; packet preamble valid
 	MOVE	X0,X:<HEAD_W4_0		; packet size lo
 	JSR	<WT_FIFO	
 	MOVE	X0,X:<HEAD_W4_1		; packet size hi
-		
+
+	;; Break packet size into TOTAL_BUFFS and LEFT_TO_READ
+	CLR	A
+	MOVE	X:HEAD_W4_0,A0
+	MOVE	X:HEAD_W4_1,X0
+ 	INSERT	#$010010,X0,A		; A = size in dwords
+
+	;; Set TOTAL_BUFFS and LEFT_TO_READ using A
+	JSR	PACKET_PARTITIONS
+
 ;;; Case (packet type) of
 	MOVE	X:HEAD_W3_0,A
 
 	CMP	#>'RP',A
-	JEQ	BUFFER_PACKET_RP
+	JEQ	HANDLE_RP
 	
 	CMP	#>'DA',A
-	JEQ	BUFFER_PACKET_DA
+	JEQ	HANDLE_DA
 
 	JMP	QT_PTYPE_ERROR
 
+PRE_ERROR	
+	BSET	#PREAMBLE_ERROR,X:<STATUS	; indicate a preamble error
+	JSR	CLEAR_FO_FIFO		; empty the fifo (2 ms!)
 
-BUFFER_PACKET_RP
+QT_PTYPE_ERROR		
+QT_FSIZE_ERROR
+RETURN_NOW
+	RTS
 
-	JMP	MCE_PACKET		; Process in the usual way
+
+		
+;;; HANDLE_RP
+;;; Handler for MCE reply (RP) packets.
 	
-BUFFER_PACKET_DA
+HANDLE_RP
+	;; Process normally if QUIET_RP not enabled
+	JCLR	#MODE_RP_BUFFER,X:MODE,MCE_PACKET
 
-	;; Do we need to add a delay since first frame?
- 	JSCLR  	#DATA_DLY,X:STATUS,PACKET_DELAY
+	;; Drop this packet if we're backed up
+	JSET	#RP_BUFFER_FULL,X:STATUS,HANDLE_RP_DROP
+
+	;; Copy packet to Y memory, designated area for replies
+	MOVE	#>REPLY_BUFFER,R1
+	JSR	BUFFER_PACKET
+
+	;; Prepare PCI block transfer
+	MOVE	#RP_BASE_LO,R0
+	JSR	LOAD_HILO_ADDRESS
+
+	MOVE	#BURST_DEST_LO,R0
+	JSR	SAVE_HILO_ADDRESS
+
+	;; Limit to the size of the reply buffer
+	CLR	A
+	CLR	B
+	MOVE	X:PACKET_SIZE,A0
+	ASL	#2,A,A			; Size in bytes
+	MOVE	X:RP_MAX_SIZE,B0
+
+	CMP	B,A			; A ? B
+	JLE	HANDLE_RP1
+	MOVE	B,A
+
+HANDLE_RP1
+	;; Prepare notification packet
 	
+	MOVE	#'NFY',X0
+	MOVE	X0,X:DTXS_WD1
+	MOVE	#'RPQ',X0
+	MOVE	X0,X:DTXS_WD2
+	MOVE	A0,X:DTXS_WD3	; A0=block_size
+	MOVE	A1,X:DTXS_WD4	; A1=0
+
+	;; DMA to host
+	MOVE	#>REPLY_BUFFER,X0
+	MOVE	A0,X:BLOCK_SIZE
+	MOVE	X0,X:BURST_SRC
+	JSR	BLOCK_TRANSFER
+
+	;; Mark buffer and signal PC
+	BSET	#RP_BUFFER_FULL,X:STATUS
+	JSR	PCI_MESSAGE_TO_HOST
+
+	;; Return to main loop
+	RTS
+
+HANDLE_RP_DROP
+	MOVE	X:RP_DROPS,A
+	ADD	#1,A
+	NOP
+	MOVE	A,X:RP_DROPS
+	JMP	DROP_PACKET		; Will RTS to main loop
+	
+;;; HANDLE_RP ends
+	
+	
+;;; HANDLE_DA
+;;; Handler for MCE data (DA) frames.
+
+HANDLE_DA
+
 	;; Increment frame count
 	MOVE	X:FRAME_COUNT,A
 	ADD	#>1,A
@@ -130,300 +193,27 @@ BUFFER_PACKET_DA
 	MOVE	A,X:<FRAME_COUNT
 
 	;; If not quiet mode, do normal processing
-	JCLR	#QT_ENABLED,X:STATUS,MCE_PACKET
+	JCLR	#MODE_QT,X:MODE,MCE_PACKET
 
-	JMP	QUIET_TRANSFER_NOW
+	;; Copy words to Y memory.
+	MOVE	#>IMAGE_BUFFER,R1
+	JSR	BUFFER_PACKET
 
-
-PACKET_DELAY 
-	MOVE	X:DATA_DLY_VAL,X0
-	DO	X0,*+3			; 10ns x DATA_DLY_VAL
-	NOP
-	NOP
-	BCLR 	#DATA_DLY,X:STATUS	; clear so delay isn't added next time.
-	RTS	
-	
-; -------------------------------------------------------------------------------------------
-; ----------------------------------- IT'S A PACKET FROM MCE --------------------------------
-; ------------------------------------------------------------------------------------------- 
-; prepare notify to inform host that a packet has arrived.
-
-MCE_PACKET
-		MOVE	#'NFY',X0		; initialise communication to host as a notify
-		MOVE	X0,X:<DTXS_WD1		; 1st word transmitted to host in notify message
-
-		MOVE	X:<HEAD_W3_0,X0		;RP or DA - top two bytes of word 3 ($2020) not passed to driver.
-		MOVE	X0,X:<DTXS_WD2		;2nd word transmitted to host in notify message
-
-		MOVE	X:<HEAD_W4_0,X0		; size of packet LSB 16bits (# 32bit words)
-		MOVE	X0,X:<DTXS_WD3		; 3rd word transmitted to host in notify message
-
-		MOVE	X:<HEAD_W4_1,X0		; size of packet MSB 16bits (# of 32bit words)
-		MOVE	X0,X:<DTXS_WD4		; 4th word transmitted to host in notify messasge
-
-		CLR	A			; 
-		MOVE	#0,R4			; initialise word count
-		MOVE	A,X:<WORD_COUNT	  	; initialise word count store (num of words written over bus/packet)
-		MOVE	A,X:<NUM_DUMPED		; initialise number dumped from FIFO (after HST TO)
-
-
-; ----------------------------------------------------------------------------------------------------------
-; Determine how to break up packet to write to host
-
-; Note that this SR uses accumulator B 
-; Therefore execute before we get the bus address from host (which is stored in B) 
-; i.e before we issue notify message ('NFY')
-
-		JSR	<CALC_NO_BUFFS		; subroutine which calculates the number of 512 (16bit) buffers 
-						; number of left over 32 (16bit) blocks  
-						; and number of left overs (16bit) words  
-
-;  note that a 512 (16-bit) buffer is transfered to the host as 4 x 64 x 32bit DMA burst
-;            a 32  (16-bit) block is transfered to the host as a    16 x 32bit DMA burst
-;            left over 16bit words are transfered to the host in pairs as 32bit words 
-; -------------------------------------------------------------------------------------------------
-
-
-; notify the host that there is a packet.....
-		
-		JSR	<PCI_MESSAGE_TO_HOST			; notify host of packet	
-		BSET	#HST_NFYD,X:<STATUS			; flag to indicate host has been notified.
-
-; initialise read/write buffers 
-; AND IMMEDIATELY BEGIN TO BUFFER FIBRE DATA TO Y MEMORY.
-
-		MOVE	#<IMAGE_BUFFER,R1		; FO ---> Y mem
-		MOVE	#<IMAGE_BUFFER,R2		; Y mem ----->  PCI BUS	
-
-
-; ---------------------------------------------------------------------------------------------------------
-; Write TOTAL_BUFFS * 512 buffers to host
-; ----------------------------------------------------------------------------------------------------				
-		DO	X:<TOTAL_BUFFS,READ_BUFFS_END	; note that if TOTAL_BUFFS = 0 we jump to ALL_BUFFS_END
-	
-WAIT_BUFF	JSET	#FATAL_ERROR,X:<STATUS,DUMP_FIFO	; if fatal error then dump fifo and reset (i.e. if HST timeout)
-		JSET	#HF,X:PDRD,WAIT_BUFF		; Wait for FIFO to be half full + 1
-		NOP
-		NOP
-		JSET	#HF,X:PDRD,WAIT_BUFF		; Protection against metastability
-
-; Copy the image block as 512 x 16bit words to DSP Y: Memory using R1 as pointer
-		DO	#512,L_BUFFER
-		MOVEP	Y:RDFIFO,Y:(R1)+
-L_BUFFER
-		NOP
-READ_BUFFS_END							; all buffers have been read (-->Y)	
-
-; ---------------------------------------------------------------------------------------------------------
-; Read NUM_LEFTOVER_BLOCKS * 32 blocks
-; ----------------------------------------------------------------------------------------------------		
-
-; less than 512 pixels but if greater than 32 will then do bursts
-; of 16 x 32bit in length, if less than 32 then does single read writes
-
-		DO	X:<NUM_LEFTOVER_BLOCKS,READ_BLOCKS	 ;note that if NUM_LEFOVERS_BLOCKS = 0 we jump to LEFTOVER_BLOCKS
-
-		DO	#32,S_BUFFER
-WAIT_1		JSET	#FATAL_ERROR,X:<STATUS,DUMP_FIFO ; check for fatal error (i.e. after HST timeout)
-		JCLR	#EF,X:PDRD,WAIT_1		; Wait for the pixel datum to be there
-		NOP					; Settling time
-		NOP
-		JCLR	#EF,X:PDRD,WAIT_1		; Protection against metastability
-		MOVEP	Y:RDFIFO,Y:(R1)+		; save fibre word
-S_BUFFER
-		NOP
-READ_BLOCKS
-
-; -----------------------------------------------------------------------------------------------------
-; Single write left over words to host
-; ----------------------------------------------------------------------------------------------------	
-
-LEFT_OVERS	
-		DO	X:<LEFT_TO_READ,LEFT_OVERS_READ		; read in remaining words of data packet
-								; if LEFT_TO_READ = 0 then will jump to LEFT_OVERS_READ
-
-WAIT_2		JSET	#FATAL_ERROR,X:<STATUS,START		; check for fatal error (i.e. after HST timeout)
-		JCLR	#EF,X:PDRD,WAIT_2			; Wait till something in FIFO flagged
-		NOP
-		NOP
-		JCLR	#EF,X:PDRD,WAIT_2		   	; protect against metastability.....
-		MOVEP	Y:RDFIFO,Y:(R1)+			; save fibre word	
-LEFT_OVERS_READ
-
-;---------------------------------------------------------------------------------------
-; ENTIRE PACKET NOW IN Y MEMORY
-;----------------------------------------------------------------------------------------
-; CHECK THAT HST COMMAND WAS ISSUED DURING DATA COLLECTION...
-
-
-WT_HOST		JSET	#FATAL_ERROR,X:<STATUS,START		; if fatal error - run initialisation code...
-		JCLR	#SEND_TO_HOST,X:<STATUS,WT_HOST		; wait for host to reply - which it does with 'send_packet_to_host' ISR
-
-;;; All data is buffered and destination address is in BURST_ADDR_HI/LO.
-
-		JSR	PCI_BURST_NOW
-		JSET	#FATAL_ERROR,X:<STATUS,START
-
-; ----------------------------------------------------------------------------------------------------------
-; reply to host's send_packet_to_host command
-
-HST_ACK_REP	MOVE	#'REP',X0
-		MOVE	X0,X:<DTXS_WD1		; REPly
-		MOVE	#'HST',X0
-		MOVE	X0,X:<DTXS_WD2		; echo command sent
-		MOVE	#'ACK',X0
-		MOVE	X0,X:<DTXS_WD3		; ACKnowledge okay
-		MOVE	#'000',X0
-		MOVE	X0,X:<DTXS_WD4		; no error
-		JSR	<PCI_MESSAGE_TO_HOST
-		JMP	<PACKET_IN
-
-;---------------------------------------------------------------------------------------------------
-; clear out the fifo after an HST timeout...
-;----------------------------------------------------------
-
-DUMP_FIFO	MOVE	#DUMP_BUFF,R1		; address where dumped words stored in Y mem
-		MOVE	#MAX_DUMP,X0		; put a limit to number of words read from fifo
-		CLR	A
-		MOVE	#0,R2			; use R2 as a dump count
-
-NEXT_DUMP	JCLR	#EF,X:PDRD,FIFO_EMPTY
-		NOP
-		NOP
-		JCLR	#EF,X:PDRD,FIFO_EMPTY
-
-		MOVEP	Y:RDFIFO,Y:(R1)+	; dump word to Y mem.
-		MOVE	(R2)+			; inc dump count
-		MOVE	R2,A			; 	
-		CMP	X0,A			; check we've not hit dump limit
-		JNE	NEXT_DUMP		; not hit limit?
-
-
-FIFO_EMPTY	MOVE	R2,X:NUM_DUMPED		; store number of words dumped after HST timeout.
-		JMP	<START			; re-initialise
-
-
-
-; ------------------------------------------------------------------------------------------------
-;                              END OF MAIN PACKET HANDLING CODE
-; ---------------------------------------------------------------------------------------------
-
-
-;----------------------------------------------;
-;  ALTERNATIVE PACKET HANDLING CODE            ;
-;----------------------------------------------;
-	
-
-QUIET_TRANSFER_NOW
-	;; Ok, we're QT.  Buffer the packet.
-
-; 	;; This won't work until you re-order HEAD * 0,1
-; 	MOVE	#HEAD_W4_1,R2		; Note W4_0 is *after* W4_1 in memory
-; 	JSR	LOAD_HILO_ADDRESS	; Packet size, in word32
-; 	ASL	#2,A,A			; Convert to bytes
-; 	ADD	#0,B			; Clear carry
-; 	ASL	#14,A,B			; B1 = size in bytes / 2^10
-; 	MOVE	#0,X0
-; 	INSERT	#$0E000A,X0,A		; A0 = size in word32 % 2^10
-
-	;; This is sort of the same thing.
-	CLR	A
-	MOVE	X:HEAD_W4_0,A0
-	MOVE	X:HEAD_W4_1,X0
- 	INSERT	#$010010,X0,A	
-
-	NOP
-	MOVE	A0,X:TEMP_PSIZE
-
-	ADD	#0,B		; Clear carry
-	ASL	#1,A,A		        ;  * 2
-	ASL	#15,A,B			; B1 = size in bytes / 2^10
-	MOVE	#0,X0
-	INSERT	#$00E009,X0,A		; A0 = (size in bytes % 2^10) / 2
-
-	MOVE	B1,X:TOTAL_BUFFS
-	MOVE	A0,X:LEFT_TO_READ
-
-BUFFER_PACKET_HALFS
-	MOVE	#IMAGE_BUFFER,R1
-	DO	X:TOTAL_BUFFS,BUFFER_PACKET_SINGLES
-	JSR	WAIT_FIFO_HALF
-	JSR	TRANSFER_FIFO_HALF
-	
-BUFFER_PACKET_SINGLES
-	DO	X:LEFT_TO_READ,BUFFER_PACKET_SEND
-	JSR	WAIT_FIFO_SINGLE
-	JSR	TRANSFER_FIFO_SINGLE
-
-BUFFER_PACKET_SEND
+	;; Check that the RAM buffer isn't full
 	MOVE	X:QT_BUF_HEAD,A
 	ADD	#1,A
 	MOVE	X:QT_BUF_MAX,B
 	CMP	A,B
-	JGE	BUFFER_PACKET_MATH
+	JGE	HANDLE_DA_MATH
 	MOVE	#0,A
-BUFFER_PACKET_MATH
+HANDLE_DA_MATH
 	MOVE	X:QT_BUF_TAIL,B
 	CMP	A,B
-	JEQ	BUFFER_PACKET_DROP	; If yes, drop packet
-
-	JSR	QT_DATA_PACKET		; and transfer
-
-BUFFER_PACKET_DONE
-	JMP	PACKET_IN
-	
-BUFFER_PACKET_DROP
-	MOVE	X:QT_DROPS,A
-	ADD	#1,A
-	NOP
-	MOVE	A,X:QT_DROPS
-	
-	JMP	BUFFER_PACKET_DONE
-
-WAIT_FIFO_HALF
-	JSET	#FATAL_ERROR,X:<STATUS,FATALITY_HANDLER
-	JSET	#HF,X:PDRD,WAIT_FIFO_HALF	; Wait for half full+1
-	NOP
-	NOP
-	JSET	#HF,X:PDRD,WAIT_FIFO_HALF	; Protect against metastability
-	RTS
-
-WAIT_FIFO_SINGLE
-	JSET	#FATAL_ERROR,X:<STATUS,DUMP_FIFO
-	JCLR	#EF,X:PDRD,WAIT_FIFO_SINGLE
-	NOP
-	NOP
-	JCLR	#EF,X:PDRD,WAIT_FIFO_SINGLE	; Protect against metastability
-	RTS	
-	
-TRANSFER_FIFO_HALF
-	;; Copies 512 16-bit words from FIFO into Y:R1
-	DO	#512,TRANSFER_FIFO_DONE
-TRANSFER_FIFO_SINGLE
-	MOVEP	Y:RDFIFO,Y:(R1)+
-TRANSFER_FIFO_DONE
-	RTS
-		
-FATALITY_HANDLER	
-	JMP	START			; What could possibly go wrong?
-
-	
-QT_PTYPE_ERROR		
-QT_FSIZE_ERROR
-	;; Prepare error message, and notify?
-
-	RTS
-	
-	
-QT_DATA_PACKET
-	;; Copy packet to next buffer address, check inform count and notify
-	;;  PC if elapsed.
+	JEQ	HANDLE_DA_DROP
 
 	;; Load packet size
-; 	MOVE	#HEAD_W4_1,R2		; Note W4_0 is *after* W4_1 in memory
-; 	JSR	LOAD_HILO_ADDRESS	; Size, in word32
 	CLR	A
-	MOVE	X:TEMP_PSIZE,A0
+	MOVE	X:PACKET_SIZE,A0
 	
 	ADD	#0,B			; Clear carry
 	ASL	#2,A,A			; Size, in bytes
@@ -438,9 +228,9 @@ QT_DATA_PACKET
 	MOVE	B0,X:BLOCK_SIZE
 	MOVE	B1,X:BURST_SRC		; Y:0
 
-	MOVE	#QT_DEST_LO,R2
+	MOVE	#QT_DEST_LO,R0
 	JSR	LOAD_HILO_ADDRESS
-	MOVE	#BURST_DEST_LO,R2
+	MOVE	#BURST_DEST_LO,R0
 	JSR	SAVE_HILO_ADDRESS
 
 	;; Send
@@ -452,19 +242,163 @@ QT_DATA_PACKET
 	;; Check if it's time to inform PC
 	JSR	BUFFER_INFORM_CHECK
 
-
 	RTS
 
+HANDLE_DA_DROP
+	;; Full buffer, drop packet.
+	MOVE	X:QT_DROPS,A
+	ADD	#1,A
+	NOP
+	MOVE	A,X:QT_DROPS
+	JMP	DROP_PACKET		; Will RTS to main loop
 	
+;;; HANDLE_DA ends
+	
+		
+
+CON_NOW
+; 	This routine runs after the PC sends a 'CON' command, and will
+; 	copy the command to the MCE and then reply to the PC.
+
+	MOVE	#>CON_SOURCE_LO,R0
+	JSR	LOAD_HILO_ADDRESS	; PCI address in A
+	ASL	#0,A,B			; MOVE A,B
+
+	;; Local buffer, in Y memory, for packet.
+	MOVE	#>COMMAND_BUFFER,R6
+	CLR	A
+
+	;; MCE commands are 64 dwords big.
+	DO	#64,CON_NOW1		; block size = 32bit x 64 (256 bytes)
+	JSR	<READ_FROM_PCI		; get next 32 bit word from HOST
+
+	MOVE	A1,Y:(R6)+		; b4, b3 (msb)		
+	MOVE	A0,Y:(R6)+		; b2, b1  (lsb)
+
+	JSR	<XMT_WD_FIBRE		; off it goes
+	NOP
+CON_NOW1
+
+	BCLR	#MODE_CHOKE,X:<MODE	; disable packet choke...
+					; comms now open with MCE and packets will be processed.	
+	BSET	#AUX1,X:PDRC		; enable hardware
+
+	;; CON processed, clear the request.
+	BCLR	#CON_DEMAND,X:STATUS
+
+	;; Reply to the CON command
+	MOVE	#'CON',X0
+	JSR	VCOM_PREPARE_REPLY
+	JSR	PCI_MESSAGE_TO_HOST	
+	RTS
+
+
+	
+		
+;;; Old MCE packet handling code, ported forward a bit.
+		
+; --------------------------------------------------------------------------
+; --------------------- MAIN PACKET HANDLING CODE --------------------------
+; --------------------------------------------------------------------------
+
+; prepare notify to inform host that a packet has arrived.
+
+MCE_PACKET
+	BCLR	#HST_NFYD,X:<STATUS		; clear flag to indicate host has been notified.
+
+	MOVE	#'NFY',X0		; initialise communication to host as a notify
+	MOVE	X0,X:<DTXS_WD1		; 1st word transmitted to host in notify message
+
+	MOVE	X:<HEAD_W3_0,X0		;RP or DA - top two bytes of word 3 ($2020) not passed to driver.
+	MOVE	X0,X:<DTXS_WD2		;2nd word transmitted to host in notify message
+
+	MOVE	X:<HEAD_W4_0,X0		; size of packet LSB 16bits (# 32bit words)
+	MOVE	X0,X:<DTXS_WD3		; 3rd word transmitted to host in notify message
+
+	MOVE	X:<HEAD_W4_1,X0		; size of packet MSB 16bits (# of 32bit words)
+	MOVE	X0,X:<DTXS_WD4		; 4th word transmitted to host in notify message
+
+	;; notify the host that there is a packet
+	BCLR	#SEND_TO_HOST,X:<STATUS		; clear send to host flag
+	JSR	<PCI_MESSAGE_TO_HOST		; notify host of packet	
+	BSET	#HST_NFYD,X:<STATUS		; flag to indicate host has been notified.
+
+
+	MOVE	#>IMAGE_BUFFER,R1
+	JSR	BUFFER_PACKET
+
+	;; Wait for HST command (and destination RAM address)
+
+WT_HOST	JSET	#FATAL_ERROR,X:<STATUS,START		; on fatal error, re-init.
+	JCLR	#SEND_TO_HOST,X:<STATUS,WT_HOST		; Set in 'send_packet_to_host' ISR
+
+	;; All data is buffered and destination address is in BURST_ADDR_HI/LO.
+	MOVE	#>IMAGE_BUFFER,X0
+	MOVE	X:PACKET_SIZE,A
+	ASL	#2,A,A
+	MOVE	X0,X:BURST_SRC
+	MOVE	A1,X:BLOCK_SIZE
+	JSR	BLOCK_TRANSFER
+
+	JSET	#FATAL_ERROR,X:<STATUS,START
+
+	;; Reply to the HST command
+	MOVE	#'HST',X0
+	JSR	VCOM_PREPARE_REPLY
+	JSR	PCI_MESSAGE_TO_HOST
+	RTS
+
+;----------------------------------------------------------
+; clear out the fifo after an HST timeout...
+;----------------------------------------------------------
+
+DUMP_FIFO
+	MOVE	#DUMP_BUFF,R1		; address where dumped words stored in Y mem
+	MOVE	#MAX_DUMP,X0		; put a limit to number of words read from fifo
+	CLR	A
+	MOVE	#0,R2			; use R2 as a dump count
+NEXT_DUMP
+	JCLR	#EF,X:PDRD,FIFO_EMPTY
+	NOP
+	NOP
+	JCLR	#EF,X:PDRD,FIFO_EMPTY
+	
+	MOVEP	Y:RDFIFO,Y:(R1)+	; dump word to Y mem.
+	MOVE	(R2)+			; inc dump count
+	MOVE	R2,A			; 	
+	CMP	X0,A			; check we've not hit dump limit
+	JNE	NEXT_DUMP		; not hit limit?
+FIFO_EMPTY
+	MOVE	R2,X:NUM_DUMPED		; store number of words dumped after HST timeout.
+	JMP	<START			; re-initialise
+
+
+; -------------------------------------------------------------------------------------
+;                              END OF MAIN PACKET HANDLING CODE
+; -------------------------------------------------------------------------------------
+
+
+
 ; -------------------------------------------------------------------------------------
 ;
 ;                              INTERRUPT SERVICE ROUTINES 
 ;
-; ---------------------------------------------------------------------------------------
+; -------------------------------------------------------------------------------------
+
+; ---------------
+; Rules:  Don't use N#, or any R# except R0 unless you add them to the saved register set.
+	
+
+; ----------------------------------------------------------------------------
+; VCOM_* - routines: utility functions for hosty command vector communication.
+;-----------------------------------------------------------------------------
 
 
-;;; VCOM_* - routines:	 utility functions for vector command communication.
-
+; VCOM_PREPARE_REPLY
+;
+; Prepare the reply packet, using X0 as the command name (second word).  The
+; message defaults to 'ACK' with NULL data.  The user may subsequenty fill in
+; the data field (word 4) and mark the packet as error if necessary.
 	
 VCOM_PREPARE_REPLY
 	;; Prepare the reply packet for command in X0.
@@ -479,12 +413,15 @@ VCOM_PREPARE_REPLY
 	MOVE	A0,X:DTXS_WD4		; no comment
 	RTS
 
-	
-VCOM_CHECK
-	;; Compare DRXR_WD1 to X0; if not equal then set-up the error reply.
-	;; Z flag will be clear if DRXR_WD1==X0.
-	;; Trashes A and B always and X0 on error.
 
+; VCOM_CHECK
+;
+; Compares DRXR_WD1 to X0.  If they are equal, Z is set on return.  If they
+; are not equal then Z is cleared and the reply will be marked as ERR with
+; 'CNE' in the last word.
+; Trashes A and B always and X0 on error.
+
+VCOM_CHECK
 	MOVE	X0,A
 	MOVE	X:DRXR_WD1,B
 	CMP	A,B
@@ -498,13 +435,29 @@ VCOM_RTS
 	RTS
 
 
+; VCOM_INTRO
+;
+; Read DSP command from DRXR.  Prepare the reply packet and verify that it
+; matches the key in X1.  If it does not, mark the reply as error and set
+; the Z flag.
+	
 VCOM_INTRO
-	;; X1 is vector command name
 	JSR	RD_DRXR			; Loads DRXR_WD*
 	MOVE	X1,X0
 	JSR	VCOM_PREPARE_REPLY
 	JSR	VCOM_CHECK
 	RTS
+
+	
+; VCOM_EXIT_ERROR_X0
+; VCOM_EXIT_X0
+; VCOM_EXIT
+;
+; For returning from host command vector interrupts only.  These three
+; routines do the following (respectively):
+; a) Mark reply as error, then (b)
+; b) Put X0 into last word of reply, then (c)
+; c) Restore registers and RTI.
 
 VCOM_EXIT_ERROR_X0
 	MOVE	#'ERR',A0
@@ -633,7 +586,7 @@ START_APPLICATION
 	JSR	VCOM_INTRO
 	JNE	VCOM_EXIT
 
-	BSET	#APPLICATION_LOADED,X:STATUS
+	BSET	#MODE_APPLICATION,X:MODE
 	RTI			; Application will reply.
 
 	
@@ -651,7 +604,7 @@ STOP_APPLICATION
 	JSR	VCOM_INTRO
 	JNE	VCOM_EXIT
 
-	BCLR	#APPLICATION_LOADED,X:STATUS
+	BCLR	#MODE_APPLICATION,X:MODE
 	BCLR	#APPLICATION_RUNNING,X:STATUS
 	JMP	VCOM_EXIT
 
@@ -713,36 +666,36 @@ QUIET_TRANSFER_SET
 	JEQ	QUIET_TRANSFER_SET_BASE
 
 	CMP	#'DEL',A
-	MOVE	#QT_BUF_SIZE,R2
-	JEQ	QUIET_TRANSFER_SET_R2
+	MOVE	#QT_BUF_SIZE,R0
+	JEQ	QUIET_TRANSFER_SET_R0
 
 	CMP	#'NUM',A
-	MOVE	#QT_BUF_MAX,R2
-	JEQ	QUIET_TRANSFER_SET_R2
+	MOVE	#QT_BUF_MAX,R0
+	JEQ	QUIET_TRANSFER_SET_R0
 
 	CMP	#'INF',A
-	MOVE	#QT_INFORM,R2	
-	JEQ	QUIET_TRANSFER_SET_R2
+	MOVE	#QT_INFORM,R0	
+	JEQ	QUIET_TRANSFER_SET_R0
 
 	CMP	#'SIZ',A
-	MOVE	#QT_FRAME_SIZE,R2	
-	JEQ	QUIET_TRANSFER_SET_R2
+	MOVE	#QT_FRAME_SIZE,R0	
+	JEQ	QUIET_TRANSFER_SET_R0
 
 	CMP	#'TAI',A
-	MOVE	#QT_BUF_TAIL,R2
-	JEQ	QUIET_TRANSFER_SET_R2
+	MOVE	#QT_BUF_TAIL,R0
+	JEQ	QUIET_TRANSFER_SET_R0
 
 	CMP	#'HEA',A
-	MOVE	#QT_BUF_HEAD,R2
-	JEQ	QUIET_TRANSFER_SET_R2
+	MOVE	#QT_BUF_HEAD,R0
+	JEQ	QUIET_TRANSFER_SET_R0
 
 	CMP	#'DRO',A
-	MOVE	#QT_DROPS,R2
-	JEQ	QUIET_TRANSFER_SET_R2
+	MOVE	#QT_DROPS,R0
+	JEQ	QUIET_TRANSFER_SET_R0
 
 	CMP	#'PER',A
-	MOVE	#TCPR0,R2
-	JEQ	QUIET_TRANSFER_SET_R2
+	MOVE	#TCPR0,R0
+	JEQ	QUIET_TRANSFER_SET_R0
 
 	CMP	#'FLU',A
 	JEQ	QUIET_TRANSFER_SET_FLUSH
@@ -750,9 +703,33 @@ QUIET_TRANSFER_SET
 	CMP	#'SET',A
 	JEQ	QUIET_TRANSFER_SET_ENABLED
 
+	CMP	#'RPS',A
+	MOVE	#RP_MAX_SIZE,R0
+	JEQ	QUIET_TRANSFER_SET_R0
+
+	CMP	#'RPB',A
+	JEQ	QUIET_TRANSFER_SET_RP_BASE
+	
+	CMP	#'RPE',A
+	JEQ	QUIET_TRANSFER_SET_RP_ENABLED
+	
 	MOVE	#'MTE',X0
 	JMP	VCOM_EXIT_ERROR_X0
 	
+QUIET_TRANSFER_SET_RP_BASE
+	MOVE	X0,X:RP_BASE_LO
+	MOVE	X1,X:RP_BASE_HI
+	JMP	VCOM_EXIT
+	
+QUIET_TRANSFER_SET_RP_ENABLED
+	BCLR	#MODE_RP_BUFFER,X:MODE
+	MOVE	X0,A
+	TST	A
+	JEQ	VCOM_EXIT
+	BSET	#MODE_RP_BUFFER,X:MODE
+	BCLR	#RP_BUFFER_FULL,X:STATUS
+	JMP	VCOM_EXIT
+
 QUIET_TRANSFER_SET_FLUSH
 	BCLR	#QT_FLUSH,X:STATUS
 	MOVE	X0,A
@@ -762,19 +739,19 @@ QUIET_TRANSFER_SET_FLUSH
 	JMP	VCOM_EXIT
 
 QUIET_TRANSFER_SET_ENABLED
-	BCLR	#QT_ENABLED,X:STATUS
+	BCLR	#MODE_QT,X:MODE
 	JSR	TIMER_DISABLE
 	MOVE	X0,A
 	TST	A
 	JEQ	VCOM_EXIT
 	MOVE	#0,A0
-	BSET	#QT_ENABLED,X:STATUS
+	BSET	#MODE_QT,X:MODE
 	MOVE	A0,X:TLR0
 	JSR	TIMER_ENABLE
 	JMP	VCOM_EXIT
 	
-QUIET_TRANSFER_SET_R2
-	MOVE	X0,X:(R2)
+QUIET_TRANSFER_SET_R0
+	MOVE	X0,X:(R0)
 	JMP	VCOM_EXIT
 
 QUIET_TRANSFER_SET_BASE
@@ -789,17 +766,7 @@ QUIET_TRANSFER_SET_BASE
 ;-----------------------------------------------------------------------------
 SYSTEM_RESET
 ;-----------------------------------------------------------------------------
-;Responseless system reset, including fifo empty
 	
-	;; Empty incoming fifo
-
-	JSR	CLEAR_FIFO
-
-	;; Reset stack, except to jump back to START
-
-; 	MOVEP	#$0001C0,X:IPRC		; Disable HF* FIFO interrupt
-; 	MOVE	#$200,SR		; Mask set up for reset switch only.
-
 	MOVEC	#1,SP			; Point stack pointer to the top	
 	MOVEC	#$000200,SSL		; SSL holds SR return state
 					; set to zero except for interrupts
@@ -816,9 +783,6 @@ CLEAN_UP_PCI
 ;--------------------------------------------------------------------
 ; Clean up the PCI board from wherever it was executing
 
-	MOVEP	#$0001C0,X:IPRC		; Disable HF* FIFO interrupt
-	MOVE	#$200,SR		; mask for reset interrupts only
-
 	MOVEC	#1,SP			; Point stack pointer to the top	
 	MOVEC	#$000200,SSL		; SR = zero except for interrupts
 	MOVEC	#0,SP			; Writing to SSH preincrements the SP
@@ -826,123 +790,6 @@ CLEAN_UP_PCI
 	NOP
 	RTI
 
-;----------------------------------------------------------------------
-SEND_PACKET_TO_CONTROLLER
-
-; forward packet stuff to the MCE
-; gets address in HOST memory where packet is stored
-; read 3 consecutive locations starting at this address
-; then sends the data from these locations up to the MCE
-;----------------------------------------------------------------------
-
-; word 1 = command = 'CON'
-; word 2 = host high address
-; word 3 = host low address
-; word 4 = '0' --> when MCE command is RS,WB,RB,ST
-;	 = '1' --> when MCE command is GO  
-
-; all MCE commands are now 'block commands'
-; i.e. 64 words long.
-
-	JSR	<SAVE_REGISTERS		; save working registers
-
-	JSR	<RD_DRXR		; read words from host write to HTXR
-					; reads as 4 x 24 bit words
-
-	MOVE	X:<DRXR_WD1,A		; read command
-	MOVE	#'CON',X0
-	CMP	X0,A			; ensure command is 'CON'
-	JNE	<CON_ERROR		; error, command NOT HCVR address 
-
-; convert 2 x 24 bit words ( only 16 LSBs are significant) from host into 32 bit address 
-	CLR	B
-	MOVE	X:<DRXR_WD2,X0		; MS 16bits of address
-	MOVE	X:<DRXR_WD3,B0		; LS 16bits of address
-	INSERT	#$010010,X0,B		; convert to 32 bits and put in B
-
-	MOVE	X:<DRXR_WD4,A		; read word 4 - GO command?
-	MOVE	X:ZERO,X0
-	CMP	X0,A
-	JEQ	BLOCK_CON
-
-
-	JCLR	#APPLICATION_RUNNING,X:STATUS,SET_PACKET_DELAY	; not running diagnostic application?
-
-; need to generate an internal go command to test master write on bus.....  Diagnostic test
-	BSET	#INTERNAL_GO,X:STATUS	; set flag so that GO reply / data is generated by PCI card... 					
-
-; since INTERNAL_GO  - read command but don't send it to MCE...
-
-CLR_CMD
-	DO	#64,END_CLR_CMD		; block size = 32bit x 64 (256 bytes)
-	JSR	<READ_FROM_PCI		; get next 32 bit word from HOST
-	NOP
-END_CLR_CMD
-	JMP	FINISH_CON		; don't send out on command on fibre
-	
-		
-SET_PACKET_DELAY
-	BSET	#DATA_DLY,X:STATUS      ; set data delay so that next data packet after go reply
-                                        ; experiences a delay before host notify.
-
-; -----------------------------------------------------------------------
-; WARNING!!!
-; MCE requires IDLE characters between 32bit words sent FROM the PCI card
-; DO not change READ_FROM_PCI to DMA block transfer....
-; ------------------------------------------------------------------------
-
-BLOCK_CON
-	MOVE	X:CONSTORE,R6
-
-	DO	#64,END_BLOCK_CON	; block size = 32bit x 64 (256 bytes)
-	JSR	<READ_FROM_PCI		; get next 32 bit word from HOST
-	MOVE	X0,A1			; prepare to send
-	MOVE	X1,A0			; prepare to send
-
-	MOVE	X1,Y:(R6)+		; b4, b3 (msb)		
-	MOVE	X0,Y:(R6)+		; b2, b1  (lsb)
-
-	JSR	<XMT_WD_FIBRE		; off it goes
-	NOP
-END_BLOCK_CON
-
-	BCLR	#PACKET_CHOKE,X:<STATUS	; disable packet choke...
-					; comms now open with MCE and packets will be processed.	
-; Enable Byte swaping for correct comms protocol.
-	BSET	#BYTE_SWAP,X:<STATUS	; flag to let host know byte swapping on
-	BSET	#AUX1,X:PDRC		; enable hardware
-
-
-; -------------------------------------------------------------------------
-; when completed successfully then PCI needs to reply to Host with
-; word1 = reply/data = reply
-FINISH_CON
-	MOVE	#'REP',X0
-	MOVE	X0,X:<DTXS_WD1		; REPly
-	MOVE	#'CON',X0
-	MOVE	X0,X:<DTXS_WD2		; echo command sent
-	MOVE	#'ACK',X0
-	MOVE	X0,X:<DTXS_WD3		; ACKnowledge okay
-	MOVE	#'000',X0
-	MOVE	X0,X:<DTXS_WD4		; read data
-	JSR	<RESTORE_REGISTERS	; restore working registers
-	JSR	<PCI_MESSAGE_TO_HOST    ;  interrupt host with message (x0 restored here)
-	RTI				; return from ISR
-
-; when there is a failure in the host to PCI command then the PCI
-; needs still to reply to Host but with an error message
-CON_ERROR
-	MOVE	#'REP',X0
-	MOVE	X0,X:<DTXS_WD1		; REPly
-	MOVE	#'CON',X0
-	MOVE	X0,X:<DTXS_WD2		; echo command sent
-	MOVE	#'ERR',X0
-	MOVE	X0,X:<DTXS_WD3		; ERRor im command
-	MOVE	#'CNE',X0		
-	MOVE	X0,X:<DTXS_WD4		; Command Name Error - command name in DRXR does not match
-	JSR	<RESTORE_REGISTERS    	; restore working registers
-	JSR	<PCI_MESSAGE_TO_HOST  	; interrupt host with message (x0 restored here)  
-	RTI				; return from ISR
 
 ; ------------------------------------------------------------------------------------
 SEND_PACKET_TO_HOST
@@ -974,6 +821,7 @@ SEND_PACKET_TO_HOST
 
 	BSET	#SEND_TO_HOST,X:<STATUS	 ; tell main program to write packet to host memory
 
+	JSR	RESTORE_REGISTERS
 	RTI			; Main loop will reply after packet transfer!
 
 	
@@ -996,23 +844,11 @@ FINISH_RST
 
 	JSET	#DCTR_HF3,X:DCTR,*
 	
-	BCLR	#APPLICATION_LOADED,X:<STATUS	; clear app flag
+	BCLR	#MODE_APPLICATION,X:<MODE	; clear app flag
         BCLR	#PREAMBLE_ERROR,X:<STATUS	; clear preamble error
 	BCLR	#APPLICATION_RUNNING,X:<STATUS  ; clear appl running bit.
 
-; initialise some parameter here - that we don't want to initialse under a fatal error reset.
-
-	CLR	A			
-	MOVE	#0,R4			; initialise word count
-	MOVE	A,X:<WORD_COUNT	  	; initialise word count store (num of words written over bus/packet)
-	MOVE	A,X:<NUM_DUMPED		; initialise number dumped from FIFO (after HST TO)
-
-
 ; remember we are in a ISR so can't just jump to start.
-
-	MOVEP	#$0001C0,X:IPRC		; Disable HF* FIFO interrupt
-	MOVE	#$200,SR		; Mask set up for reset switch only.
-
 
 	MOVEC	#1,SP			; Point stack pointer to the top	
 	MOVEC	#$000200,SSL		; SSL holds SR return state
@@ -1025,6 +861,49 @@ FINISH_RST
 	RTI				; return from ISR - to START
 
 
+SEND_PACKET_TO_CONTROLLER
+
+; 	Host command identifying location of an MCE command to send to
+; 	the MCE.  Since this can come at any time, just record the
+; 	request and then do the CONning from the main loop.
+
+; word 1 = command = 'CON'
+; word 2 = source host bus address, bits 31:16
+; word 3 = source host bus address, bits 15:0
+; word 4 = '0' --> when MCE command is RS,WB,RB,ST
+;	 = '1' --> when MCE command is GO  
+
+	JSR	<SAVE_REGISTERS		; save working registers
+
+	;; Read command and verify it's a CON...
+	MOVE	#'CON',X1
+	JSR	VCOM_INTRO
+	JNE	VCOM_EXIT
+
+	;; If we have an outstanding CON, return an error.
+	MOVE	#'BUS',X0
+	JSET	#CON_DEMAND,X:STATUS,VCOM_EXIT_ERROR_X0
+
+	;; Set up the transfer (to be initiated from the main loop)
+	BSET	#CON_DEMAND,X:STATUS
+	MOVE	X:<DRXR_WD2,X0
+	MOVE	X:<DRXR_WD3,X1
+	MOVE	X0,X:CON_SOURCE_HI
+	MOVE	X1,X:CON_SOURCE_LO
+
+; 	;; Fourth word indicates if this is a go.  Who cares?
+; 	MOVE	X:<DRXR_WD4,A		; read word 4 - GO command?
+; 	MOVE	#0,X0
+; 	CMP	X0,A
+; 	JEQ	BLOCK_CON
+
+	;; No reply, leave it till after the CON routine.
+	JSR	RESTORE_REGISTERS
+	RTI
+
+;;; End transfer-to-controller interrupt.
+
+	
 ;---------------------------------------------------------------
 ;
 ;                          * END OF ISRs *
@@ -1039,71 +918,6 @@ FINISH_RST
 ;
 ;-----------------------------------------------------------------
 
-
-; -------------------------------------------------------------
-CALC_NO_BUFFS
-;----------------------------------------------------
-; number of 512 buffers in packet calculated (X:TOTAL_BUFFS) 
-; and number of left over blocks (X:NUM_LEFTOVER_BLOCKS)
-; and left over words (X:LEFT_TO_READ)
-
-	CLR	B
-	MOVE	X:<HEAD_W4_0,B0		; LS 16bits
-	MOVE	X:<HEAD_W4_1,X0		; MS 16bits
-
-	INSERT	#$010010,X0,B		; now size of packet B....giving # of 32bit words in packet
-	NOP
-
-; need to covert this to 16 bit since read from FIFO and saved in Y memory as 16bit words...
-
-; so double size of packet....
-	ASL	B	
-
-; now save	
-	MOVE	B0,X0
-	MOVE	B1,X1
-	MOVE	X0,X:<PACKET_SIZE_LOW	; low 24 bits of packet size (in 16bit words)
-	MOVE	X1,X:<PACKET_SIZE_HIH	; high 8 bits of packet size (in 16bit words)
-
-	MOVE	X:<PACKET_SIZE_LOW,A0
-	MOVE	X:<PACKET_SIZE_HIH,A1
-	ASR	#9,A,A			; divide by 512...number of 16bit words in a buffer
-	NOP
-	MOVE	A0,X:<TOTAL_BUFFS
-
-	MOVE	A0,X1
-	MOVE	#HF_FIFO,Y1
-	MPY	X1,Y1,A
-	ASR	#1,A,B			; B holds number of 16bit words in all full buffers
-	NOP
-
-	MOVE	X:<PACKET_SIZE_LOW,A0
-	MOVE	X:<PACKET_SIZE_HIH,A1	; A holds total number of 16bit words	
-	SUB	B,A			; now A holds number of left over 16bit words 
-	NOP
-	MOVE	A0,X:<LEFT_TO_READ	; store number of left over 16bit words to read
-	ASR	#5,A,A			; divide by 32... number of 16bit words in lefover block
-	NOP
-	MOVE	A0,X:<NUM_LEFTOVER_BLOCKS
-	MOVE	A0,X1
-	MOVE	#>SMALL_BLK,Y1
-	MPY	X1,Y1,A
-	ASR	#1,A,A
-	NOP
-	
-	ADD	A,B			; B holds words in all buffers
-	NOP
-	MOVE	X:<PACKET_SIZE_LOW,A0
-	MOVE	X:<PACKET_SIZE_HIH,A1	; A holds total number of words	
-	SUB	B,A			; now A holds number of left over words
-	NOP
-	MOVE	A0,X:<LEFT_TO_READ	; store number of left over 16bit words to read
-
-	ASR	#1,A,A			; divide by two to get number of 32 bit words to write
-	NOP				; for pipeline
-	MOVE	A0,X:<LEFT_TO_WRITE	; store number of left over 32 bit words (2 x 16 bit) to write to host after small block transfer as well
-
-	RTS
 
 ;---------------------------------------------------------------
 GET_FO_WRD	
@@ -1146,50 +960,30 @@ PCI_MESSAGE_TO_HOST
 
 	JSET	#DCTR_HF3,X:DCTR,*	; make sure host ready to receive interrupt
 					; cleared via fast interrupt if host out of its ISR
+	MOVE	#>DTXS_WD1,R0
 
-	JCLR	#STRQ,X:DSR,*		; Wait for transmitter to be NOT FULL
-					; i.e. if CLR then FULL so wait
-					; if not then it is clear to write
-
-PCI_MESSAGE_TO_HOST_NOW			; non-blocking entry point...
-	
-	MOVE	X:<DTXS_WD1,X0
-	MOVE	X0,X:DTXS		; Write 24 bit word1
-
+	DO	#4,PCI_MESSAGE_TO_HOST_RESTORE
 	JCLR	#STRQ,X:DSR,*		; wait to be not full
-	MOVE	X:<DTXS_WD2,X0
-	MOVE	X0,X:DTXS		; Write 24 bit word2
+	MOVEP	X:(R0)+,X:DTXS
 
-	JCLR	#STRQ,X:DSR,*		; wait to be not full
-	MOVE	X:<DTXS_WD3,X0
-	MOVE	X0,X:DTXS		; Write 24 bit word3
-
-	JCLR	#STRQ,X:DSR,*		; wait to be not full
-	MOVE	X:<DTXS_WD4,X0
-	MOVE	X0,X:DTXS		; Write 24 bit word4
-
-
-; restore X0....  
-; PCI_MESSAGE_TO_HOST is used by all command vector ISRs. 
-; Working registers must be restored before RTI.  
-; However, we want to restore before asserting INTA.
-; x0 is only one that can't be restored before PCI_MESSAGE_TO_HOST
-; (since it is used by this SR) hence we restore here.
-; this is redundant for a 'NFY' message (since sequential instruction) 
-; but may be required for a PCI command reply 'REP' message.
-; (since interrupt driven) 
-
+PCI_MESSAGE_TO_HOST_RESTORE	
+		
+	;; Re-restore X0 and R0
 	MOVE	X:SV_X0,X0		; restore X0
+	MOVE	X:SV_R0,R0		; restore X0
 
 ; all the transmit words are in the FIFO, interrupt the Host
 ; the Host should clear this interrupt once it is detected. 
 ; It does this by writing to HCVR to cause a fast interrupt.
 
-
-	BSET	#DCTR_HF3,X:DCTR	; set flag to handshake interrupt (INTA) with host. 
+	; set flag to handshake interrupt (INTA) with host.
+	BSET	#DCTR_HF3,X:DCTR
+	; only interrupt in irq mode
+	JCLR	#MODE_IRQ,X:MODE,PCI_MESSAGE_TO_HOST_RETURN
 	BSET	#INTA,X:DCTR		; Assert the interrupt
-
+PCI_MESSAGE_TO_HOST_RETURN
 	RTS
+
 
 ;---------------------------------------------------------------
 RD_DRXR
@@ -1199,27 +993,19 @@ RD_DRXR
 ; the host writes 4 words to this FIFO then interrupts the PCI
 ; which reads the 4 words and acts on them accordingly.
 
-
 	JCLR	#SRRQ,X:DSR,*		; Wait for receiver to be not empty
 					; implies that host has written words
 
-
 ; actually reading as slave here so this shouldn't be necessary......?
 
-	BCLR	#FC1,X:DPMC		; 24 bit read FC1 = 0, FC1 = 0
-	BSET	#FC0,X:DPMC	
+ 	BCLR	#FC1,X:DPMC		; 24 bit read FC1 = 0, FC1 = 0
+ 	BSET	#FC0,X:DPMC	
 
-
-	MOVEP	X:DRXR,X0		; Get word1
-	MOVE	X0,X:<DRXR_WD1	
-	MOVEP	X:DRXR,X0		; Get word2
-	MOVE	X0,X:<DRXR_WD2	
-	MOVEP	X:DRXR,X0		; Get word3
-	MOVE	X0,X:<DRXR_WD3
-	MOVEP	X:DRXR,X0		; Get word4
-	MOVE	X0,X:<DRXR_WD4
+	MOVE	#DRXR_WD1,R3
+	REP	#4
+	MOVEP	X:DRXR,X:(R3)+
 	RTS
-
+	
 ;---------------------------------------------------------------
 READ_FROM_PCI
 ;--------------------------------------------------------------
@@ -1250,8 +1036,8 @@ RD_PCI	JSET	#MRRQ,X:DPSR,GET_DAT	; If MTRQ = 1 go read the word from host via FI
 	JCLR	#MARQ,X:DPSR,*		; Wait for PCI addressing to be complete
 	JMP	<WRT_ADD
 
-GET_DAT	MOVEP	X:DRXR,X0		; Read 1st 16 bits of 32 bit word from host memory
-	MOVEP	X:DRXR,X1		; Read 2nd 16 bits of 32 bit word from host memory	
+GET_DAT	MOVEP	X:DRXR,A0		; Read 1st 16 bits of 32 bit word from host memory
+	MOVEP	X:DRXR,A1		; Read 2nd 16 bits of 32 bit word from host memory	
 
 ; note that we now have 4 bytes in X0 and X1.
 ; The 32bit word was in host memory in little endian format
@@ -1286,6 +1072,7 @@ RESTORE_REGISTERS
 	MOVE	X:<SV_Y0,Y0
 	MOVE	X:<SV_Y1,Y1
 
+	MOVE	X:<SV_R0,R0
 	RTS
 
 ;-------------------------------------------------------------------------------------
@@ -1308,6 +1095,7 @@ SAVE_REGISTERS
 	MOVE	Y0,X:<SV_Y0
 	MOVE	Y1,X:<SV_Y1
 
+	MOVE	R0,X:<SV_R0
 	RTS
 
 ;-------------------------------------------------------
@@ -1317,64 +1105,33 @@ XMT_WD_FIBRE
 ; we want to send 32bit word in little endian fomat to the host.
 ; i.e. b4b3b2b1 goes b1, b2, b3, b4
 ; currently the bytes are in this order:
-;  A1 = $00 b2 b1
-;  A0 = $00 b4 b3
-;  A = $00 00 b2 b1 00 b4 b3
+;  A0 = $00 b2 b1
+;  A1 = $00 b4 b3
+;  A = $00 00 b4 b3 00 b2 b1
 
-; This subroutine must take at least 160ns (4 bytes at 25Mbytes/s)
+	;; Isolate all four bytes
 
-	NOP
-	NOP
+	MOVE	B0,X0			; Save B
+	MOVE	B1,X1
 
-; split up 4 bytes b2, b1, b4, b3
+	ASL	#24,A,B
+	AND	#>$0000FF,B		; B1=b1
+	MOVE	B1,X:FO_SEND
 
-	ASL	#16,A,A			; shift byte b2 into A2
-	MOVE	#$FFF000,R0		; Memory mapped address of transmitter
+	ASL	#16,A,B
+	AND	#>$0000FF,B
+	MOVE	B1,X:FO_SEND		; B1=b2
 
-	MOVE	A2,Y1			; byte b2 in Y1
+	ASR	#8,A,B
+	AND	#>$0000FF,A
+	MOVE	A1,X:FO_SEND		; A1=b3
 
-	ASL     #8,A,A			; shift byte b1 into A2
-	NOP
-	MOVE	A2,Y0			; byte b1 in Y0
+	AND	#>$0000FF,B
+	MOVE	B1,X:FO_SEND 		; B1=b4
 
-	ASL     #16,A,A			; shift byte b4 into A2
-	NOP
-	MOVE	A2,X1			; byte b4 in X1
-
-
-	ASL     #8,A,A			; shift byte b3 into A2
-	NOP
-	MOVE	A2,X0			; byte b3 in x0	
-
-; transmit b1, b2, b3 ,b4
-
-	MOVE	Y0,X:(R0)		; byte b1 - off it goes
-	MOVE	Y1,X:(R0)		; byte b2 - off it goes
-	MOVE	X0,X:(R0)		; byte b3 - off it goes 
-	MOVE	X1,X:(R0)		; byte b4 - off it goes
-
-	NOP
-	NOP
+	MOVE	X0,B0			; Restore B
+	MOVE	X1,B1
 	RTS
-
-
-
-;;; MFH - PCI BURST ROUTINES
-;;;  - on error, do not re-start DMA!
-;;;  - handle "resume" errors properly
-
-PCI_BURST_NOW
-
-	MOVE    X:<HEAD_W4_0,B0		; LS 16bits
-	ASL	#8,B,B
-	MOVE    X:<HEAD_W4_1,X1		; MS 16bits
-	ASR	#6,B,B			; Size in BYTES
-
-	MOVE	R2,X:BURST_SRC
-	MOVE	B0,X:BLOCK_SIZE
-	
-	JSR	BLOCK_TRANSFER
-	RTS	
 
 	
 ;----------------------------------------------
@@ -1385,9 +1142,10 @@ FLUSH_PCI_FIFO
  	NOP
 	JSET	#CLRT,X:DPCR,*
 	RTS	
-
 	
-CLEAR_FIFO			
+;----------------------------------------------
+CLEAR_FO_FIFO			
+;----------------------------------------------
 	MOVEP	#%011000,X:PDRD			; clear FIFO RESET* for 2 ms
 	MOVE	#200000,X0
 	DO	X0,*+3
@@ -1474,13 +1232,13 @@ ERROR_APER
 BLOCK_TRANSFER
 ;----------------------------------------------
 ;   In:
-;   - BLOCK_DEST_HI:BLOCK_DEST_LO is PC RAM address
+;   - BURST_DEST_HI:BURST_DEST_LO is PC RAM address
 ;   - BLOCK_SIZE is packet size, in bytes
-;   - BLOCK_SRC is start of data in Y memory
+;   - BURST_SRC is start of data in Y memory
 ;  Out:
 ;   - BLOCK_SIZE will be decremented to zero.
-;   - BLOCK_DEST_HI:LO will be incremented by BLOCK_SIZE
-;   - BLOCK_SRC will be incremented by BLOCK_SIZE/2
+;   - BURST_DEST_HI:LO will be incremented by BLOCK_SIZE
+;   - BURST_SRC will be incremented by BLOCK_SIZE/2
 ;  Trashes:
 ;   - A and B
 	
@@ -1497,7 +1255,7 @@ BLOCK_TRANSFER
 	
 	CMP	B,A			; A ? B
 	JGE	<BLOCK_TRANSFER1	; jump if A >= B
-	MOVE	A,B	
+	MOVE	A,B			; This only moves A1,B1.
 BLOCK_TRANSFER1
 	SUB	B,A			; A -= B
 	ADD	#0,B			; Clear carry bit
@@ -1603,7 +1361,7 @@ BLOCK_UPDATE
  	MOVE	A1,B1			; Save A again...
 	NOP
 	
-	MOVE	#BURST_DEST_LO,R2
+	MOVE	#BURST_DEST_LO,R0
 	JSR	ADD_HILO_ADDRESS	; This updates BURST_DEST
 
 	MOVE	X:BURST_SIZE,B
@@ -1613,6 +1371,105 @@ BLOCK_UPDATE
 
 	RTS
 
+
+;----------------------------------------------;
+;  MCE PACKET PROCESSING                       ;
+;----------------------------------------------;
+	
+; 	Given a dword count in A, computes number of half FIFOs and
+; 	number of left over FIFO reads required to get the whole
+; 	packet.
+
+; 	Input: A is packet size, in dwords
+; 	Output: sets X:TOTAL_BUFFS and X:LEFT_TO_READ
+; 	Trashes: A,B,X0
+
+	
+PACKET_PARTITIONS
+	MOVE	A0,X:PACKET_SIZE
+
+	ADD	#0,B			; Clear carry
+	ASL	#1,A,A		        ;  * 2
+	ASL	#15,A,B			; B1 = size in bytes / 2^10
+	MOVE	#0,X0
+	INSERT	#$00E009,X0,A		; A0 = (size in bytes % 2^10) / 2
+
+	MOVE	B1,X:TOTAL_BUFFS
+	MOVE	A0,X:LEFT_TO_READ
+	RTS
+	
+
+;;; Copies the packet in the FIFO to Y memory; assumes first 4 words
+;;; have been loaded into HEAD_W* in the usual way.
+	
+
+BUFFER_PACKET
+
+	;; Assumes that TOTAL_BUFFS and LEFT_TO_READ have already
+	;; been set and dumps fifo into Y:(R1), destroying R1.
+
+	
+BUFFER_PACKET_HALFS
+	DO	X:TOTAL_BUFFS,BUFFER_PACKET_SINGLES
+	JSR	WAIT_FIFO_HALF
+	JSR	BUFFER_PACKET_HALF
+BUFFER_PACKET_SINGLES
+	DO	X:LEFT_TO_READ,BUFFER_PACKET_DONE
+BUFFER_PACKET_SINGLE
+	JSET	#FATAL_ERROR,X:<STATUS,DUMP_FIFO
+	JCLR	#EF,X:PDRD,BUFFER_PACKET_SINGLE
+	JCLR	#EF,X:PDRD,BUFFER_PACKET_SINGLE	; Protect against metastability
+	MOVEP	Y:RDFIFO,Y:(R1)+
+BUFFER_PACKET_DONE
+	RTS
+
+BUFFER_PACKET_HALF
+	;; Copies 512 16-bit words from FIFO into Y:R1
+	DO	#512,BUFFER_PACKET_HALF_DONE
+	MOVEP	Y:RDFIFO,Y:(R1)+
+	NOP
+BUFFER_PACKET_HALF_DONE
+	RTS	
+	
+WAIT_FIFO_HALF
+	JSET	#FATAL_ERROR,X:<STATUS,FATALITY_HANDLER
+	JSET	#HF,X:PDRD,WAIT_FIFO_HALF	; Wait for half full+1
+	NOP
+	NOP
+	JSET	#HF,X:PDRD,WAIT_FIFO_HALF	; Protect against metastability
+	RTS
+
+FATALITY_HANDLER	
+	JMP	START			; What could possibly go wrong?
+
+
+; 	Reads a packet from the fifo, discarding it.
+; 
+; 	In: TOTAL_BUFFS & LEFT_TO_READ
+; 	Trashes: A0
+	
+DROP_PACKET
+	DO	X:TOTAL_BUFFS,DROP_PACKET_SINGLES
+	JSR	WAIT_FIFO_HALF
+	JSR	DROP_FIFO_HALF
+	NOP	
+DROP_PACKET_SINGLES
+	DO	X:LEFT_TO_READ,DROP_PACKET_DONE
+DROP_PACKET_SINGLE
+	JSET	#FATAL_ERROR,X:<STATUS,DUMP_FIFO
+	JCLR	#EF,X:PDRD,DROP_PACKET_SINGLE
+	JCLR	#EF,X:PDRD,DROP_PACKET_SINGLE	; Protect against metastability
+	MOVEP	Y:RDFIFO,A0
+DROP_PACKET_DONE
+	RTS
+
+DROP_FIFO_HALF
+	;; Read and discard 512 16-bit words from the FO FIFO
+	DO	#512,DROP_FIFO_DONE
+	MOVEP	Y:RDFIFO,A0
+DROP_FIFO_DONE
+	RTS
+		
 	
 ;----------------------------------------------;
 ;  TIMER HANDLING                              ;
@@ -1664,16 +1521,16 @@ BUFFER_INCR
 
 	CLR	B
 	MOVE	X:QT_BUF_SIZE,B0
-	MOVE	#QT_DEST_LO,R2
+	MOVE	#QT_DEST_LO,R0
 	JSR	ADD_HILO_ADDRESS	; QT_DEST += QT_BUF_SIZE	
 		
 	RTS
 
 	
 BUFFER_RESET
-	MOVE	#QT_BASE_LO,R2
+	MOVE	#QT_BASE_LO,R0
 	JSR	LOAD_HILO_ADDRESS
-	MOVE	#QT_DEST_LO,R2
+	MOVE	#QT_DEST_LO,R0
 	JSR	SAVE_HILO_ADDRESS	; QT_DEST_LO = QT_BASE_LO
 
 	MOVE	#0,X0
@@ -1715,7 +1572,7 @@ BUFFER_INFORM
 	JSET	#DCTR_HF3,X:DCTR,INFORM_EXIT
 	JCLR	#STRQ,X:DSR,INFORM_EXIT
 
-	JSR	PCI_MESSAGE_TO_HOST_NOW
+	JSR	PCI_MESSAGE_TO_HOST
 
 	BCLR	#QT_FLUSH,X:STATUS
 	MOVE	#0,X0			; Reset inform index
@@ -1734,268 +1591,37 @@ INFORM_EXIT
 ;;; mem0[15..0] = addr[15..0] and mem1[15..0] = addr[31..16].
 	
 LOAD_HILO_ADDRESS
-	;; Load the 32 bit address stored in [ R2+1 : R2 ] into A
+	;; Load the 32 bit address stored in [ R0+1 : R0 ] into A
 	;; Trashes X0.
 	CLR	A
-	MOVE	X:(R2)+,A0
-	MOVE	X:(R2)-,X0
+	MOVE	X:(R0)+,A0
+	MOVE	X:(R0)-,X0
 	INSERT	#$010010,X0,A
 	RTS
 
 ADD_HILO_ADDRESS
-	;; Adds B to the hilo address stored at [ R2+1 : R2 ]
+	;; Adds B to the hilo address stored at [ R0+1 : R0 ]
 	;; Trashes X0 and A and B.
 
 	JSR	LOAD_HILO_ADDRESS
 	ADD	B,A
 
 SAVE_HILO_ADDRESS
-	;; Save the low 32 bits of A into [ R2+1 : R2 ]
+	;; Save the low 32 bits of A into [ R0+1 : R0 ]
 	;; Trashes X0 and B, preserves A.
 
-	MOVE	X0,X:(R2)+		; pre-increment
+	MOVE	X0,X:(R0)+		; pre-increment
 	MOVE	#0,X0
 	ASL	#8,A,B
 	INSERT	#$008010,X0,A
-	MOVE	B1,X:(R2)-		; store hi16
-	MOVE	A0,X:(R2)
+	MOVE	B1,X:(R0)-		; store hi16
+	MOVE	A0,X:(R0)
 	ASR	#8,B,A
 	RTS
 	
-		
-; TEST_ROUTINES			; Passed.
-
-; 	MOVE	#$01,A1
-; 	MOVE	#$020304,A0
-; 	MOVE	#BDEBUG0,R2
-
-; 	JSR     SAVE_HILO_ADDRESS
-
-; 	JSR	LOAD_HILO_ADDRESS
-; 	MOVE	#BDEBUG2,R2
-; 	JSR	SAVE_HILO_ADDRESS
-
-; 	MOVE	#$02,B1
-; 	MOVE	#$000203,B0
-; 	MOVE	#BDEBUG0,R2
-; 	JSR	ADD_HILO_ADDRESS
-
-; 	RTS
-
-
+	
 BOOTCODE_END
 BOOTEND_ADDR	EQU	@CVI(BOOTCODE_END)
 
 PROGRAM_END
 PEND_ADDR	EQU	@CVI(PROGRAM_END)
-;---------------------------------------------
-
-
-; --------------------------------------------------------------------
-; --------------- x memory parameter table ---------------------------
-; --------------------------------------------------------------------
-
-        ORG     X:VAR_TBL,P:
-
-
-	IF	@SCP("DOWNLOAD","ROM")	; Boot ROM code
-VAR_TBL_START	EQU	@LCV(L)-2
-	ENDIF
-
-	IF	@SCP("DOWNLOAD","ONCE")	; Download via ONCE debugger
-VAR_TBL_START	EQU	@LCV(L)
-	ENDIF
-
-; -----------------------------------------------
-; do not move these (X:0 --> x:3)
-STATUS		DC	0
-FRAME_COUNT	DC	0	; used as a check....... increments for every frame write.....must be cleared by host.
-PRE_CORRUPT	DC	0
-
-REV_NUMBER	DC	$550104		; byte 0 = minor revision #
-					; byte 1 = major revision #
-					; byte 2 = release Version (ascii letter)
-REV_DATA	DC	$000000		; data: day-month-year
-P_CHECKSUM	DC	$2EF490         ;**** DO NOT CHANGE
-; -------------------------------------------------
-WORD_COUNT		DC	0	; word count.  Number of words successfully writen to host in last packet.	
-NUM_DUMPED		DC	0	; number of words (16-bit) dumped to Y memory (512) after an HST timeout.
-; --------------------------------------------------------------------------------------------------------------
-
-DRXR_WD1		DC	0
-DRXR_WD2		DC	0
-DRXR_WD3		DC	0
-DRXR_WD4		DC	0
-DTXS_WD1		DC	0
-DTXS_WD2		DC	0
-DTXS_WD3		DC	0
-DTXS_WD4		DC	0
-
-PCI_WD1_1		DC	0
-PCI_WD1_2		DC	0
-PCI_WD2_1		DC	0
-PCI_WD2_2		DC	0
-PCI_WD3_1		DC	0
-PCI_WD3_2		DC	0
-PCI_WD4_1		DC	0
-PCI_WD4_2		DC	0
-PCI_WD5_1		DC	0
-PCI_WD5_2		DC	0
-PCI_WD6_1		DC	0
-PCI_WD6_2		DC	0
-
-
-HEAD_W1_1		DC	0
-HEAD_W1_0		DC	0
-HEAD_W2_1		DC	0
-HEAD_W2_0		DC	0
-HEAD_W3_1		DC	0
-HEAD_W3_0		DC	0
-HEAD_W4_1		DC	0
-HEAD_W4_0		DC	0
-
-
-REP_WD1			DC	0
-REP_WD2			DC	0
-REP_WD3			DC	0
-REP_WD4			DC	0
-
-SV_A0			DC	0   
-SV_A1			DC	0 
-SV_A2			DC	0
-SV_B0			DC	0
-SV_B1			DC	0
-SV_B2			DC	0
-SV_X0			DC	0
-SV_X1			DC	0
-SV_Y0			DC	0
-SV_Y1			DC	0
-
-SV_SR			DC	0	; stauts register save.
-
-ZERO			DC	0
-ONE			DC	1
-FOUR			DC	4
-
-
-
-PACKET_SIZE_LOW		DC	0
-PACKET_SIZE_HIH		DC	0
-
-PREAMB1			DC	$A5A5	; pramble 16-bit word....2 of which make up first preamble 32bit word
-PREAMB2			DC	$5A5A	; preamble 16-bit word....2 of which make up second preamble 32bit word
-DATA_WD			DC	$4441	; "DA"
-REPLY_WD		DC	$5250	; "RP"
-
-TOTAL_BUFFS		DC	0	; total number of 512 buffers in packet
-LEFT_TO_READ		DC	0	; number of words (16 bit) left to read after last 512 buffer
-LEFT_TO_WRITE		DC	0	; number of woreds (32 bit) to write to host i.e. half of those left over read
-NUM_LEFTOVER_BLOCKS	DC	0	; small block DMA burst transfer
-
-DATA_DLY_VAL		DC	0	; data delay value..  Delay added to first frame received after GO command 
-CONSTORE		DC	$200
-
-;;; MFH - PCI burst parameters
-
-BLOCK_SIZE		DC	0
-BURST_SIZE		DC	0
-BURST_DEST_LO		DC	0
-BURST_DEST_HI		DC	0
-BURST_SRC		DC	0
-	
-DMA_ERRORS		DC	0
-EC_TRTY			DC	0
-EC_TO			DC	0
-EC_TDIS			DC	0
-EC_TAB			DC	0
-EC_MAB			DC	0
-EC_DPER			DC	0
-EC_APER			DC	0
-
-;;; Vars for Quiet Transfer Mode
-	
-QT_BASE_LO		DC	0	; PC buffer start address bits 15-0
-QT_BASE_HI		DC	0	; PC buffer start address bits 31-16
-QT_BUF_SIZE		DC	0	; Separation of buffers, in bytes
-QT_BUF_MAX		DC	0	; Number of buffers
-QT_FRAME_SIZE		DC	0	; Expected data packet size, in bytes
-QT_INFORM		DC	0	; Number of packets to copy before informing
-
-QT_BUF_HEAD		DC	0	; Index of buf for next write
-QT_BUF_TAIL		DC	0	; Index at which we must not write
-
-QT_DEST_LO		DC	0	; PC address for next write
-QT_DEST_HI		DC	0	; 
-QT_INFORM_IDX		DC	0	; Number of packets since last inform
-QT_DROPS		DC	0	; Dropped packets
-
-;;; Bus latency timer
-PCI_BURST_SIZE		DC	$40	; Should be < 4*latency assigned by OS
-	
-TEMP_PSIZE		DC	0
-
-BDEBUG0			DC	0
-BDEBUG1			DC	0
-BDEBUG2			DC	0
-BDEBUG3			DC	0
-BDEBUG4			DC	0
-BDEBUG5			DC	0
-BDEBUG6			DC	0
-BDEBUG7			DC	0
-BDEBUG8			DC	0
-BDEBUG9			DC	0
-
-;----------------------------------------------------------
-
-
-
-	IF	@SCP("DOWNLOAD","ROM")	; Boot ROM code
-VAR_TBL_END	EQU	@LCV(L)-2
-	ENDIF
-
-	IF	@SCP("DOWNLOAD","ONCE")	; Download via ONCE debugger
-VAR_TBL_END	EQU	@LCV(L)
-	ENDIF
-
-VAR_TBL_LENGTH EQU	VAR_TBL_END-VAR_TBL_START
-                          
-
-	IF	@CVS(N,*)>=APPLICATION
-        WARN    'The boot code is too large and could be overwritten by an Application!'
-	ENDIF
-
-
-;--------------------------------------------
-; APPLICATION AREA
-;---------------------------------------------
-	IF	@SCP("DOWNLOAD","ROM")		; Download via ONCE debugger
-	ORG	P:APPLICATION,P:APPLICATION+2
-	ENDIF
-
-	IF	@SCP("DOWNLOAD","ONCE")		; Download via ONCE debugger
-	ORG	P:APPLICATION,P:APPLICATION
-	ENDIF
-
-; starts with no application loaded
-; so just reply with an error if we get a GOA command
-	MOVE	#'REP',X0
-	MOVE	X0,X:<DTXS_WD1		; REPly
-	MOVE	#'GOA',X0
-	MOVE	X0,X:<DTXS_WD2		; echo command sent
-	MOVE	#'ERR',X0
-	MOVE	X0,X:<DTXS_WD3		; No Application Loaded
-	MOVE	#'NAL',X0
-	MOVE	X0,X:<DTXS_WD4		; write to PCI memory error;
-	JSR	<RESTORE_REGISTERS	
-	JSR	<PCI_MESSAGE_TO_HOST
-	BCLR	#APPLICATION_LOADED,X:<STATUS 
-	JMP	PACKET_IN
-
-
-;;; MFH -- HACKING AREA
-
-
-
-	
-		
-END_ADR	EQU	@LCV(L)		; End address of P: code written to ROM
