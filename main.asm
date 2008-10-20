@@ -988,19 +988,18 @@ PCI_MESSAGE_TO_HOST_RETURN
 ;---------------------------------------------------------------
 RD_DRXR
 ;--------------------------------------------------------------
-; routine is used to read from HTXR-DRXR data path
-; which is used by the Host to communicate with the PCI board
-; the host writes 4 words to this FIFO then interrupts the PCI
-; which reads the 4 words and acts on them accordingly.
+; Routine to read from HTXR-DRXR data path.  This is where the host
+; puts data prior to issuing a vector command.
+;
+; HCTR[HTF] determines how the data written by the host is decoded
+; here.  Typically HCTR = 0x900, meaning the 3 LSBs of each 32-bit
+; word written by the host are returned in each read of DRXR.
+;
+; We only check for non-empty FIFO here, so all 4 words must be
+; written to the FIFO before calling this routine.
 
 	JCLR	#SRRQ,X:DSR,*		; Wait for receiver to be not empty
 					; implies that host has written words
-
-; actually reading as slave here so this shouldn't be necessary......?
-
- 	BCLR	#FC1,X:DPMC		; 24 bit read FC1 = 0, FC1 = 0
- 	BSET	#FC0,X:DPMC	
-
 	MOVE	#DRXR_WD1,R3
 	REP	#4
 	MOVEP	X:DRXR,X:(R3)+
@@ -1180,49 +1179,49 @@ PCI_ERROR_CLEAR
 ERROR_TRTY
 	MOVE	X:EC_TRTY,A0
 	INC	A
-	MOVEP	#$0400,X:DPSR		; Clear target retry error bit
+	MOVEP	#>$0400,X:DPSR		; Clear target retry error bit
 	MOVE	A0,X:EC_TRTY
 	BSET	#PCIDMA_RESTART,X:STATUS
 	RTS
 ERROR_TO
 	MOVE	X:EC_TO,A0
 	INC	A
-	MOVEP	#$0800,X:DPSR		; Clear timeout error bit
+	MOVEP	#>$0800,X:DPSR		; Clear timeout error bit
 	MOVE	A0,X:EC_TO
 	BSET	#PCIDMA_RESUME,X:STATUS
 	RTS
 ERROR_TDIS
 	MOVE	X:EC_TDIS,A0
 	INC	A
-	MOVEP	#$0200,X:DPSR		; Clear target disconnect bit
+	MOVEP	#>$0200,X:DPSR		; Clear target disconnect bit
 	MOVE	A0,X:EC_TDIS
 	BSET	#PCIDMA_RESUME,X:STATUS
 	RTS
 ERROR_TAB
 	MOVE	X:EC_TAB,A0
 	INC	A
-	MOVEP	#$0100,X:DPSR		; Clear target abort error bit
+	MOVEP	#>$0100,X:DPSR		; Clear target abort error bit
 	MOVE	A0,X:EC_TAB
 	BSET	#PCIDMA_RESTART,X:STATUS
 	RTS
 ERROR_MAB
 	MOVE	X:EC_MAB,A0
 	INC	A
-	MOVEP	#$0080,X:DPSR		; Clear master abort error bit
+	MOVEP	#>$0080,X:DPSR		; Clear master abort error bit
 	MOVE	A0,X:EC_MAB
 	BSET	#PCIDMA_RESTART,X:STATUS
 	RTS
 ERROR_DPER
 	MOVE	X:EC_DPER,A0
 	INC	A
-	MOVEP	#$0040,X:DPSR		; Clear data parity error bit
+	MOVEP	#>$0040,X:DPSR		; Clear data parity error bit
 	MOVE	A0,X:EC_DPER
 	BSET	#PCIDMA_RESTART,X:STATUS
 	RTS
 ERROR_APER
 	MOVE	X:EC_APER,A0
 	INC	A
-	MOVEP	#$0020,X:DPSR		; Clear address parity error bit
+	MOVEP	#>$0020,X:DPSR		; Clear address parity error bit
 	MOVE	A0,X:EC_APER
 	BSET	#PCIDMA_RESTART,X:STATUS
 	RTS
@@ -1332,7 +1331,7 @@ BLOCK_RESUME
 	CLR	A
 	CLR	B
 	MOVEP	X:DPSR,A0		; Get words left to write
-	JCLR	#15,X:DPSR,BLOCK_RESUME1
+	JCLR	#RDCQ,X:DPSR,BLOCK_RESUME1
 	
 	INC	B
 	
@@ -1350,19 +1349,15 @@ BLOCK_RESUME1
 	JSR	BLOCK_UPDATE
 	JMP	BLOCK_PCI		; Recalculate pci and resend
 
-;;; Subroutine:	subtract A from BURST_SIZE and add A to BURST_DEST_LO
-;;;  Caller can check Z flag to see if BURST_SIZE is 0 now.
+; BLOCK_UPDATE
+;  Subtract A from BURST_SIZE and add A to BURST_DEST_LO
+;  Caller can check Z flag to see if BURST_SIZE is now 0.
 BLOCK_UPDATE
-	;; Use A (number of bytes bursted) to update
-	;;  BURST_DEST_HI:LO and BURST_SIZE
-
-	MOVE	A0,X1			; Save A
- 	MOVE	A0,B0			; Save A again...
- 	MOVE	A1,B1			; Save A again...
-	NOP
+	MOVE	A0,X1			; Save A for later
+	ASL	#0,A,B			; MOVE A,B
 	
-	MOVE	#BURST_DEST_LO,R0
-	JSR	ADD_HILO_ADDRESS	; This updates BURST_DEST
+	MOVE	#BURST_DEST_LO,R0	; 
+	JSR	ADD_HILO_ADDRESS	; This updates BURST_DEST to BURST_DEST + B
 
 	MOVE	X:BURST_SIZE,B
 	SUB	X1,B			; Zero flag must be preserved!
@@ -1399,30 +1394,43 @@ PACKET_PARTITIONS
 	RTS
 	
 
-;;; Copies the packet in the FIFO to Y memory; assumes first 4 words
-;;; have been loaded into HEAD_W* in the usual way.
+; BUFFER_PACKET
+;
+; Copies the packet in the FIFO to Y memory.
 	
+; In: TOTAL_BUFFS and LEFT_TO_READ must be pre-set (via PACKET_PARTITIONS);
+;     R1 is the destination index in Y memory.
+; Trashes: R1 is updated to point to the end of the copied data.
 
 BUFFER_PACKET
-
-	;; Assumes that TOTAL_BUFFS and LEFT_TO_READ have already
-	;; been set and dumps fifo into Y:(R1), destroying R1.
-
 	
 BUFFER_PACKET_HALFS
 	DO	X:TOTAL_BUFFS,BUFFER_PACKET_SINGLES
 	JSR	WAIT_FIFO_HALF
 	JSR	BUFFER_PACKET_HALF
+
+	;; Buffering single words in poll mode is very slow; but if we see a
+	;; half-full fifo, we can do our partial read at full speed.
+	JCLR	#HF,X:PDRD,BUFFER_PACKET_SINGLES_FAST
+	
 BUFFER_PACKET_SINGLES
 	DO	X:LEFT_TO_READ,BUFFER_PACKET_DONE
 BUFFER_PACKET_SINGLE
 	JSET	#FATAL_ERROR,X:<STATUS,DUMP_FIFO
 	JCLR	#EF,X:PDRD,BUFFER_PACKET_SINGLE
+	NOP
+	NOP
 	JCLR	#EF,X:PDRD,BUFFER_PACKET_SINGLE	; Protect against metastability
 	MOVEP	Y:RDFIFO,Y:(R1)+
 BUFFER_PACKET_DONE
 	RTS
 
+BUFFER_PACKET_SINGLES_FAST
+	DO	X:LEFT_TO_READ,BUFFER_PACKET_SINGLES_FAST_DONE
+	MOVEP	Y:RDFIFO,Y:(R1)+
+BUFFER_PACKET_SINGLES_FAST_DONE
+	RTS
+	
 BUFFER_PACKET_HALF
 	;; Copies 512 16-bit words from FIFO into Y:R1
 	DO	#512,BUFFER_PACKET_HALF_DONE
@@ -1443,10 +1451,12 @@ FATALITY_HANDLER
 	JMP	START			; What could possibly go wrong?
 
 
-; 	Reads a packet from the fifo, discarding it.
+; DROP_PACKET
+;
+; Reads a packet from the fifo, discarding it.
 ; 
-; 	In: TOTAL_BUFFS & LEFT_TO_READ
-; 	Trashes: A0
+; In: TOTAL_BUFFS & LEFT_TO_READ
+; Trashes: A0
 	
 DROP_PACKET
 	DO	X:TOTAL_BUFFS,DROP_PACKET_SINGLES

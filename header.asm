@@ -82,6 +82,8 @@ TAB	EQU	8		; Target Abort
 TDIS	EQU	9		; Target Disconnect
 TO	EQU	11		; Timeout
 MDT	EQU	14		; Master Data Transfer complete
+RDCQ	EQU	15		; Remaining Data Count Qualifier
+	
 SCLK	EQU	2		; SCLK = transmitter special code
 
 ; bits in DPMC
