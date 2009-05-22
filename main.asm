@@ -14,8 +14,11 @@ See info.asm for versioning and authors.
 	
 PACKET_IN
 
+	;; Clear I'm-alive bit
+	BCLR    #MAIN_LOOP_POLL,X:<STATUS
+	
 	;; Reinitialize if a serious error has been detected
-	JSET	#FATAL_ERROR,X:<STATUS,START
+ 	JSET	#FATAL_ERROR,X:<STATUS,START 
 
 	;; Jump to special application area if signalled to do so
 	JSET	#MODE_APPLICATION,X:<MODE,APPLICATION
@@ -27,7 +30,7 @@ PACKET_IN
 	JSSET	#QT_FLUSH,X:STATUS,BUFFER_INFORM
 	
 	;; Check for data in fibre-optic FIFO
-	JSR	<GET_FO_WRD
+	JSR	<CHECK_FO
  	JSSET	#FO_WRD_RCV,X:STATUS,HANDLE_FIFO
 
 	;; New CON code, only run if the fifo isn't hot.
@@ -49,6 +52,46 @@ PACKET_IN
 ;;; Fibre data detected; process it and return to main loop.
 
 HANDLE_FIFO
+	;; Poll for 8 words -- the preamble and packet size.
+	MOVE	#>HEAD_W1_0,R0
+	DO	#8,HANDLE_FIFO_CHECK_PREAMBLE
+HANDLE_FIFO_WAIT
+	JCLR	#EF,X:PDRD,HANDLE_FIFO_WAIT
+	NOP
+	NOP
+	JCLR	#EF,X:PDRD,HANDLE_FIFO_WAIT
+	MOVEP	X:RDFIFO,X0
+	MOVE	X0,X:(R0)+
+
+HANDLE_FIFO_CHECK_PREAMBLE
+	MOVE	#>HEAD_W1_0,R0
+	MOVE	#>$A5A5,A
+	MOVE	X:(R0)+,X0
+	CMP	X0,A
+	JNE	<PRE_ERROR
+	MOVE	X:(R0)+,X0
+	CMP	X0,A
+	JNE	<PRE_ERROR
+	MOVE	#>$5A5A,A
+	MOVE	X:(R0)+,X0
+	CMP	X0,A
+	JNE	<PRE_ERROR
+	MOVE	X:(R0)+,X0
+	CMP	X0,A
+	JNE	<PRE_ERROR
+
+	;; Good enough.  Construct the packet size from words 6 and 7
+	CLR	A
+	MOVE	X:>(HEAD_W1_0+6),A0
+	MOVE	X:>(HEAD_W1_0+7),X0
+ 	INSERT	#$010010,X0,A		; A = size in dwords
+
+	;; Set TOTAL_BUFFS and LEFT_TO_READ using A
+	JSR	PACKET_PARTITIONS
+	JMP	XXXX	
+		
+OLD_HANDLE_FIFO
+
 	JSET	#MODE_CHOKE,X:<MODE,RETURN_NOW	; IF MCE Packet choke on - just keep clearing FIFO.
 	MOVE	X0,X:<HEAD_W1_0				;store received word
 	MOVE	X:PREAMB1,A
@@ -74,7 +117,6 @@ HANDLE_FIFO
 	JNE	<PRE_ERROR		; if not go to start
 
 PACKET_INFO                                            ; packet preamble valid
-
 	JSR	<WT_FIFO	
 	MOVE	X0,X:<HEAD_W3_0		; RP or DA
 	JSR	<WT_FIFO	
@@ -93,7 +135,7 @@ PACKET_INFO                                            ; packet preamble valid
 
 	;; Set TOTAL_BUFFS and LEFT_TO_READ using A
 	JSR	PACKET_PARTITIONS
-
+XXXX
 ;;; Case (packet type) of
 	MOVE	X:HEAD_W3_0,A
 
@@ -161,7 +203,7 @@ HANDLE_RP1
 	;; DMA to host
 	MOVE	#>REPLY_BUFFER,X0
 	MOVE	A0,X:BLOCK_SIZE
-	MOVE	X0,X:BURST_SRC
+	MOVE	X0,X:YMEM_SRC
 	JSR	BLOCK_TRANSFER
 
 	;; Mark buffer and signal PC
@@ -184,8 +226,9 @@ HANDLE_RP_DROP
 ;;; HANDLE_DA
 ;;; Handler for MCE data (DA) frames.
 
-HANDLE_DA
 
+HANDLE_DA
+	
 	;; Increment frame count
 	MOVE	X:FRAME_COUNT,A
 	ADD	#>1,A
@@ -226,7 +269,7 @@ HANDLE_DA_MATH
 
 	;; Prepare burst variables
 	MOVE	B0,X:BLOCK_SIZE
-	MOVE	B1,X:BURST_SRC		; Y:0
+	MOVE	B1,X:YMEM_SRC		; Y:0
 
 	MOVE	#QT_DEST_LO,R0
 	JSR	LOAD_HILO_ADDRESS
@@ -253,35 +296,184 @@ HANDLE_DA_DROP
 	JMP	DROP_PACKET		; Will RTS to main loop
 	
 ;;; HANDLE_DA ends
+
+
+
+;;; DMA FROM HOST PC TO Y memory, and beyond.
+
+;----------------------------------------------
+CON_TRANSFER
+;----------------------------------------------
+;   In:
+;   - BURST_SRC_HI:BURST_SRC_LO is PC RAM address
+;   - BLOCK_SIZE is packet size, in bytes
+;   - YMEM_DEST is start of data in Y memory
+;  Out:
+;   - BLOCK_SIZE will be decremented to zero.
+;   - BURST_SRC_HI:LO will be incremented by BLOCK_SIZE
+;   - YMEM_DEST will be incremented by BLOCK_SIZE/2
+;  Trashes:
+;   - A and B
 	
-		
+	;; DSP PCI burst limit is 256 bytes.
+	MOVE	X:BLOCK_SIZE,A	        ; A1 = BLOCK_SIZE
+	
+	CMP	#0,A
+	JEQ	XBLOCK_DONE
+
+	;; Transfer bytes in blocks of PCI_BURST_SIZE
+	CLR	B
+	MOVE	X:PCI_BURST_SIZE,B1
+	
+	CMP	B,A			; A ? B
+	JGE	<XBLOCK_TRANSFER1	; jump if A >= B
+	MOVE	A,B			; This only moves A1,B1.
+XBLOCK_TRANSFER1
+	SUB	B,A			; A -= B
+	ADD	#0,B			; Clear carry bit
+	MOVE	A,X:BLOCK_SIZE		; Updated BLOCK_SIZE
+	MOVE	B,X:BURST_SIZE		; BURST_SIZE ;= round32(min(BLOCK_SIZE,$100))
+	ASR	#25,B,B			; B0 = # of 16 bit words
+
+	;; Setup DMA from BURST_SRC to PCI tx
+	MOVE	X:YMEM_DEST,A0
+	MOVE	A0,X:DDR0		; DMA dest'n
+	MOVEP	#>DRXR,X:DSR0		; DMA source
+	ADD	B,A
+	DEC	B
+	MOVE	A0,X:YMEM_DEST		; YMEM_DEST += BURST_SIZE/2
+	
+	MOVEP	B0,X:DCO0		; DMA length = BURST_SIZE/2 - 1
+
+ 	;; DMA go
+ 	MOVEP	#$8EEAC4,X:DCR0
+
+XBLOCK_PCI
+	;; Setup PCI burst using BURST_SIZE
+	CLR	A
+	CLR	B
+	MOVE	X:BURST_SIZE,B0		; B = n8
+	DEC	B			; n8 - 1
+	ADD	#0,B			; Clear carry
+	ASR	#2,B,B			; (n8 - 1)/4 = n32 - 1
+	ADD	#0,B			; Clear carry
+	ASL	#16,B,B			; B[23:16] = " "
+	
+	MOVE	X:BURST_SRC_HI,A0
+
+	ADD	B,A
+	NOP
+	MOVE	A0,X:DPMC		; PCI burst length and HI address
+
+	MOVE	#$06,A0			; This is a read.
+	ADD	#0,B			; Clear carry
+	ASL	#16,A,A
+	MOVE	X:BURST_SRC_LO,B0
+	ADD	B,A
+	NOP
+	MOVEP	A0,X:DPAR		; PCI LO address and GO
+
+
+
+XBLOCK_CHECK
+	NOP
+	NOP
+	JCLR	#MARQ,X:DPSR,*		; Wait for burst termination
+
+	;; Check for error
+	JSET	#MDT,X:DPSR,XBLOCK_OK
+
+	JSR	PCI_ERROR_CLEAR
+
+	BCLR	#PCIDMA_RESTART,X:STATUS ; Test and clear
+	JCS	<XBLOCK_RESTART
+
+	BCLR	#PCIDMA_RESUME,X:STATUS	; Test and clear
+	JCS	<XBLOCK_RESUME
+
+XBLOCK_OK
+	MOVE	X:BURST_SIZE,A0		; Pass # of words written to updater
+	JSR	XBLOCK_UPDATE
+	JMP	CON_TRANSFER		; Finish the block
+XBLOCK_DONE
+	RTS				; Done	
+	
+XBLOCK_RESTART
+	JMP	XBLOCK_PCI		; Recalculate pci and resend
+
+XBLOCK_RESUME
+	CLR	A
+	CLR	B
+	MOVEP	X:DPSR,A0		; Get words left to write
+	JCLR	#RDCQ,X:DPSR,XBLOCK_RESUME1
+	
+	INC	B
+	
+XBLOCK_RESUME1
+
+	INC	B			; We want N, not N-1.
+	ADD	#0,B			; Clear carry
+	ASR	#16,A,A
+	ADD	A,B			; B is words remaining
+	ADD	#0,B			; Clear carry
+	ASL	#2,B,B			; Number of bytes left to transfer
+	MOVE	X:BURST_SIZE,A0
+	SUB	B,A			; A is words written
+
+	JSR	XBLOCK_UPDATE
+	JMP	XBLOCK_PCI		; Recalculate pci and resend
+
+; BLOCK_UPDATE
+;  Subtract A from BURST_SIZE and add A to BURST_DEST_LO
+;  Caller can check Z flag to see if BURST_SIZE is now 0.
+XBLOCK_UPDATE
+	MOVE	A0,X1			; Save A for later
+	ASL	#0,A,B			; MOVE A,B
+	
+	MOVE	#BURST_SRC_LO,R0	; 
+	JSR	ADD_HILO_ADDRESS	; This updates BURST_DEST to BURST_DEST + B
+
+	MOVE	X:BURST_SIZE,B
+	SUB	X1,B			; Zero flag must be preserved!
+	NOP
+	MOVE	B1,X:BURST_SIZE
+
+	RTS
+
+
+	
 
 CON_NOW
 ; 	This routine runs after the PC sends a 'CON' command, and will
 ; 	copy the command to the MCE and then reply to the PC.
 
-	MOVE	#>CON_SOURCE_LO,R0
-	JSR	LOAD_HILO_ADDRESS	; PCI address in A
-	ASL	#0,A,B			; MOVE A,B
+	;; PCI burst the command into Y memory
+	MOVE	#>CON_SRC_LO,R0
+	JSR	LOAD_HILO_ADDRESS
+	MOVE	#>BURST_SRC_LO,R0
+	JSR	SAVE_HILO_ADDRESS
+	MOVE	#>COMMAND_BUFFER,B0
+	MOVE	#>256,A0
+	MOVE	B0,X:YMEM_DEST
+	MOVE	A0,X:BLOCK_SIZE
+	JSR	CON_TRANSFER
 
-	;; Local buffer, in Y memory, for packet.
+CON_NOW_TRANSMIT
+	;; Send bytes to MCE -- LSB first.
+	
 	MOVE	#>COMMAND_BUFFER,R6
-	CLR	A
+	DO	#128,CON_NOW_CLEANUP	; block size = 16bit x 128 (256 bytes)
+	MOVE	Y:(R6)+,A1		; b2, b1  (lsb)
+	ASR	#8,A,B		        ; Shift b2 into B1
+	AND	#>$FF,A
+	MOVE	A1,X:FO_SEND
+	MOVE	B1,X:FO_SEND
 
-	;; MCE commands are 64 dwords big.
-	DO	#64,CON_NOW1		; block size = 32bit x 64 (256 bytes)
-	JSR	<READ_FROM_PCI		; get next 32 bit word from HOST
-
-	MOVE	A1,Y:(R6)+		; b4, b3 (msb)		
-	MOVE	A0,Y:(R6)+		; b2, b1  (lsb)
-
-	JSR	<XMT_WD_FIBRE		; off it goes
-	NOP
-CON_NOW1
-
+CON_NOW_CLEANUP
 	BCLR	#MODE_CHOKE,X:<MODE	; disable packet choke...
 					; comms now open with MCE and packets will be processed.	
-	BSET	#AUX1,X:PDRC		; enable hardware
+	;; Can we kill this?  Apparently it isn't a factor on 250 MHz boards?
+; 	BSET	#AUX1,X:PDRC		; enable hardware
 
 	;; CON processed, clear the request.
 	BCLR	#CON_DEMAND,X:STATUS
@@ -289,7 +481,8 @@ CON_NOW1
 	;; Reply to the CON command
 	MOVE	#'CON',X0
 	JSR	VCOM_PREPARE_REPLY
-	JSR	PCI_MESSAGE_TO_HOST	
+	JSR	PCI_MESSAGE_TO_HOST
+
 	RTS
 
 
@@ -336,7 +529,7 @@ WT_HOST	JSET	#FATAL_ERROR,X:<STATUS,START		; on fatal error, re-init.
 	MOVE	#>IMAGE_BUFFER,X0
 	MOVE	X:PACKET_SIZE,A
 	ASL	#2,A,A
-	MOVE	X0,X:BURST_SRC
+	MOVE	X0,X:YMEM_SRC
 	MOVE	A1,X:BLOCK_SIZE
 	JSR	BLOCK_TRANSFER
 
@@ -888,8 +1081,8 @@ SEND_PACKET_TO_CONTROLLER
 	BSET	#CON_DEMAND,X:STATUS
 	MOVE	X:<DRXR_WD2,X0
 	MOVE	X:<DRXR_WD3,X1
-	MOVE	X0,X:CON_SOURCE_HI
-	MOVE	X1,X:CON_SOURCE_LO
+	MOVE	X0,X:CON_SRC_HI
+	MOVE	X1,X:CON_SRC_LO
 
 ; 	;; Fourth word indicates if this is a go.  Who cares?
 ; 	MOVE	X:<DRXR_WD4,A		; read word 4 - GO command?
@@ -919,6 +1112,16 @@ SEND_PACKET_TO_CONTROLLER
 ;-----------------------------------------------------------------
 
 
+CHECK_FO
+	JCLR	#EF,X:PDRD,CLR_FO_RTS
+	NOP
+	NOP
+	JCLR	#EF,X:PDRD,CLR_FO_RTS
+
+	BSET	#FO_WRD_RCV,X:<STATUS
+	RTS
+	
+	
 ;---------------------------------------------------------------
 GET_FO_WRD	
 ;--------------------------------------------------------------
@@ -930,10 +1133,11 @@ GET_FO_WRD
 		JCLR	#EF,X:PDRD,CLR_FO_RTS		; check twice for FO metastability.	
 		JMP	RD_FO_WD
 
-WT_FIFO		JCLR	#EF,X:PDRD,*			; Wait till something in FIFO flagged
+WT_FIFO	
+		JCLR	#EF,X:PDRD,*			; Wait till something in FIFO flagged
 		NOP
 		NOP
-		JCLR	#EF,X:PDRD,WT_FIFO	; check twice.....
+		JCLR	#EF,X:PDRD,WT_FIFO		; check twice.....
 
 ; Read one word from the fiber optics FIFO, check it and put it in A1
 RD_FO_WD
@@ -1264,11 +1468,11 @@ BLOCK_TRANSFER1
 
 	;; Setup DMA from BURST_SRC to PCI tx
 	MOVEP	#DTXM,X:DDR0		; DMA dest'n
-	MOVE	X:BURST_SRC,A0
+	MOVE	X:YMEM_SRC,A0
 	MOVEP	A0,X:DSR0		; DMA source
 	ADD	B,A
 	DEC	B
-	MOVE	A0,X:BURST_SRC		; BURST_SRC += BURST_SIZE/2
+	MOVE	A0,X:YMEM_SRC		; BURST_SRC += BURST_SIZE/2
 	
 	MOVEP	B0,X:DCO0		; DMA length = BURST_SIZE/2 - 1
 
@@ -1403,17 +1607,15 @@ PACKET_PARTITIONS
 ; Trashes: R1 is updated to point to the end of the copied data.
 
 BUFFER_PACKET
-	
-BUFFER_PACKET_HALFS
-	DO	X:TOTAL_BUFFS,BUFFER_PACKET_SINGLES
+	DO	X:TOTAL_BUFFS,BUFFER_PACKET_HALFS_DONE
 	JSR	WAIT_FIFO_HALF
 	JSR	BUFFER_PACKET_HALF
-
+	NOP
+BUFFER_PACKET_HALFS_DONE
+	
 	;; Buffering single words in poll mode is very slow; but if we see a
 	;; half-full fifo, we can do our partial read at full speed.
 	JCLR	#HF,X:PDRD,BUFFER_PACKET_SINGLES_FAST
-	
-BUFFER_PACKET_SINGLES
 	DO	X:LEFT_TO_READ,BUFFER_PACKET_DONE
 BUFFER_PACKET_SINGLE
 	JSET	#FATAL_ERROR,X:<STATUS,DUMP_FIFO

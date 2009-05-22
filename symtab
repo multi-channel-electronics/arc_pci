@@ -1,6 +1,0 @@
-#!/bin/bash
-
-cat U0104.lod | \
-	sed 's/\r//g' | \
-	awk '($0=="_SYMBOL N") {on=0} (on==1) {print $3, $1} ($0=="_SYMBOL X") {on=1}' \
-	> symtab.out

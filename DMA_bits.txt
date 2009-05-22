@@ -13,4 +13,4 @@
 		 .. .		no dest address update
 		     ...	source address post-inc +1
 			 ..	dest is in X mem
-			   ..	dest is in ??? mem	
+			   ..	src is in Y mem	

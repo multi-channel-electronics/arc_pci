@@ -45,14 +45,14 @@ DTXS_WD2		DC	0
 DTXS_WD3		DC	0
 DTXS_WD4		DC	0
 
-HEAD_W1_1		DC	0
-HEAD_W1_0		DC	0
-HEAD_W2_1		DC	0
-HEAD_W2_0		DC	0
-HEAD_W3_1		DC	0
-HEAD_W3_0		DC	0
-HEAD_W4_1		DC	0
-HEAD_W4_0		DC	0
+HEAD_W1_0		DC	0       ; Preamble $A5A5
+HEAD_W1_1		DC	0	;          $A5A5
+HEAD_W2_0		DC	0	;          $5A5A
+HEAD_W2_1		DC	0	;          $5A5A
+HEAD_W3_0		DC	0	; 'RP' or 'DA'
+HEAD_W3_1 		DC	0	; '  '   $2020
+HEAD_W4_0		DC	0	; Packet size LSW
+HEAD_W4_1		DC	0	;             MSW
 
 SV_A0			DC	0   
 SV_A1			DC	0 
@@ -88,7 +88,10 @@ BLOCK_SIZE		DC	0
 BURST_SIZE		DC	0
 BURST_DEST_LO		DC	0
 BURST_DEST_HI		DC	0
-BURST_SRC		DC	0
+BURST_SRC_LO		DC	0
+BURST_SRC_HI		DC	0
+YMEM_SRC		DC	0
+YMEM_DEST               DC      0
 	
 DMA_ERRORS		DC	0
 EC_TRTY			DC	0
@@ -125,8 +128,8 @@ RP_MAX_SIZE		DC	0
 RP_DROPS		DC	0
 
 ;;; Source bus address for MCE commands
-CON_SOURCE_LO		DC	0
-CON_SOURCE_HI		DC	0
+CON_SRC_LO		DC	0
+CON_SRC_HI		DC	0
 	
 ;;; Bus latency timer
 PCI_BURST_SIZE		DC	$40	; Should be < 4*latency assigned by OS
@@ -164,6 +167,8 @@ PCIDMA_RETRY		EQU	18
 
 QT_FLUSH		EQU	20  ; Set when it is time to inform Host of current buffer position.
 RP_BUFFER_FULL		EQU	21  ; Set when Quiet RP buffer is occupied.
+
+MAIN_LOOP_POLL          EQU     23  ; Cleared by the main loop, use to check for DSP lock-up
 	
 ;;; Bit defines for MODE word
 

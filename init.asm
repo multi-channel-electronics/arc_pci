@@ -322,7 +322,8 @@ X_WRITE
 ;----------------------------------------------------------------------------
 ; Disable byte swapping - enabled after first command to MCE.
 ; i.e after first 'CON'
-	BCLR	#AUX1,X:PDRC
+	;; Can we kill this?  Apparently it isn't a factor on 250 MHz boards?
+; 	BCLR	#AUX1,X:PDRC
 
 ;----------------------------------------------------------------------------
 ; Initialize PCI controller again, after booting, to make sure it sticks
