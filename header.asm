@@ -30,6 +30,8 @@ SMALL_BLK	EQU	32	; small block burst size for < 512 pixels
 IMAGE_BUFFER	EQU	0	; Data frame buffer offset.
 REPLY_BUFFER	EQU     $100000	; Buffer MCE replies at 1M
 COMMAND_BUFFER	EQU	$200000	; Buffer MCE commands at 2M
+TIMER_BUFFER    EQU     $201000
+TIMER_BUFFER_END EQU    $202000
 
 	
 ; HST timeout recovery....
@@ -98,21 +100,25 @@ DDR0	EQU	$FFFFEE		; Destination address register
 DCO0	EQU	$FFFFED		; Counter register
 DCR0	EQU	$FFFFEC		; Control register
 
-; The DCTR host flags are written by the DSP and read by PCI host
-DCTR_HF3	EQU	3		; used as a semiphore for INTA handshaking
-DCTR_HF4  	EQU	4		; 
-DCTR_HF5  	EQU	5		; 
-INTA	   	EQU	6		; Request PCI interrupt
+; DCTR bits
+DCTR_HCIE	EQU	0 	; Interrupt enable
+DCTR_HF3	EQU	3	; used as a semaphore for INTA handshaking
+DCTR_HF4  	EQU	4	; 
+DCTR_HF5  	EQU	5	; 
+INTA	   	EQU	6	; Request PCI interrupt
 
 ; The DSR host flags are written by the PCI host and read by the DSP
-DSR_BUF0   EQU	4		; PCI host sets this when copying buffer 0
-DSR_BUF1   EQU	5		; PCI host sets this when copying buffer 1
+DSR_HF0   EQU	3		; PC side INTA hand-shaking
+DSR_HF1   EQU	4		; 
+DSR_HF2   EQU	5		; 
 
 ; DPCR bit definitions
 CLRT	EQU	14		; Clear transmitter
 MACE	EQU	18		; Master access counter enable
 IAE	EQU	21		; Insert Address Enable
 
+
+	
 ; Addresses of ESSI port
 TX00	EQU	$FFFFBC		; Transmit Data Register 0
 SSISR0	EQU	$FFFFB7		; Status Register
@@ -190,3 +196,24 @@ TCF		EQU	21
 ;;; FO transmitter memory-mapped location
 
 FO_SEND		EQU	$FFF000
+
+;--------------------------------------------------------------------
+; Interrupt configuration
+;--------------------------------------------------------------------
+;  IPRC determines core interrupt modes and levels.
+;   - [5:3] IRQB mode|level - FIFO half full
+;   - [8:6] IRQC mode|level - reset switch
+;  So $1C0 is 111|000|000 = IRQC level-triggered priority 3 and IRQB disabled.
+;
+;  IPRP determines peripheral interrupt levels.
+;   - [1:0] HI-32 level.  Must be higher than SR IPL mask
+;  So set to 2, and ensure SR[I] > 1.
+;
+;  SR determines many things... but most importantly
+;   - [9:8] Interrupt mask - must be smaller than HI-32 IPL
+;  So set to $100
+
+MY_IPRC		EQU	$0001C0
+MY_IPRP		EQU	$000002
+MY_SR		EQU	$000100
+

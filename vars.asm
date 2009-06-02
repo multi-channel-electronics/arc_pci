@@ -81,6 +81,11 @@ NUM_LEFTOVER_BLOCKS	DC	0	; small block DMA burst transfer
 
 PACKET_SIZE		DC	0	; Size, in dwords of most recent packet from MCE.
 
+
+;;; Packet processing error counts
+PREAMBLE_ERRORS		DC	0   ; Failed on preamble processing
+PTYPE_ERRORS		DC	0   ; Failed on packet type
+PSIZE_ERRORS		DC	0   ; Failed on packet size test
 	
 ;;;PCI burst parameters
 	
@@ -133,7 +138,12 @@ CON_SRC_HI		DC	0
 	
 ;;; Bus latency timer
 PCI_BURST_SIZE		DC	$40	; Should be < 4*latency assigned by OS
+
+;;; Timer buffer
+TIMER_INDEX		DC	0
 	
+;;; Generic debug
+		
 BDEBUG0			DC	0
 BDEBUG1			DC	0
 BDEBUG2			DC	0
@@ -154,12 +164,13 @@ SEND_TO_HOST		EQU	1   ; set in HST ISR when host ready for packet (stays set unt
 FATAL_ERROR		EQU	2   ; PCI message to host error detected by driver....
 FO_WRD_RCV		EQU	3   ; set when packet detected in FIFO - stays set till packet processed
 
-PREAMBLE_ERROR		EQU	6   ; set if preamble error detected
-DATA_DLY		EQU	7   ; set in CON ISR if MCE command is 'GO'.  USed to add delay to first returned data packet 
+; PREAMBLE_ERROR		EQU	6   ; set if preamble error detected
+; DATA_DLY		EQU	7   ; set in CON ISR if MCE command is 'GO'.  USed to add delay to first returned data packet 
 
 HST_NFYD		EQU	9   ; set after host notified (NFY message) of packet (stays set until after HST reply)
 
 CON_DEMAND		EQU	10  ; Host has requested an MCE command be sent
+CON_MCE                 EQU     11  ; Command has been copied and we should send it to the MCE
 
 PCIDMA_RESTART		EQU	16  ; DMA flags used for error recovery
 PCIDMA_RESUME		EQU	17
@@ -168,16 +179,17 @@ PCIDMA_RETRY		EQU	18
 QT_FLUSH		EQU	20  ; Set when it is time to inform Host of current buffer position.
 RP_BUFFER_FULL		EQU	21  ; Set when Quiet RP buffer is occupied.
 
+FREEZER			EQU	22  ; Suspend operations and just idle in the main loop
 MAIN_LOOP_POLL          EQU     23  ; Cleared by the main loop, use to check for DSP lock-up
 	
 ;;; Bit defines for MODE word
 
 MODE_APPLICATION	EQU	0   ; set if PCI application to run
-MODE_CHOKE		EQU	1   ; drop all packets from MCE
+MODE_MCE		EQU	1   ; process packets from MCE
 MODE_QT			EQU	2   ; Quiet transfer for data packets
 MODE_RP_BUFFER		EQU     3   ; Quiet transfer for reply packets
-MODE_IRQ		EQU	4   ; Enable PCI interrupts on NFY
-	
+MODE_NOIRQ		EQU	4   ; Disbale PCI interrupts on NFY
+MODE_HANDSHAKE		EQU	5   ; Enable IRQ hand-shaking
 
 	IF	@SCP("DOWNLOAD","ROM")	; Boot ROM code
 VAR_TBL_END	EQU	@LCV(L)-2

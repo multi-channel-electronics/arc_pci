@@ -1,4 +1,5 @@
-	COMMENT *
+
+		COMMENT *
 
 Main section of the pci card code.
 
@@ -16,6 +17,9 @@ PACKET_IN
 
 	;; Clear I'm-alive bit
 	BCLR    #MAIN_LOOP_POLL,X:<STATUS
+
+	;; Are we in state freeze?
+	JSET	#FREEZER,X:<STATUS,PACKET_IN
 	
 	;; Reinitialize if a serious error has been detected
  	JSET	#FATAL_ERROR,X:<STATUS,START 
@@ -33,7 +37,8 @@ PACKET_IN
 	JSR	<CHECK_FO
  	JSSET	#FO_WRD_RCV,X:STATUS,HANDLE_FIFO
 
-	;; New CON code, only run if the fifo isn't hot.
+	;; CON only progresses if FIFO isn't hot.
+	JSSET   #CON_MCE,X:STATUS,CON_NOW_TRANSMIT
 	JSSET	#CON_DEMAND,X:STATUS,CON_NOW
 
 	;; Hackers, welcome.
@@ -52,36 +57,43 @@ PACKET_IN
 ;;; Fibre data detected; process it and return to main loop.
 
 HANDLE_FIFO
+	MOVE	#>$A00,A1
+	JSR	TIMER_STORE_A1
+	JSR	TIMER_STORE
+	
 	;; Poll for 8 words -- the preamble and packet size.
 	MOVE	#>HEAD_W1_0,R0
+	MOVE	#>$00FFFF,X0		; Mask lower 16 bits
+	MOVE	R0,A0
 	DO	#8,HANDLE_FIFO_CHECK_PREAMBLE
 HANDLE_FIFO_WAIT
 	JCLR	#EF,X:PDRD,HANDLE_FIFO_WAIT
 	NOP
 	NOP
 	JCLR	#EF,X:PDRD,HANDLE_FIFO_WAIT
-	MOVEP	X:RDFIFO,X0
-	MOVE	X0,X:(R0)+
+	MOVEP	Y:RDFIFO,A
+	AND	X0,A
+	NOP
+	MOVE	A1,X:(R0)+
 
 HANDLE_FIFO_CHECK_PREAMBLE
 	MOVE	#>HEAD_W1_0,R0
-	MOVE	#>$A5A5,A
-	MOVE	X:(R0)+,X0
-	CMP	X0,A
-	JNE	<PRE_ERROR
-	MOVE	X:(R0)+,X0
-	CMP	X0,A
-	JNE	<PRE_ERROR
-	MOVE	#>$5A5A,A
-	MOVE	X:(R0)+,X0
-	CMP	X0,A
-	JNE	<PRE_ERROR
-	MOVE	X:(R0)+,X0
-	CMP	X0,A
-	JNE	<PRE_ERROR
+	CLR	B
+	CLR	A
+	MOVE	X:(R0)+,B
+	CMP	#>$A5A5,B
+	JNE	PRE_ERROR
+	MOVE	X:(R0)+,B
+	CMP	#>$A5A5,B
+	JNE	PRE_ERROR
+	MOVE	X:(R0)+,B
+	CMP	#>$5A5A,B
+	JNE	PRE_ERROR
+	MOVE	X:(R0)+,B
+	CMP	#>$5A5A,B
+	JNE	PRE_ERROR
 
 	;; Good enough.  Construct the packet size from words 6 and 7
-	CLR	A
 	MOVE	X:>(HEAD_W1_0+6),A0
 	MOVE	X:>(HEAD_W1_0+7),X0
  	INSERT	#$010010,X0,A		; A = size in dwords
@@ -92,11 +104,11 @@ HANDLE_FIFO_CHECK_PREAMBLE
 		
 OLD_HANDLE_FIFO
 
-	JSET	#MODE_CHOKE,X:<MODE,RETURN_NOW	; IF MCE Packet choke on - just keep clearing FIFO.
-	MOVE	X0,X:<HEAD_W1_0				;store received word
+	JCLR	#MODE_MCE,X:<MODE,RETURN_NOW	; IF MCE Packet choke on - just keep clearing FIFO.
+	MOVE	X0,X:<HEAD_W1_0			;store received word
 	MOVE	X:PREAMB1,A
-	CMP	X0,A					; check it is correct
-	JNE	<PRE_ERROR				; if not go to start
+	CMP	X0,A				; check it is correct
+	JNE	<PRE_ERROR			; if not go to start
 
 	JSR	<WT_FIFO		; wait for next preamble 16-bit word
 	MOVE	X0,X:<HEAD_W1_1		;store received word
@@ -136,6 +148,7 @@ PACKET_INFO                                            ; packet preamble valid
 	;; Set TOTAL_BUFFS and LEFT_TO_READ using A
 	JSR	PACKET_PARTITIONS
 XXXX
+	JSR	TIMER_STORE
 ;;; Case (packet type) of
 	MOVE	X:HEAD_W3_0,A
 
@@ -148,12 +161,25 @@ XXXX
 	JMP	QT_PTYPE_ERROR
 
 PRE_ERROR	
-	BSET	#PREAMBLE_ERROR,X:<STATUS	; indicate a preamble error
-	JSR	CLEAR_FO_FIFO		; empty the fifo (2 ms!)
-
-QT_PTYPE_ERROR		
+	MOVE	#>PREAMBLE_ERRORS,R0
+	JSR	INCR_X_R0
+	JMP	CLEAR_FO_FIFO		; empty the fifo (2 ms!)
+	
+QT_PTYPE_ERROR
+ 	MOVE	#>PTYPE_ERRORS,R0
+	JMP	INCR_X_R0
 QT_FSIZE_ERROR
+	MOVE	#>PSIZE_ERRORS,R0
+	JMP	INCR_X_R0
 RETURN_NOW
+	RTS
+
+INCR_X_R0
+	;; Increment the X memory varible at R0. Trashes A.
+	MOVE	X:(R0),A0
+	INC	A
+	NOP
+	MOVE	A0,X:(R0)
 	RTS
 
 
@@ -172,6 +198,10 @@ HANDLE_RP
 	MOVE	#>REPLY_BUFFER,R1
 	JSR	BUFFER_PACKET
 
+	MOVE	#>$b00,A1
+	JSR	TIMER_STORE_A1
+	JSR	TIMER_STORE
+	
 	;; Prepare PCI block transfer
 	MOVE	#RP_BASE_LO,R0
 	JSR	LOAD_HILO_ADDRESS
@@ -191,8 +221,16 @@ HANDLE_RP
 	MOVE	B,A
 
 HANDLE_RP1
-	;; Prepare notification packet
+	;; DMA to host
+	MOVE	#>REPLY_BUFFER,X0
+	MOVE	A0,X:BLOCK_SIZE
+	MOVE	X0,X:YMEM_SRC
+	JSR	TIMER_STORE
+	JSR	BLOCK_TRANSFER
+	JSR	TIMER_STORE
 	
+	;; Prepare notification packet
+	JSR	PCI_LOCKDOWN		; Disable host IRQ
 	MOVE	#'NFY',X0
 	MOVE	X0,X:DTXS_WD1
 	MOVE	#'RPQ',X0
@@ -200,24 +238,19 @@ HANDLE_RP1
 	MOVE	A0,X:DTXS_WD3	; A0=block_size
 	MOVE	A1,X:DTXS_WD4	; A1=0
 
-	;; DMA to host
-	MOVE	#>REPLY_BUFFER,X0
-	MOVE	A0,X:BLOCK_SIZE
-	MOVE	X0,X:YMEM_SRC
-	JSR	BLOCK_TRANSFER
-
 	;; Mark buffer and signal PC
 	BSET	#RP_BUFFER_FULL,X:STATUS
 	JSR	PCI_MESSAGE_TO_HOST
+	BSET	#DCTR_HCIE,X:DCTR	; Enable host IRQ
 
+	JSR	TIMER_STORE
+	
 	;; Return to main loop
 	RTS
 
 HANDLE_RP_DROP
-	MOVE	X:RP_DROPS,A
-	ADD	#1,A
-	NOP
-	MOVE	A,X:RP_DROPS
+	MOVE	#RP_DROPS,R0
+	JSR	INCR_X_R0
 	JMP	DROP_PACKET		; Will RTS to main loop
 	
 ;;; HANDLE_RP ends
@@ -228,12 +261,9 @@ HANDLE_RP_DROP
 
 
 HANDLE_DA
-	
 	;; Increment frame count
-	MOVE	X:FRAME_COUNT,A
-	ADD	#>1,A
-	NOP
-	MOVE	A,X:<FRAME_COUNT
+	MOVE	#FRAME_COUNT,R0
+	JSR	INCR_X_R0
 
 	;; If not quiet mode, do normal processing
 	JCLR	#MODE_QT,X:MODE,MCE_PACKET
@@ -241,6 +271,10 @@ HANDLE_DA
 	;; Copy words to Y memory.
 	MOVE	#>IMAGE_BUFFER,R1
 	JSR	BUFFER_PACKET
+
+	MOVE	#$e00,A1
+	JSR	TIMER_STORE_A1
+	JSR	TIMER_STORE
 
 	;; Check that the RAM buffer isn't full
 	MOVE	X:QT_BUF_HEAD,A
@@ -279,6 +313,8 @@ HANDLE_DA_MATH
 	;; Send
 	JSR	BLOCK_TRANSFER
 
+	JSR	TIMER_STORE
+	
 	;; Next buffer
 	JSR	BUFFER_INCR
 
@@ -289,10 +325,8 @@ HANDLE_DA_MATH
 
 HANDLE_DA_DROP
 	;; Full buffer, drop packet.
-	MOVE	X:QT_DROPS,A
-	ADD	#1,A
-	NOP
-	MOVE	A,X:QT_DROPS
+	MOVE	#QT_DROPS,R0
+	JSR	INCR_X_R0
 	JMP	DROP_PACKET		; Will RTS to main loop
 	
 ;;; HANDLE_DA ends
@@ -447,6 +481,10 @@ CON_NOW
 ; 	This routine runs after the PC sends a 'CON' command, and will
 ; 	copy the command to the MCE and then reply to the PC.
 
+	MOVE	#>$C00,A1
+	JSR	TIMER_STORE_A1
+	JSR	TIMER_STORE
+	
 	;; PCI burst the command into Y memory
 	MOVE	#>CON_SRC_LO,R0
 	JSR	LOAD_HILO_ADDRESS
@@ -458,8 +496,14 @@ CON_NOW
 	MOVE	A0,X:BLOCK_SIZE
 	JSR	CON_TRANSFER
 
+	BSET	#CON_MCE,X:STATUS
+	JSR	TIMER_STORE
+	RTS
+	
+	
 CON_NOW_TRANSMIT
 	;; Send bytes to MCE -- LSB first.
+	JSR	TIMER_STORE
 	
 	MOVE	#>COMMAND_BUFFER,R6
 	DO	#128,CON_NOW_CLEANUP	; block size = 16bit x 128 (256 bytes)
@@ -470,19 +514,23 @@ CON_NOW_TRANSMIT
 	MOVE	B1,X:FO_SEND
 
 CON_NOW_CLEANUP
-	BCLR	#MODE_CHOKE,X:<MODE	; disable packet choke...
+	BSET	#MODE_MCE,X:<MODE	; enable response handling
 					; comms now open with MCE and packets will be processed.	
-	;; Can we kill this?  Apparently it isn't a factor on 250 MHz boards?
-; 	BSET	#AUX1,X:PDRC		; enable hardware
 
-	;; CON processed, clear the request.
+	;; CON processed, clear the state bits.
+	BCLR	#CON_MCE,X:STATUS
 	BCLR	#CON_DEMAND,X:STATUS
 
+	JSR	TIMER_STORE
+	
 	;; Reply to the CON command
+	JSR	PCI_LOCKDOWN
 	MOVE	#'CON',X0
 	JSR	VCOM_PREPARE_REPLY
 	JSR	PCI_MESSAGE_TO_HOST
+	BSET	#DCTR_HCIE,X:DCTR	; Enable host IRQ
 
+	JSR	TIMER_STORE
 	RTS
 
 
@@ -497,7 +545,8 @@ CON_NOW_CLEANUP
 ; prepare notify to inform host that a packet has arrived.
 
 MCE_PACKET
-	BCLR	#HST_NFYD,X:<STATUS		; clear flag to indicate host has been notified.
+	JSR	PCI_LOCKDOWN		; Disable host IRQ
+	BCLR	#HST_NFYD,X:<STATUS	; clear flag to indicate host has been notified.
 
 	MOVE	#'NFY',X0		; initialise communication to host as a notify
 	MOVE	X0,X:<DTXS_WD1		; 1st word transmitted to host in notify message
@@ -515,7 +564,7 @@ MCE_PACKET
 	BCLR	#SEND_TO_HOST,X:<STATUS		; clear send to host flag
 	JSR	<PCI_MESSAGE_TO_HOST		; notify host of packet	
 	BSET	#HST_NFYD,X:<STATUS		; flag to indicate host has been notified.
-
+	BSET	#DCTR_HCIE,X:DCTR	; Enable host IRQ
 
 	MOVE	#>IMAGE_BUFFER,R1
 	JSR	BUFFER_PACKET
@@ -536,9 +585,11 @@ WT_HOST	JSET	#FATAL_ERROR,X:<STATUS,START		; on fatal error, re-init.
 	JSET	#FATAL_ERROR,X:<STATUS,START
 
 	;; Reply to the HST command
+	JSR	PCI_LOCKDOWN		; Disable host IRQ
 	MOVE	#'HST',X0
 	JSR	VCOM_PREPARE_REPLY
 	JSR	PCI_MESSAGE_TO_HOST
+	BSET	#DCTR_HCIE,X:DCTR	; Enable host IRQ
 	RTS
 
 ;----------------------------------------------------------
@@ -851,6 +902,9 @@ QUIET_TRANSFER_SET
 	JSR	VCOM_INTRO
 	JNE	VCOM_EXIT
 
+	MOVE	#BDEBUG0,R0
+	JSR	INCR_X_R0
+	
 	MOVE	X:DRXR_WD2,A		; Parameter id
 	MOVE	X:DRXR_WD3,X0		; First arg
 	MOVE	X:DRXR_WD4,X1		; Second arg
@@ -912,40 +966,40 @@ QUIET_TRANSFER_SET
 QUIET_TRANSFER_SET_RP_BASE
 	MOVE	X0,X:RP_BASE_LO
 	MOVE	X1,X:RP_BASE_HI
-	JMP	VCOM_EXIT
+	JMP	VCOM_EXITX
 	
 QUIET_TRANSFER_SET_RP_ENABLED
 	BCLR	#MODE_RP_BUFFER,X:MODE
 	MOVE	X0,A
 	TST	A
-	JEQ	VCOM_EXIT
+	JEQ	VCOM_EXITX
 	BSET	#MODE_RP_BUFFER,X:MODE
 	BCLR	#RP_BUFFER_FULL,X:STATUS
-	JMP	VCOM_EXIT
+	JMP	VCOM_EXITX
 
 QUIET_TRANSFER_SET_FLUSH
 	BCLR	#QT_FLUSH,X:STATUS
 	MOVE	X0,A
 	TST	A
-	JEQ	VCOM_EXIT
+	JEQ	VCOM_EXITX
 	BSET	#QT_FLUSH,X:STATUS
-	JMP	VCOM_EXIT
+	JMP	VCOM_EXITX
 
 QUIET_TRANSFER_SET_ENABLED
 	BCLR	#MODE_QT,X:MODE
 	JSR	TIMER_DISABLE
 	MOVE	X0,A
 	TST	A
-	JEQ	VCOM_EXIT
+	JEQ	VCOM_EXITX
 	MOVE	#0,A0
 	BSET	#MODE_QT,X:MODE
 	MOVE	A0,X:TLR0
 	JSR	TIMER_ENABLE
-	JMP	VCOM_EXIT
+	JMP	VCOM_EXITX
 	
 QUIET_TRANSFER_SET_R0
 	MOVE	X0,X:(R0)
-	JMP	VCOM_EXIT
+	JMP	VCOM_EXITX
 
 QUIET_TRANSFER_SET_BASE
 	MOVE	X0,X:QT_BASE_LO
@@ -953,9 +1007,28 @@ QUIET_TRANSFER_SET_BASE
 
 	JSR	BUFFER_RESET
 
-	JMP	VCOM_EXIT
+	JMP	VCOM_EXITX
+
+VCOM_EXITX
+	MOVE	X:BDEBUG0,X0
+	JMP VCOM_EXIT_X0
 
 
+;-----------------------------------------------------------------------------
+MODE_SET_FAST
+;-----------------------------------------------------------------------------
+; This is a 'fast' command in the sense that it does not reply to the host.
+; It is used to set various communication parameters prior to issuing normal
+; DSP commands.  A single word is read from the DRXR into DRXR_WD1 as data.
+
+	MOVE	X0,X:SV_X0		; Save X0
+	JCLR	#SRRQ,X:DSR,*		; Wait for data
+	MOVE	X:DRXR,X0
+	MOVE	X0,X:MODE
+	MOVE	X:SV_X0,X0
+	RTI
+	
+	
 ;-----------------------------------------------------------------------------
 SYSTEM_RESET
 ;-----------------------------------------------------------------------------
@@ -963,7 +1036,7 @@ SYSTEM_RESET
 	MOVEC	#1,SP			; Point stack pointer to the top	
 	MOVEC	#$000200,SSL		; SSL holds SR return state
 					; set to zero except for interrupts
-	MOVEC	#0,SP			; Writing to SSH preincrements the SP
+	MOVEC	#>MY_SR,SP		; Writing to SSH preincrements the SP
 					; so first set to 0
 	MOVEC	#START,SSH		; SSH holds return address of PC
 					; therefore,return to initialization
@@ -1038,7 +1111,7 @@ FINISH_RST
 	JSET	#DCTR_HF3,X:DCTR,*
 	
 	BCLR	#MODE_APPLICATION,X:<MODE	; clear app flag
-        BCLR	#PREAMBLE_ERROR,X:<STATUS	; clear preamble error
+;         BCLR	#PREAMBLE_ERROR,X:<STATUS	; clear preamble error
 	BCLR	#APPLICATION_RUNNING,X:<STATUS  ; clear appl running bit.
 
 ; remember we are in a ISR so can't just jump to start.
@@ -1152,6 +1225,33 @@ CLR_FO_RTS
 		BCLR	#FO_WRD_RCV,X:<STATUS
 		RTS
 
+
+; PCI semaphore
+;
+; In order for routines in non-interrupt context to write to the
+; DTXS, (via PCI_MESSAGE_TO_HOST) they need to end up with
+; interrupts disabled and HCF3 cleared.
+;
+; Non-interrupt PCIers must call PCI_LOCKDOWN before proceeding to
+; fill DTXS_WD? and call PCI_MESSAGE_TO_HOST.
+;
+; Restore with PCI_LOCKUP, or just re-enable HCIE.
+		
+PCI_LOCKDOWN_AGAIN
+	BSET	#DCTR_HCIE,X:DCTR	; Re-enable host IRQ
+	DO	#50,PCI_LOCKDOWN	; Delay for ~us
+	NOP
+	
+PCI_LOCKDOWN
+	;; Entry
+	BCLR	#DCTR_HCIE,X:DCTR	; Disable host IRQ
+	JSET	#DCTR_HF3,X:DCTR,PCI_LOCKDOWN_AGAIN
+	RTS
+
+PCI_LOCKUP
+	BCLR	#DCTR_HCIE,X:DCTR	; Enable host IRQ
+	RTS
+
 	
 ; ----------------------------------------------------------------------------
 PCI_MESSAGE_TO_HOST
@@ -1162,8 +1262,13 @@ PCI_MESSAGE_TO_HOST
 ; PCI card writes here first then causes an interrupt INTA on
 ; the PCI bus to alert the host to the reply message
 
-	JSET	#DCTR_HF3,X:DCTR,*	; make sure host ready to receive interrupt
-					; cleared via fast interrupt if host out of its ISR
+; This routine cannot block for anything because it is always
+; called either from a host interrupt handler or with host
+; interrupts disabled.
+	
+; 	JSET	#DCTR_HF3,X:DCTR,*	; make sure host ready to receive interrupt
+; 					; cleared via fast interrupt if host out of its ISR
+; 	JSET	#INTA,X:DCTR,*		; This should be cleared by host before HF.
 	MOVE	#>DTXS_WD1,R0
 
 	DO	#4,PCI_MESSAGE_TO_HOST_RESTORE
@@ -1176,15 +1281,18 @@ PCI_MESSAGE_TO_HOST_RESTORE
 	MOVE	X:SV_X0,X0		; restore X0
 	MOVE	X:SV_R0,R0		; restore X0
 
-; all the transmit words are in the FIFO, interrupt the Host
-; the Host should clear this interrupt once it is detected. 
-; It does this by writing to HCVR to cause a fast interrupt.
-
-	; set flag to handshake interrupt (INTA) with host.
+	; Use HF3 as additional handshake
 	BSET	#DCTR_HF3,X:DCTR
 	; only interrupt in irq mode
-	JCLR	#MODE_IRQ,X:MODE,PCI_MESSAGE_TO_HOST_RETURN
+	JSET	#MODE_NOIRQ,X:MODE,PCI_MESSAGE_TO_HOST_HANDSHAKE
 	BSET	#INTA,X:DCTR		; Assert the interrupt
+PCI_MESSAGE_TO_HOST_HANDSHAKE
+	JCLR	#MODE_HANDSHAKE,X:MODE,PCI_MESSAGE_TO_HOST_RETURN
+	;; Ceci n'est pas un handshake
+	JCLR	#DSR_HF0,X:DSR,*	; Wait for host to ack
+	BCLR	#INTA,X:DCTR		; Clear interrupt
+	BCLR	#DCTR_HF3,X:DCTR	; Clear hand-shake bit
+	JSET	#DSR_HF0,X:DSR,*	; Wait for host to ack
 PCI_MESSAGE_TO_HOST_RETURN
 	RTS
 
@@ -1607,15 +1715,25 @@ PACKET_PARTITIONS
 ; Trashes: R1 is updated to point to the end of the copied data.
 
 BUFFER_PACKET
+
+	MOVE	#>$b00,A1
+	JSR	TIMER_STORE_A1
+	JSR	TIMER_STORE
+	
 	DO	X:TOTAL_BUFFS,BUFFER_PACKET_HALFS_DONE
 	JSR	WAIT_FIFO_HALF
+	JSR	TIMER_STORE
 	JSR	BUFFER_PACKET_HALF
+	JSR	TIMER_STORE
 	NOP
 BUFFER_PACKET_HALFS_DONE
 	
 	;; Buffering single words in poll mode is very slow; but if we see a
 	;; half-full fifo, we can do our partial read at full speed.
 	JCLR	#HF,X:PDRD,BUFFER_PACKET_SINGLES_FAST
+;;; DOES THIS WORK?
+	JMP	BUFFER_PACKET_SINGLES_NOT_QUITE_SO_FAST
+	
 	DO	X:LEFT_TO_READ,BUFFER_PACKET_DONE
 BUFFER_PACKET_SINGLE
 	JSET	#FATAL_ERROR,X:<STATUS,DUMP_FIFO
@@ -1632,7 +1750,21 @@ BUFFER_PACKET_SINGLES_FAST
 	MOVEP	Y:RDFIFO,Y:(R1)+
 BUFFER_PACKET_SINGLES_FAST_DONE
 	RTS
+
+;; This is a non-polling read!  It has been calibrated for the
+;; 56308 running at 250 MHz to read at 12 Mwords/s
 	
+BUFFER_PACKET_SINGLES_NOT_QUITE_SO_FAST
+	DO	X:LEFT_TO_READ,BUFFER_PACKET_SINGLES_NOT_QUITE_SO_FAST_DONE
+	MOVEP	Y:RDFIFO,Y:(R1)+
+BUFFER_PACKET_SINGLES_NOT_QUITE_SO_FAST_DONE
+	NOP
+	NOP
+	NOP
+	JSR	TIMER_STORE
+	JSR	TIMER_STORE
+	RTS
+		
 BUFFER_PACKET_HALF
 	;; Copies 512 16-bit words from FIFO into Y:R1
 	DO	#512,BUFFER_PACKET_HALF_DONE
@@ -1716,6 +1848,32 @@ TIMER_ACTION_OK
 	RTS
 
 
+;----------------------------------------------;
+;  TIMER UTILITY                               ;
+;----------------------------------------------;
+
+TIMER_STORE_INIT
+	MOVE	#>TIMER_BUFFER,A0
+	NOP
+	MOVE	A0,X:TIMER_INDEX
+	MOVE	A0,R4
+	RTS
+
+TIMER_STORE
+	;; Write the timer value to the timer buffer.
+	;; Trashes A.  Sorry.
+	MOVE	X:TCR0,A
+	; Fall-through
+
+TIMER_STORE_A1
+	;; Write A1 to to the timer buffer. Trashes A.
+	MOVE	A1,Y:(R4)+
+	MOVE	R4,A1
+	CMP	#>TIMER_BUFFER_END,A
+	MOVE	A1,X:TIMER_INDEX
+	JGE	TIMER_STORE_INIT
+	RTS
+
 
 ;----------------------------------------------;
 ;  CIRCULAR BUFFER HANDLING                    ;
@@ -1768,6 +1926,12 @@ BUFFER_INFORM
 ;---------------------------------------------------------------
 ; Informs host of current buffer status
 
+	;; Skip this information if host is processing some other data.
+	JSET	#DCTR_HF3,X:DCTR,INFORM_EXIT
+	JCLR	#STRQ,X:DSR,INFORM_EXIT
+
+	JSR	PCI_LOCKDOWN		; Disable host IRQ
+
 	MOVE	#'QTI',X0		; Quiet Transfer Inform
 	MOVE	X0,X:<DTXS_WD1
 
@@ -1780,15 +1944,12 @@ BUFFER_INFORM
 	MOVE	X:QT_DROPS,X0		; Dropped packet count
 	MOVE	X0,X:<DTXS_WD4
 
-
-	JSET	#DCTR_HF3,X:DCTR,INFORM_EXIT
-	JCLR	#STRQ,X:DSR,INFORM_EXIT
-
 	JSR	PCI_MESSAGE_TO_HOST
 
 	BCLR	#QT_FLUSH,X:STATUS
 	MOVE	#0,X0			; Reset inform index
 	MOVE	X0,X:QT_INFORM_IDX
+	BSET	#DCTR_HCIE,X:DCTR	; Enable host IRQ
 INFORM_EXIT
 	RTS
 

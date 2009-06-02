@@ -146,13 +146,20 @@ INIT_PCI
 	NOP
 
 ; Disable PCI interrupts
-	BCLR	#MODE_IRQ,X:<MODE		; $8E
+	BSET	#MODE_NOIRQ,X:<MODE		; $8E
 	NOP
 
 ; Enable PCI interrupts
-	BSET	#MODE_IRQ,X:<MODE		; $90
+	BCLR	#MODE_NOIRQ,X:<MODE		; $90
 	NOP
 
+; Enable interrupt hand-shaking
+	BSET	#MODE_HANDSHAKE,X:<MODE		; $92
+	NOP
+
+; Mode setting pretty-fast interrupt
+	JSR	MODE_SET_FAST	                ; $94
+	
 ; ***********************************************************************
 ; For now have boot code starting from P:$100
 ; just to make debugging tidier etc.
@@ -267,11 +274,10 @@ START	MOVEP	#>$000001,X:DPMC
 	NOP
 	MOVEP	A,X:DPSR
 
-;--------------------------------------------------------------------
-; Enable one interrupt only: software reset switch
-	MOVEP	#$0001C0,X:IPRC	; IRQB priority = 1 (FIFO half full HF*)
-				; IRQC priority = 2 (reset switch)
-	MOVE	#$200,SR	; Mask set up for reset switch only
+; Status word and interrupt configuration.
+	MOVEP	#>MY_IPRC,X:IPRC
+	MOVEP	#>MY_IPRP,X:IPRP
+	MOVE	#>MY_SR,SR
 
 
 ;--------------------------------------------------------------------------
@@ -315,16 +321,10 @@ X_WRITE
 	MOVE	X1,X:FRAME_COUNT		; restore frame count
 
 ;-------------------------------------------------------------------------------
-; initialise MODE; packet choke and PCI interrupts are ON.
-	BSET	#MODE_CHOKE,X:MODE
-	BSET	#MODE_IRQ,X:MODE
+; Initialise MODE; packet choke and PCI interrupts are ON.
+;  - that's MODE=0 .
 	
-;----------------------------------------------------------------------------
-; Disable byte swapping - enabled after first command to MCE.
-; i.e after first 'CON'
-	;; Can we kill this?  Apparently it isn't a factor on 250 MHz boards?
-; 	BCLR	#AUX1,X:PDRC
-
+		
 ;----------------------------------------------------------------------------
 ; Initialize PCI controller again, after booting, to make sure it sticks
         BCLR	#20,X:DCTR		; Terminate and reset mode 
@@ -337,6 +337,9 @@ X_WRITE
 
 	;; Configure our code
 	JSR	CLEAR_FO_FIFO		; Clear the fibre fifo!
+ 	BSET	#AUX1,X:PDRC		; Enable byte-swapping - still necc. on ARC-64
+	BSET	#DCTR_HCIE,X:DCTR	; Enable host interrupts
 	JSR	TIMER_DISABLE		; Disable NFY timer
+	JSR	TIMER_STORE_INIT        ; Initialize timing buffer
 
 ;;; Fall-through to main.asm
