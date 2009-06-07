@@ -8,6 +8,12 @@ CLB=dsplnk
 CLD=cldlod
 LOD=lod2s
 
+# Provide parseable error strings.
+SED_PROG='s/\r//g'
+AWK_PROG='($$5=="ERROR") {file=substr($$3,2); match($$4, "[0-9]*"); \
+	lino=substr($$4, RSTART, RLENGTH); split($$0, msg, "---"); \
+	printf "%s:%s: error: %s\n", file, lino, msg[2] ;} ELSE {print $$0}'
+
 ASM_FLAGS=-dDOWNLOAD ROM
 
 default: $(TARGET).s
@@ -24,7 +30,7 @@ build.clb: header.asm init.asm main.asm build.asm vars.asm app.asm info.asm
 	$(CLB) $(CLB_FLAGS) -m$*map $<
 
 %clb : %asm
-	$(ASM) $(ASM_FLAGS) -l$*ls -b$@ $<
+	$(ASM) $(ASM_FLAGS) -l$*ls -b$@ $< |sed $(SED_PROG) | awk $(AWK_PROG)
 
 clean:	tidy
 	-rm *.lod
