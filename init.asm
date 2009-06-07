@@ -99,7 +99,6 @@ INIT_PCI
        WARN    '*** Error: HCVR vectors overwritten *** '
        ENDIF
 	
-;	ORG	P:$72,P:$72
 	ORG	P:$72,P:$74
 
 ; This allows for the DSP to be loaded from the ONCE port via the WIGGLER
@@ -145,21 +144,6 @@ INIT_PCI
 	BCLR	#RP_BUFFER_FULL,X:<STATUS	; $8C
 	NOP
 
-; Disable PCI interrupts
-	BSET	#MODE_NOIRQ,X:<MODE		; $8E
-	NOP
-
-; Enable PCI interrupts
-	BCLR	#MODE_NOIRQ,X:<MODE		; $90
-	NOP
-
-; Enable interrupt hand-shaking
-	BSET	#MODE_HANDSHAKE,X:<MODE		; $92
-	NOP
-
-; Mode setting pretty-fast interrupt
-	JSR	MODE_SET_FAST	                ; $94
-	
 ; ***********************************************************************
 ; For now have boot code starting from P:$100
 ; just to make debugging tidier etc.
@@ -187,10 +171,11 @@ INIT_PCI
 
 	
 START	MOVEP	#>$000001,X:DPMC
+; 	MOVEP	#>$100000,X:DCTR		; Set PCI mode
 	BSET	#20,X:DCTR		; HI32 mode = 1 => PCI
 	BCLR	#21,X:DCTR
 	BCLR	#22,X:DCTR
-	NOP
+ 	NOP
 	BSET	#MACE,X:DPCR		; Master access counter enable
 	NOP
 	NOP				; End of PCI programming
@@ -320,21 +305,20 @@ X_WRITE
 	MOVE	Y1,X:NUM_DUMPED			; restore number dumped (after HST TO)
 	MOVE	X1,X:FRAME_COUNT		; restore frame count
 
-;-------------------------------------------------------------------------------
-; Initialise MODE; packet choke and PCI interrupts are ON.
-;  - that's MODE=0 .
 	
-		
 ;----------------------------------------------------------------------------
 ; Initialize PCI controller again, after booting, to make sure it sticks
+
+;  	MOVEP	#>$000000,X:DCTR
         BCLR	#20,X:DCTR		; Terminate and reset mode 
         NOP
         JSET    #HACT,X:DSR,*		; Test for personal reset completion
+;  	MOVEP	#>$100000,X:DCTR
         NOP
-        BSET    #20,X:DCTR              ; HI32 mode = 1 => PCI
+ 	BSET    #20,X:DCTR              ; HI32 mode = 1 => PCI
         NOP
-        JSET    #12,X:DPSR,*		; Host data transfer not in progress
-
+	JSET    #12,X:DPSR,*		; Host data transfer not in progress
+	
 	;; Configure our code
 	JSR	CLEAR_FO_FIFO		; Clear the fibre fifo!
  	BSET	#AUX1,X:PDRC		; Enable byte-swapping - still necc. on ARC-64

@@ -188,8 +188,6 @@ MODE_APPLICATION	EQU	0   ; set if PCI application to run
 MODE_MCE		EQU	1   ; process packets from MCE
 MODE_QT			EQU	2   ; Quiet transfer for data packets
 MODE_RP_BUFFER		EQU     3   ; Quiet transfer for reply packets
-MODE_NOIRQ		EQU	4   ; Disbale PCI interrupts on NFY
-MODE_HANDSHAKE		EQU	5   ; Enable IRQ hand-shaking
 
 	IF	@SCP("DOWNLOAD","ROM")	; Boot ROM code
 VAR_TBL_END	EQU	@LCV(L)-2

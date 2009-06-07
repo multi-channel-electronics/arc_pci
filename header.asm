@@ -102,15 +102,15 @@ DCR0	EQU	$FFFFEC		; Control register
 
 ; DCTR bits
 DCTR_HCIE	EQU	0 	; Interrupt enable
-DCTR_HF3	EQU	3	; used as a semaphore for INTA handshaking
+DCTR_HF3	EQU	3	; Semaphore for INTA handshaking
 DCTR_HF4  	EQU	4	; 
 DCTR_HF5  	EQU	5	; 
 INTA	   	EQU	6	; Request PCI interrupt
 
 ; The DSR host flags are written by the PCI host and read by the DSP
 DSR_HF0   EQU	3		; PC side INTA hand-shaking
-DSR_HF1   EQU	4		; 
-DSR_HF2   EQU	5		; 
+DSR_HF1   EQU	4		; PC side hand-shaking enabled
+DSR_HF2   EQU	5		; PC side INTA disable (polling mode)
 
 ; DPCR bit definitions
 CLRT	EQU	14		; Clear transmitter
