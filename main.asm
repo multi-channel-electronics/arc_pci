@@ -528,6 +528,19 @@ VCOM_EXIT
 	RTI
 	
 
+;---------------------------------------------------------------
+RD_DRXR
+;--------------------------------------------------------------
+; Routine to read from HTXR-DRXR data path.  For HCTR = 0x900,
+; 3 LSB of each 32-bit word written by the host is returned on
+; each read.  This only polls for first word, not all of them.
+	JCLR	#SRRQ,X:DSR,*		; Wait for receiver to be not empty
+	MOVE	#DRXR_WD1,R3
+	REP	#4
+	MOVEP	X:DRXR,X:(R3)+
+	RTS
+
+	
 ; ----------------------------------------------------------------------------
 READ_MEMORY
 ;-----------------------------------------------------------------------------
@@ -777,40 +790,41 @@ QUIET_TRANSFER_SET
 QUIET_TRANSFER_SET_RP_BASE
 	MOVE	X0,X:RP_BASE_LO
 	MOVE	X1,X:RP_BASE_HI
-	JMP	VCOM_EXITX
+	JMP	VCOM_EXIT
 	
 QUIET_TRANSFER_SET_RP_ENABLED
 	BCLR	#MODE_RP_BUFFER,X:MODE
 	MOVE	X0,A
 	TST	A
-	JEQ	VCOM_EXITX
+	JEQ	VCOM_EXIT
 	BSET	#MODE_RP_BUFFER,X:MODE
 	BCLR	#RP_BUFFER_FULL,X:STATUS
-	JMP	VCOM_EXITX
+	JMP	VCOM_EXIT
 
 QUIET_TRANSFER_SET_FLUSH
 	BCLR	#QT_FLUSH,X:STATUS
 	MOVE	X0,A
 	TST	A
-	JEQ	VCOM_EXITX
+	JEQ	VCOM_EXIT
 	BSET	#QT_FLUSH,X:STATUS
-	JMP	VCOM_EXITX
+	JMP	VCOM_EXIT
 
 QUIET_TRANSFER_SET_ENABLED
-	BCLR	#MODE_QT,X:MODE
-	JSR	TIMER_DISABLE
 	MOVE	X0,A
 	TST	A
-	JEQ	VCOM_EXITX
-	MOVE	#0,A0
+	JEQ	QUIET_TRANSFER_SET_DISABLED
 	BSET	#MODE_QT,X:MODE
-	MOVE	A0,X:TLR0
 	JSR	TIMER_ENABLE
-	JMP	VCOM_EXITX
+	JMP	VCOM_EXIT
+
+QUIET_TRANSFER_SET_DISABLED
+	BCLR	#MODE_QT,X:MODE
+	JSR	TIMER_DEFAULT
+	JMP	VCOM_EXIT
 	
 QUIET_TRANSFER_SET_R0
 	MOVE	X0,X:(R0)
-	JMP	VCOM_EXITX
+	JMP	VCOM_EXIT
 
 QUIET_TRANSFER_SET_BASE
 	MOVE	X0,X:QT_BASE_LO
@@ -818,11 +832,7 @@ QUIET_TRANSFER_SET_BASE
 
 	JSR	BUFFER_RESET
 
-	JMP	VCOM_EXITX
-
-VCOM_EXITX
-	MOVE	X:BDEBUG0,X0
-	JMP	VCOM_EXIT_X0
+	JMP	VCOM_EXIT
 
 
 ;-----------------------------------------------------------------------------
@@ -1094,19 +1104,6 @@ PCI_MESSAGE_TO_HOST_HANDSHAKE
 	JSET	#DSR_HF0,X:DSR,*	; Wait for host to ack
 	RTS
 
-
-;---------------------------------------------------------------
-RD_DRXR
-;--------------------------------------------------------------
-; Routine to read from HTXR-DRXR data path.  For HCTR = 0x900,
-; 3 LSB of each 32-bit word written by the host is returned on
-; each read.  This only polls for first word, not all of them.
-	JCLR	#SRRQ,X:DSR,*		; Wait for receiver to be not empty
-	MOVE	#DRXR_WD1,R3
-	REP	#4
-	MOVEP	X:DRXR,X:(R3)+
-	RTS
-	
 
 ;------------------------------------------------------------------------------------
 RESTORE_REGISTERS
@@ -1646,7 +1643,7 @@ DROP_FIFO_DONE
 ;  TIMER HANDLING                              ;
 ;----------------------------------------------;
 	
-; Start value is TLR, count is in TCR, int occurs at TCPR
+; Start value is TLR, count is in TCR, flag marked at TCPR
 ; Must set TCSR[TCIE] to enable int
 ; Must set TCSR[T] for timer to restart
 
@@ -1662,15 +1659,25 @@ TIMER_DISABLE
 	MOVE	X0,X:TCSR0
 	RTS
 
+TIMER_DEFAULT
+	JSR	TIMER_DISABLE
+	MOVE	#$4C4B40,X0		; 5M -> 10 Hz.
+	NOP
+	MOVE	X0,X:TCPR0
+	JSR	TIMER_ENABLE
+	RTS
+	
+	
 ;;; Timer action is called from the main loop when counter flag is detected.
 TIMER_ACTION
- 	MOVE	X:QT_INFORM_IDX,A
 	MOVE	#$300201,X0		; Clear TOF, TCF, leave timer enabled.
 	NOP
 	MOVE	X0,X:TCSR0
+ 	MOVE	X:QT_INFORM_IDX,A	; QT inform time?
+	JCLR	#MODE_QT,X:MODE,TIMER_ACTION_OK
  	CMP	#>0,A			; If inform_idx != 0
  	JEQ	TIMER_ACTION_OK
-	BSET	#QT_FLUSH,X:STATUS	;	schedule inform
+	BSET	#QT_FLUSH,X:STATUS	;    schedule inform
 TIMER_ACTION_OK
 	RTS
 
@@ -1679,6 +1686,8 @@ TIMER_ACTION_OK
 ;  TIMER UTILITY                               ;
 ;----------------------------------------------;
 
+TIMER_SOURCE	EQU	TCR1
+	
 TIMER_STORE_INIT
 	MOVE	#>TIMER_BUFFER,A0
 	NOP
@@ -1689,7 +1698,7 @@ TIMER_STORE_INIT
 TIMER_STORE
 	;; Write the timer value to the timer buffer.
 	;; Trashes A.  Sorry.
-	MOVE	X:TCR0,A
+	MOVE	X:TIMER_SOURCE,A
 	; Fall-through
 
 TIMER_STORE_A1

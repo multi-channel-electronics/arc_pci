@@ -323,7 +323,7 @@ X_WRITE
 	JSR	CLEAR_FO_FIFO		; Clear the fibre fifo!
  	BSET	#AUX1,X:PDRC		; Enable byte-swapping - still necc. on ARC-64
 	BSET	#DCTR_HCIE,X:DCTR	; Enable host interrupts
-	JSR	TIMER_DISABLE		; Disable NFY timer
+	JSR	TIMER_DEFAULT		; Enable timer (channel 0) for misc. uses
 	JSR	TIMER_STORE_INIT        ; Initialize timing buffer
 
 ;;; Fall-through to main.asm
