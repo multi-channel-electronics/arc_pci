@@ -1,4 +1,4 @@
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  build.asm  Page 1
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  build.asm  Page 1
 
 
 
@@ -64,7 +64,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  build.asm  Page
 60                                                                             ; command is sent
 61     
 62        000200           APPL_PARAM EQU    $200                              ; application parameters in x memory start here.
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  header.asm  Page 2
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  header.asm  Page 2
 
 
 
@@ -130,7 +130,7 @@ chip RAM
 121       000002           MRRQ      EQU     2                                 ; Master Receive Request (DPSR)
 122       00000A           TRTY      EQU     10                                ; PCI Target Retry (DPSR)
 123    
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  header.asm  Page 3
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  header.asm  Page 3
 
 
 
@@ -196,7 +196,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  header.asm  Pag
 183       FFFF8B           TCSR1     EQU     $FFFF8B                           ; Control and status register
 184       FFFF8A           TLR1      EQU     $FFFF8A                           ; Load register
 185       FFFF89           TCPR1     EQU     $FFFF89                           ; Compare register
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  header.asm  Page 4
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  header.asm  Page 4
 
 
 
@@ -262,7 +262,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  header.asm  Pag
 247                        ;  IPRC determines core interrupt modes and levels.
 248                        ;   - [5:3] IRQB mode|level - FIFO half full
 249                        ;   - [8:6] IRQC mode|level - reset switch
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  header.asm  Page 5
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  header.asm  Page 5
 
 
 
@@ -328,7 +328,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  header.asm  Pag
      d                      000000
      d                      000000
      d                      000000
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  init.asm  Page 6
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  init.asm  Page 6
 
 
 
@@ -394,7 +394,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  init.asm  Page 
 334                                 ; Initialize the PLL - phase locked loop
 335                                 INIT_PCI
 336       P:000030 P:000032 08F4BD            MOVEP             #PLL_INIT,X:PCTL        ; Initialize PLL
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  init.asm  Page 7
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  init.asm  Page 7
 
 
 
@@ -460,7 +460,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  init.asm  Page 
      d                      000000
      d                      000000
 359    
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  init.asm  Page 8
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  init.asm  Page 8
 
 
 
@@ -526,7 +526,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  init.asm  Page 
 411                                 ; ***********************************************************************
 412                                 ; For now have boot code starting from P:$100
 413                                 ; just to make debugging tidier etc.
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  init.asm  Page 9
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  init.asm  Page 9
 
 
 
@@ -592,7 +592,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  init.asm  Page 
 ut)
                             00003C
 468       P:000114 P:000116 07F43D            MOVEP             #%000000,X:PDRC         ; Data Register - AUX3 = i/p, AUX1 not used
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  init.asm  Page 10
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  init.asm  Page 10
 
 
 
@@ -658,7 +658,7 @@ e
 511    
 512                                 ; Program the DRAM memory access and addressing
 513       P:000132 P:000134 08F4BB            MOVEP             #$020022,X:BCR          ; Bus Control Register
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  init.asm  Page 11
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  init.asm  Page 11
 
 
 
@@ -724,7 +724,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  init.asm  Page 
 560       P:000153 P:000155 300000            MOVE              #VAR_TBL,R0             ; start of parameter table in X
 561       P:000154 P:000156 065780            DO      #VAR_TBL_LENGTH,X_WRITE
                             000157
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  init.asm  Page 12
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  init.asm  Page 12
 
 
 
@@ -790,7 +790,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  init.asm  Page 
 614       
 615       P:000171 P:000173 0A00A2            JSET    #FATAL_ERROR,X:<STATUS,START
                             000100
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 13
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 13
 
 
 
@@ -844,7 +844,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 660  m                                        ENDM
 661    
 662                                 PCI_LOCKUP MACRO
-663  m                                        BCLR    #DCTR_HCIE,X:DCTR
+663  m                                        BSET    #DCTR_HCIE,X:DCTR                 ; Enable host interrupts
 664  m                                        ENDM
 665    
 666    
@@ -856,7 +856,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 672                                 PCI_LOCKDOWN_ENTRY
 673       
 674       P:000186 P:000188 0A8500            BCLR    #DCTR_HCIE,X:DCTR                 ; Disable host IRQ
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 14
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 14
 
 
 
@@ -922,7 +922,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 717    
 718       
 719       P:0001B9 P:0001BB 50F000            MOVE              X:>(HEAD_W1_0+6),A0
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 15
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 15
 
 
 
@@ -988,7 +988,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 762    
 763    
 766    
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 16
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 16
 
 
 
@@ -1054,7 +1054,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 807       P:00020E P:000210 0BF080            JSR     TIMER_STORE
                             00063F
 808    
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 17
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 17
 
 
 
@@ -1120,7 +1120,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 855    
 856       
 857       P:000239 P:00023B 56F000            MOVE              X:QT_BUF_HEAD,A
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 18
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 18
 
 
 
@@ -1186,7 +1186,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 900    
 901       P:000265 P:000267 00000C            RTS
 902    
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 19
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 19
 
 
 
@@ -1252,7 +1252,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 946       P:00028A P:00028C 66F400            MOVE              #>COMMAND_BUFFER,R6
                             200000
 947       P:00028C P:00028E 068080            DO      #128,CON_TRANSMIT1                ; block size = 16bit x 128 (256 bytes)
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 20
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 20
 
 
 
@@ -1318,7 +1318,7 @@ not passed to driver.
 995       P:0002AE P:0002B0 440C00            MOVE              X0,X:<DTXS_WD2          ;2nd word transmitted to host in notify mess
 age
 996    
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 21
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 21
 
 
 
@@ -1384,7 +1384,7 @@ sage
 1043      P:0002D5 P:0002D7 61F400            MOVE              #DUMP_BUFF,R1           ; address where dumped words stored in Y mem
                             001000
 1044      P:0002D7 P:0002D9 44F400            MOVE              #MAX_DUMP,X0            ; put a limit to number of words read from f
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 22
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 22
 
 
 
@@ -1450,7 +1450,7 @@ eout.
                             00000B
 1096   
 1097      P:0002EF P:0002F1 56F400            MOVE              #'ACK',A                ; Note this sets A0 = 0
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 23
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 23
 
 
 
@@ -1516,7 +1516,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 1147                                ; c) Restore registers and RTI.
 1148   
 1149                                VCOM_EXIT_ERROR_X0
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 24
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 24
 
 
 
@@ -1582,7 +1582,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 1198      P:00032C P:00032E 0E2313            JNE     VCOM_EXIT
 1199   
 1200      P:00032D P:00032F 44F000            MOVE              X:REV_NUMBER,X0
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 25
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 25
 
 
 
@@ -1648,7 +1648,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 1247      P:000351 P:000353 60F000            MOVE              X:DRXR_WD3,R0
                             000009
 1248      P:000353 P:000355 44F000            MOVE              X:DRXR_WD4,X0
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 26
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 26
 
 
 
@@ -1714,7 +1714,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 1297                                ; word 2-4 unused
 1298   
 1299      P:000373 P:000375 0BF080            JSR     SAVE_REGISTERS
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 27
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 27
 
 
 
@@ -1780,7 +1780,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 1347                                QUIET_TRANSFER_SET
 1348                                ;-----------------------------------------------------------------------------
 1349                                ;Quiet transfer mode configuration
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 28
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 28
 
 
 
@@ -1846,7 +1846,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 1387      P:0003CB P:0003CD 0AF0AA            JEQ     QUIET_TRANSFER_SET_R0
                             00041D
 1388   
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 29
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 29
 
 
 
@@ -1912,7 +1912,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 1425                                QUIET_TRANSFER_SET_RP_ENABLED
 1426      P:0003FD P:0003FF 0A7003            BCLR    #MODE_RP_BUFFER,X:MODE
                             000001
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 30
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 30
 
 
 
@@ -1978,7 +1978,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
                             000200
 1474                                                                                    ; set to zero except for interrupts
 1475      P:000429 P:00042B 0500BB            MOVEC             #0,SP                   ; Writing to SSH preincrements the SP
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 31
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 31
 
 
 
@@ -2044,7 +2044,7 @@ memory
 1526      P:000442 P:000444 0E2313            JNE     VCOM_EXIT
 1527   
 1528                                ; RST command OK so reply to host
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 32
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 32
 
 
 
@@ -2110,7 +2110,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 1578      
 1579      P:00045F P:000461 0BF080            JSR     RESTORE_REGISTERS
                             000485
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 33
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 33
 
 
 
@@ -2176,7 +2176,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 1636      P:000470 P:000472 0A8981            JCLR    #STRQ,X:DSR,*                     ; wait to be not full
                             000470
 1637      P:000472 P:000474 08D88D            MOVEP             X:(R0)+,X:DTXS
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 34
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 34
 
 
 
@@ -2242,7 +2242,7 @@ ing CMP
 1690      P:000494 P:000496 541000            MOVE              A1,X:<SV_A1
 1691      P:000495 P:000497 521100            MOVE              A2,X:<SV_A2
 1692   
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 35
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 35
 
 
 
@@ -2308,7 +2308,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 1746   
 1747      P:0004B0 P:0004B2 50F000            MOVE              X:DMA_ERRORS,A0
                             000034
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 36
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 36
 
 
 
@@ -2374,7 +2374,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 1785      P:0004E7 P:0004E9 507000            MOVE              A0,X:EC_TAB
                             000038
 1786      P:0004E9 P:0004EB 0A7030            BSET    #PCIDMA_RESTART,X:STATUS
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 37
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 37
 
 
 
@@ -2440,7 +2440,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 1831                                BLOCK_TRANSFER0
 1832      
 1833      
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 38
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 38
 
 
 
@@ -2506,7 +2506,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 1878      P:000538 P:00053A 0D04B0            JSR     PCI_ERROR_CLEAR
 1879   
 1880      P:000539 P:00053B 0A7010            BCLR    #PCIDMA_RESTART,X:STATUS          ; Test and clear
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 39
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 39
 
 
 
@@ -2572,7 +2572,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 1929      P:000558 P:00055A 507000            MOVE              A0,X:DDR0               ; DMA dest'n
                             FFFFEE
 1930      P:00055A P:00055C 08F4AF            MOVEP             #>DRXR,X:DSR0           ; DMA source
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 40
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 40
 
 
 
@@ -2638,7 +2638,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 1976                                ; X0 is the PCI command (6 is read, 7 is write).
 1977                                ; Trashes A and B but not R0 and X0.
 1978      P:00057F P:000581 200013            CLR     A
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 41
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 41
 
 
 
@@ -2704,7 +2704,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 2033      P:0005A9 P:0005AB 57F000            MOVE              X:BURST_SIZE,B
                             00002A
 2034      P:0005AB P:0005AD 20006C            SUB     X1,B                              ; Zero flag must be preserved!
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 42
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 42
 
 
 
@@ -2770,7 +2770,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
                             00063F
 2084      P:0005C9 P:0005CB 0BF080            JSR     BUFFER_PACKET_HALF
                             0005E5
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 43
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 43
 
 
 
@@ -2836,7 +2836,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 2136      P:0005EA P:0005EC 0A00A2            JSET    #FATAL_ERROR,X:<STATUS,FATALITY_HANDLER
                             0005FF
 2137      P:0005EC P:0005EE 01ADA1            JSET    #HF,X:PDRD,WAIT_FIFO_HALF         ; Wait for half full+1
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 44
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 44
 
 
 
@@ -2902,7 +2902,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 2185   
 2186                                DROP_FIFO_HALF
 2187      
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 45
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 45
 
 
 
@@ -2968,7 +2968,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 2234      P:000637 P:000639 00000C            RTS
 2235   
 2236   
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 46
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 46
 
 
 
@@ -3034,7 +3034,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
                             000693
 2285   
 2286      P:00065A P:00065C 00000C            RTS
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 47
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 47
 
 
 
@@ -3100,7 +3100,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 2332      P:000681 P:000683 440D00            MOVE              X0,X:<DTXS_WD3
 2333   
 2334      P:000682 P:000684 44F000            MOVE              X:QT_DROPS,X0           ; Dropped packet count
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 48
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  main.asm  Page 48
 
 
 
@@ -3166,7 +3166,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  main.asm  Page 
 2393                                          INCLUDE 'vars.asm'
 2394                                      COMMENT *
 2395   
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  vars.asm  Page 49
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  vars.asm  Page 49
 
 
 
@@ -3232,7 +3232,7 @@ eply
 2455 d    X:000011 P:0006B1 000000  SV_A2     DC      0
 2456 d    X:000012 P:0006B2 000000  SV_B0     DC      0
 2457 d    X:000013 P:0006B3 000000  SV_B1     DC      0
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  vars.asm  Page 50
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  vars.asm  Page 50
 
 
 
@@ -3298,7 +3298,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  vars.asm  Page 
 2518 d    X:000034 P:0006D4 000000  DMA_ERRORS DC     0                                 ; Error counting
 2519 d    X:000035 P:0006D5 000000  EC_TRTY   DC      0
 2520 d    X:000036 P:0006D6 000000  EC_TO     DC      0
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  vars.asm  Page 51
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  vars.asm  Page 51
 
 
 
@@ -3364,7 +3364,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  vars.asm  Page 
 2585                                 SEND_TO_HOST
 2586      000001                              EQU     1                                 ; set in HST ISR when host ready for packet 
 (stays set until after HST reply)
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  vars.asm  Page 52
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  vars.asm  Page 52
 
 
 
@@ -3430,7 +3430,7 @@ in loop
 2641   
 2642                                        *
 2643                                          PAGE    132                               ; Printronix page width - 132 columns
-Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  20:54:47  app.asm  Page 53
+Motorola DSP56300 Assembler  Version 6.3.4   09-06-08  21:10:06  app.asm  Page 53
 
 
 
