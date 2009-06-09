@@ -22,37 +22,38 @@ VAR_TBL_START	EQU	@LCV(L)-2
 VAR_TBL_START	EQU	@LCV(L)
 	ENDIF
 
-; -----------------------------------------------
-STATUS			DC	0	; Internal control flags
-MODE			DC	0	; Configure special options
 
-FRAME_COUNT		DC	0
+;-----------------------------------------------
+STATUS			DC	0	; Internal status flags
+MODE			DC	0	; Operating mode control
+FRAME_COUNT		DC	0	; Count of data frames from MCE
+
+;-----------------------------------------------
 REV_NUMBER		DC	$550105	; byte 0 = minor revision #
 					; byte 1 = major revision #
 					; byte 2 = release Version (ascii letter)
-REV_DATA		DC	$000000 ; data: day-month-year
-P_CHECKSUM		DC	$2EF490 ;**** DO NOT CHANGE
-; -------------------------------------------------
-NUM_DUMPED		DC	0	; number of words (16-bit) dumped to Y memory (512) after an HST timeout.
-; --------------------------------------------------------------------------------------------------------------
+REV_DATA		DC	$000000 ; Not used by UBC
+P_CHECKSUM		DC	$2EF490 ; Not used by UBC
 
-DRXR_WD1		DC	0
+;-----------------------------------------------
+NUM_DUMPED		DC	0	; number of words (16-bit) dumped to Y memory (512) after an HST timeout.
+;-----------------------------------------------
+
+
+;;; Vector command handling
+	
+DRXR_WD1		DC	0	; Storage for words read from PC during vector command
 DRXR_WD2		DC	0
 DRXR_WD3		DC	0
 DRXR_WD4		DC	0
-DTXS_WD1		DC	0
+
+DTXS_WD1		DC	0	; Storage for words to be written to PC as reply
 DTXS_WD2		DC	0
 DTXS_WD3		DC	0
 DTXS_WD4		DC	0
 
-HEAD_W1_0		DC	0       ; Preamble $A5A5
-HEAD_W1_1		DC	0	;          $A5A5
-HEAD_W2_0		DC	0	;          $5A5A
-HEAD_W2_1		DC	0	;          $5A5A
-HEAD_W3_0		DC	0	; 'RP' or 'DA'
-HEAD_W3_1 		DC	0	; '  '   $2020
-HEAD_W4_0		DC	0	; Packet size LSW
-HEAD_W4_1		DC	0	;             MSW
+	
+;;; Register storage during vector command interrupts
 
 SV_A0			DC	0   
 SV_A1			DC	0 
@@ -65,40 +66,50 @@ SV_X1			DC	0
 SV_Y0			DC	0
 SV_Y1			DC	0
 SV_R0			DC	0
+SV_SR			DC	0
 
-SV_SR			DC	0	; stauts register save.
 
-PACKET_SIZE_LOW		DC	0
-PACKET_SIZE_HIH		DC	0
+;;; MCE packet header storage
 
-PREAMB1			DC	$A5A5	; pramble 16-bit word....2 of which make up first preamble 32bit word
-PREAMB2			DC	$5A5A	; preamble 16-bit word....2 of which make up second preamble 32bit word
+HEAD_W1_0		DC	0       ; Preamble $A5A5
+HEAD_W1_1		DC	0	;          $A5A5
+HEAD_W2_0		DC	0	;          $5A5A
+HEAD_W2_1		DC	0	;          $5A5A
+HEAD_W3_0		DC	0	; 'RP' or 'DA'
+HEAD_W3_1 		DC	0	; '  '   $2020
+HEAD_W4_0		DC	0	; Packet size LSW
+HEAD_W4_1		DC	0	;             MSW
 
-TOTAL_BUFFS		DC	0	; total number of 512 buffers in packet
-LEFT_TO_READ		DC	0	; number of words (16 bit) left to read after last 512 buffer
-LEFT_TO_WRITE		DC	0	; number of woreds (32 bit) to write to host i.e. half of those left over read
-NUM_LEFTOVER_BLOCKS	DC	0	; small block DMA burst transfer
 
+;;; Packet processing
+	
 PACKET_SIZE		DC	0	; Size, in dwords of most recent packet from MCE.
+TOTAL_BUFFS		DC	0	; Number of 512 word half-buffers in packet.
+LEFT_TO_READ		DC	0	; Number of words left to read after last 512 buffer
 
+PREAMBLE_ERRORS		DC	0	; Failed on preamble processing
+PTYPE_ERRORS		DC	0	; Failed on packet type
+PSIZE_ERRORS		DC	0	; Failed on packet size test
 
-;;; Packet processing error counts
-PREAMBLE_ERRORS		DC	0   ; Failed on preamble processing
-PTYPE_ERRORS		DC	0   ; Failed on packet type
-PSIZE_ERRORS		DC	0   ; Failed on packet size test
 	
-;;;PCI burst parameters
+;;; PCI burst parameters
 	
-BLOCK_SIZE		DC	0
+PCI_BURST_SIZE		DC	$40	; Should be < 4*latency assigned by OS
 BURST_SIZE		DC	0
+BLOCK_SIZE		DC	0
+
+CON_SRC_LO		DC	0	; Set by CON host command
+CON_SRC_HI		DC	0
+
+YMEM_SRC		DC	0	; Vars for YMEM -> PC transfers
 BURST_DEST_LO		DC	0
 BURST_DEST_HI		DC	0
-BURST_SRC_LO		DC	0
+
+BURST_SRC_LO		DC	0	; Vars for PC -> YMEM transfers
 BURST_SRC_HI		DC	0
-YMEM_SRC		DC	0
 YMEM_DEST               DC      0
 	
-DMA_ERRORS		DC	0
+DMA_ERRORS		DC	0	; Error counting
 EC_TRTY			DC	0
 EC_TO			DC	0
 EC_TDIS			DC	0
@@ -108,7 +119,7 @@ EC_DPER			DC	0
 EC_APER			DC	0
 
 	
-;;; Vars for Quiet Transfer Mode
+;;; Quiet Transfer Mode setup - for data packets -> PC
 	
 QT_BASE_LO		DC	0	; PC buffer start address bits 15-0
 QT_BASE_HI		DC	0	; PC buffer start address bits 31-16
@@ -123,24 +134,21 @@ QT_BUF_TAIL		DC	0	; Index at which we must not write
 QT_DEST_LO		DC	0	; PC address for next write
 QT_DEST_HI		DC	0	; 
 QT_INFORM_IDX		DC	0	; Number of packets since last inform
-QT_DROPS		DC	0	; Dropped packets
+QT_DROPS		DC	0	; Dropped packet count
 
 
-;;; Vars for RP Quiet transfer
-RP_BASE_LO		DC	0
-RP_BASE_HI		DC	0
-RP_MAX_SIZE		DC	0
-RP_DROPS		DC	0
-
-;;; Source bus address for MCE commands
-CON_SRC_LO		DC	0
-CON_SRC_HI		DC	0
+;;; Quiet-RP setup - for rapid replies -> PC
 	
-;;; Bus latency timer
-PCI_BURST_SIZE		DC	$40	; Should be < 4*latency assigned by OS
+RP_BASE_LO		DC	0	; PC buffer start address
+RP_BASE_HI		DC	0	; 
+RP_MAX_SIZE		DC	0	; Maximum reply size, dwords
+RP_DROPS		DC	0	; Dropped packet count
 
-;;; Timer buffer
+
+;;; Timer storage buffer index
+
 TIMER_INDEX		DC	0
+
 	
 ;;; Generic debug
 		
@@ -164,13 +172,10 @@ SEND_TO_HOST		EQU	1   ; set in HST ISR when host ready for packet (stays set unt
 FATAL_ERROR		EQU	2   ; PCI message to host error detected by driver....
 FO_WRD_RCV		EQU	3   ; set when packet detected in FIFO - stays set till packet processed
 
-; PREAMBLE_ERROR		EQU	6   ; set if preamble error detected
-; DATA_DLY		EQU	7   ; set in CON ISR if MCE command is 'GO'.  USed to add delay to first returned data packet 
-
 HST_NFYD		EQU	9   ; set after host notified (NFY message) of packet (stays set until after HST reply)
 
 CON_DEMAND		EQU	10  ; Host has requested an MCE command be sent
-CON_MCE                 EQU     11  ; Command has been copied and we should send it to the MCE
+CON_MCE                 EQU     11  ; Command has been copied to Y buffer and should be sent to MCE
 
 PCIDMA_RESTART		EQU	16  ; DMA flags used for error recovery
 PCIDMA_RESUME		EQU	17
@@ -181,14 +186,18 @@ RP_BUFFER_FULL		EQU	21  ; Set when Quiet RP buffer is occupied.
 
 FREEZER			EQU	22  ; Suspend operations and just idle in the main loop
 MAIN_LOOP_POLL          EQU     23  ; Cleared by the main loop, use to check for DSP lock-up
-	
+
+
 ;;; Bit defines for MODE word
 
 MODE_APPLICATION	EQU	0   ; set if PCI application to run
-MODE_MCE		EQU	1   ; process packets from MCE
-MODE_QT			EQU	2   ; Quiet transfer for data packets
-MODE_RP_BUFFER		EQU     3   ; Quiet transfer for reply packets
+MODE_MCE		EQU	1   ; process packets from MCE (!choke)
+MODE_QT			EQU	2   ; Quiet transfer for data packets (QT mode)
+MODE_RP_BUFFER		EQU     3   ; Quiet transfer for reply packets (Quiet-RP)
 
+
+;;; END OF VARIABLE TABLE
+	
 	IF	@SCP("DOWNLOAD","ROM")	; Boot ROM code
 VAR_TBL_END	EQU	@LCV(L)-2
 	ENDIF

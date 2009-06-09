@@ -45,7 +45,7 @@ INIT	JMP	<START
 ; a software reset button on the font panel of the card is connected to the IRQC*
 ; line which if pressed causes the DSP to jump to an ISR which causes the program
 ; counter to the beginning of the program INIT and sets the stack pointer to TOP.
-	JSR	CLEAN_UP_PCI			; $14 - Software reset switch
+	JSR	SYSTEM_RESET			; $14 - Software reset switch
 
 	DC	0,0,0,0,0,0,0,0,0,0,0,0		; Reserved interrupts
 	DC	0,0,0,0,0,0,0,0,0,0,0,0,0,0
@@ -171,10 +171,7 @@ INIT_PCI
 
 	
 START	MOVEP	#>$000001,X:DPMC
-; 	MOVEP	#>$100000,X:DCTR		; Set PCI mode
-	BSET	#20,X:DCTR		; HI32 mode = 1 => PCI
-	BCLR	#21,X:DCTR
-	BCLR	#22,X:DCTR
+ 	MOVEP	#>$100000,X:DCTR	; Set PCI mode
  	NOP
 	BSET	#MACE,X:DPCR		; Master access counter enable
 	NOP
@@ -291,31 +288,28 @@ CLR1
 ; but not frame_count and num_dumped - don't want these reset by fatal error...
 ; they will be reset by new packet or pci_reset ISR
 
-	MOVE	X:NUM_DUMPED,Y1			; store number dumped (after HST TO)
-	MOVE	X:FRAME_COUNT,X1		; store frame count
+	MOVE	X:NUM_DUMPED,Y1		; store number dumped (after HST TO)
+	MOVE	X:FRAME_COUNT,X1	; store frame count
 
 ; Move the table of constants from P: space to X: space
-	MOVE	#VAR_TBL_START,R1 		; Start of parameter table in P 
-	MOVE	#VAR_TBL,R0			; start of parameter table in X
+	MOVE	#VAR_TBL_START,R1 	; Start of parameter table in P 
+	MOVE	#VAR_TBL,R0		; start of parameter table in X
 	DO	#VAR_TBL_LENGTH,X_WRITE
 	MOVE	P:(R1)+,X0
-	MOVE	X0,X:(R0)+			; Write the constants to X:
+	MOVE	X0,X:(R0)+		; Write the constants to X:
 X_WRITE
 
-	MOVE	Y1,X:NUM_DUMPED			; restore number dumped (after HST TO)
-	MOVE	X1,X:FRAME_COUNT		; restore frame count
+	MOVE	Y1,X:NUM_DUMPED		; restore number dumped (after HST TO)
+	MOVE	X1,X:FRAME_COUNT	; restore frame count
 
 	
 ;----------------------------------------------------------------------------
 ; Initialize PCI controller again, after booting, to make sure it sticks
 
-;  	MOVEP	#>$000000,X:DCTR
-        BCLR	#20,X:DCTR		; Terminate and reset mode 
+  	MOVEP	#>$000000,X:DCTR
         NOP
         JSET    #HACT,X:DSR,*		; Test for personal reset completion
-;  	MOVEP	#>$100000,X:DCTR
-        NOP
- 	BSET    #20,X:DCTR              ; HI32 mode = 1 => PCI
+  	MOVEP	#>$100000,X:DCTR
         NOP
 	JSET    #12,X:DPSR,*		; Host data transfer not in progress
 	

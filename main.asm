@@ -9,6 +9,8 @@ See info.asm for versioning and authors.
 	PAGE    132     ; Printronix page width - 132 columns
 	OPT	CEX	; print DC evaluations
 
+
+	
 ;;;
 ;;; Start main loop
 ;;;
@@ -52,7 +54,38 @@ PACKET_IN
 ;;; End of main loop.
 ;;; 
 
+; PCI semaphore
+;
+; In order for routines in non-interrupt context to write to the
+; DTXS, (via PCI_MESSAGE_TO_HOST) they need to end up with
+; interrupts disabled and HCF3 cleared.
+;
+; Non-interrupt PCIers should use macro
+;	PCI_LOCKDOWN
+; to get exclusive access and then release it with
+;	PCI_LOCKUP
+; after calling PCI_MESSAGE_TO_HOST.
 
+PCI_LOCKDOWN	MACRO
+	JSR	PCI_LOCKDOWN_ENTRY
+	ENDM
+
+PCI_LOCKUP	MACRO
+	BCLR	#DCTR_HCIE,X:DCTR
+	ENDM
+
+
+PCI_LOCKDOWN_AGAIN
+	BSET	#DCTR_HCIE,X:DCTR	; Re-enable host IRQ
+	REP	#50			; Delay for ~us
+	NOP
+	
+PCI_LOCKDOWN_ENTRY
+	;; Entry
+	BCLR	#DCTR_HCIE,X:DCTR	; Disable host IRQ
+	JSET	#DCTR_HF3,X:DCTR,PCI_LOCKDOWN_AGAIN
+	RTS
+	
 
 ;;; Fibre data detected; process it and return to main loop.
 
@@ -185,18 +218,18 @@ HANDLE_RP1
 	JSR	TIMER_STORE
 	
 	;; Prepare notification packet
-	JSR	PCI_LOCKDOWN		; Disable host IRQ
+	PCI_LOCKDOWN			; Disable host IRQ
 	MOVE	#'NFY',X0
 	MOVE	X0,X:DTXS_WD1
 	MOVE	#'RPQ',X0
 	MOVE	X0,X:DTXS_WD2
-	MOVE	A0,X:DTXS_WD3	; A0=block_size
-	MOVE	A1,X:DTXS_WD4	; A1=0
+	MOVE	A0,X:DTXS_WD3		; A0=block_size
+	MOVE	A1,X:DTXS_WD4		; A1=0
 
 	;; Mark buffer and signal PC
 	BSET	#RP_BUFFER_FULL,X:STATUS
 	JSR	PCI_MESSAGE_TO_HOST
-	BSET	#DCTR_HCIE,X:DCTR	; Enable host IRQ
+	PCI_LOCKUP			; Enable host IRQ
 
 	JSR	TIMER_STORE
 	RTS				; Back to main loop
@@ -337,11 +370,11 @@ CON_TRANSMIT1
 	JSR	TIMER_STORE
 	
 	;; Reply to the CON command
-	JSR	PCI_LOCKDOWN
+	PCI_LOCKDOWN
 	MOVE	#'CON',X0
 	JSR	VCOM_PREPARE_REPLY
 	JSR	PCI_MESSAGE_TO_HOST
-	BSET	#DCTR_HCIE,X:DCTR	; Enable host IRQ
+	PCI_LOCKUP			; Enable host IRQ
 
 	JSR	TIMER_STORE
 	RTS				; Back to main loop
@@ -358,7 +391,7 @@ CON_TRANSMIT1
 ; prepare notify to inform host that a packet has arrived.
 
 MCE_PACKET
-	JSR	PCI_LOCKDOWN		; Disable host IRQ
+	PCI_LOCKDOWN			; Disable host IRQ
 	BCLR	#HST_NFYD,X:<STATUS	; clear flag to indicate host has been notified.
 
 	MOVE	#'NFY',X0		; initialise communication to host as a notify
@@ -377,7 +410,7 @@ MCE_PACKET
 	BCLR	#SEND_TO_HOST,X:<STATUS		; clear send to host flag
 	JSR	<PCI_MESSAGE_TO_HOST		; notify host of packet	
 	BSET	#HST_NFYD,X:<STATUS		; flag to indicate host has been notified.
-	BSET	#DCTR_HCIE,X:DCTR	; Enable host IRQ
+	PCI_LOCKUP
 
 	MOVE	#>IMAGE_BUFFER,R1
 	JSR	BUFFER_PACKET
@@ -398,11 +431,11 @@ WT_HOST	JSET	#FATAL_ERROR,X:<STATUS,START		; on fatal error, re-init.
 	JSET	#FATAL_ERROR,X:<STATUS,START
 
 	;; Reply to the HST command
-	JSR	PCI_LOCKDOWN		; Disable host IRQ
+	PCI_LOCKDOWN			; Disable host IRQ
 	MOVE	#'HST',X0
 	JSR	VCOM_PREPARE_REPLY
 	JSR	PCI_MESSAGE_TO_HOST
-	BSET	#DCTR_HCIE,X:DCTR	; Enable host IRQ
+	PCI_LOCKUP			; Enable host IRQ
 	RTS
 
 ;----------------------------------------------------------
@@ -850,19 +883,6 @@ SYSTEM_RESET
 	RTI				; return from ISR - to START
 
 
-;--------------------------------------------------------------------
-CLEAN_UP_PCI
-;--------------------------------------------------------------------
-; Clean up the PCI board from wherever it was executing
-
-	MOVEC	#1,SP			; Point stack pointer to the top	
-	MOVEC	#$000200,SSL		; SR = zero except for interrupts
-	MOVEC	#0,SP			; Writing to SSH preincrements the SP
-	MOVEC	#START,SSH		; Set PC to for full initialization
-	NOP
-	RTI
-
-
 ; ------------------------------------------------------------------------------------
 SEND_PACKET_TO_HOST
 ; this command is received from the Host and actions the PCI board to pick up an address
@@ -917,20 +937,9 @@ FINISH_RST
 	JSET	#DCTR_HF3,X:DCTR,*
 	
 	BCLR	#MODE_APPLICATION,X:<MODE	; clear app flag
-;         BCLR	#PREAMBLE_ERROR,X:<STATUS	; clear preamble error
 	BCLR	#APPLICATION_RUNNING,X:<STATUS  ; clear appl running bit.
 
-; remember we are in a ISR so can't just jump to start.
-
-	MOVEC	#1,SP			; Point stack pointer to the top	
-	MOVEC	#$000200,SSL		; SSL holds SR return state
-					; set to zero except for interrupts
-	MOVEC	#0,SP			; Writing to SSH preincrements the SP
-					; so first set to 0
-	MOVEC	#START,SSH		; SSH holds return address of PC
-					; therefore,return to initialization
-	NOP
-	RTI				; return from ISR - to START
+	JMP	SYSTEM_RESET	        ; Handle the stack and stuff...
 
 
 SEND_PACKET_TO_CONTROLLER
@@ -992,71 +1001,17 @@ SEND_PACKET_TO_CONTROLLER
 
 
 CHECK_FO
-	JCLR	#EF,X:PDRD,CLR_FO_RTS
+	JCLR	#EF,X:PDRD,CHECK_FO_CLEAR
 	NOP
 	NOP
-	JCLR	#EF,X:PDRD,CLR_FO_RTS
-
+	JCLR	#EF,X:PDRD,CHECK_FO_CLEAR
 	BSET	#FO_WRD_RCV,X:<STATUS
 	RTS
 	
-	
-;---------------------------------------------------------------
-GET_FO_WRD	
-;--------------------------------------------------------------
-; Anything in fibre receive FIFO?   If so store in X0
-
-		JCLR	#EF,X:PDRD,CLR_FO_RTS
-		NOP	
-		NOP
-		JCLR	#EF,X:PDRD,CLR_FO_RTS		; check twice for FO metastability.	
-		JMP	RD_FO_WD
-
-WT_FIFO	
-		JCLR	#EF,X:PDRD,*			; Wait till something in FIFO flagged
-		NOP
-		NOP
-		JCLR	#EF,X:PDRD,WT_FIFO		; check twice.....
-
-; Read one word from the fiber optics FIFO, check it and put it in A1
-RD_FO_WD
-		MOVEP	Y:RDFIFO,X0			; then read to X0
-		MOVE	#$00FFFF,A1			; mask off top 2 bytes ($FC)
-		AND	X0,A				; since receiving 16 bits in 24bit register
-		NOP
-		MOVE	A1,X0
-		BSET	#FO_WRD_RCV,X:<STATUS
-		RTS
-CLR_FO_RTS	
-		BCLR	#FO_WRD_RCV,X:<STATUS
-		RTS
-
-
-; PCI semaphore
-;
-; In order for routines in non-interrupt context to write to the
-; DTXS, (via PCI_MESSAGE_TO_HOST) they need to end up with
-; interrupts disabled and HCF3 cleared.
-;
-; Non-interrupt PCIers must call PCI_LOCKDOWN before proceeding to
-; fill DTXS_WD? and call PCI_MESSAGE_TO_HOST.
-;
-; Restore with PCI_LOCKUP, or just re-enable HCIE.
-		
-PCI_LOCKDOWN_AGAIN
-	BSET	#DCTR_HCIE,X:DCTR	; Re-enable host IRQ
-	REP	#50			; Delay for ~us
-	NOP
-	
-PCI_LOCKDOWN
-	;; Entry
-	BCLR	#DCTR_HCIE,X:DCTR	; Disable host IRQ
-	JSET	#DCTR_HF3,X:DCTR,PCI_LOCKDOWN_AGAIN
+CHECK_FO_CLEAR
+	BCLR	#FO_WRD_RCV,X:<STATUS
 	RTS
 
-PCI_LOCKUP
-	BCLR	#DCTR_HCIE,X:DCTR	; Enable host IRQ
-	RTS
 
 	
 ;----------------------------------------------------------------------------
@@ -1686,7 +1641,7 @@ TIMER_ACTION_OK
 ;  TIMER UTILITY                               ;
 ;----------------------------------------------;
 
-TIMER_SOURCE	EQU	TCR1
+TIMER_SOURCE	EQU	TCR0
 	
 TIMER_STORE_INIT
 	MOVE	#>TIMER_BUFFER,A0
@@ -1766,7 +1721,7 @@ BUFFER_INFORM
 	JSET	#DCTR_HF3,X:DCTR,INFORM_EXIT
 	JCLR	#STRQ,X:DSR,INFORM_EXIT
 
-	JSR	PCI_LOCKDOWN		; Disable host IRQ
+	PCI_LOCKDOWN			; Disable host IRQ
 
 	MOVE	#'QTI',X0		; Quiet Transfer Inform
 	MOVE	X0,X:<DTXS_WD1
@@ -1785,7 +1740,7 @@ BUFFER_INFORM
 	BCLR	#QT_FLUSH,X:STATUS
 	MOVE	#0,X0			; Reset inform index
 	MOVE	X0,X:QT_INFORM_IDX
-	BSET	#DCTR_HCIE,X:DCTR	; Enable host IRQ
+	PCI_LOCKUP			; Enable host IRQ
 INFORM_EXIT
 	RTS
 
