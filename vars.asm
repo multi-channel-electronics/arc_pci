@@ -179,7 +179,6 @@ CON_MCE                 EQU     11  ; Command has been copied to Y buffer and sh
 
 PCIDMA_RESTART		EQU	16  ; DMA flags used for error recovery
 PCIDMA_RESUME		EQU	17
-PCIDMA_RETRY		EQU	18
 
 QT_FLUSH		EQU	20  ; Set when it is time to inform Host of current buffer position.
 RP_BUFFER_FULL		EQU	21  ; Set when Quiet RP buffer is occupied.

@@ -1283,7 +1283,7 @@ BLOCK_TRANSFER_HANDLE_ERRORS
 	BCLR	#PCIDMA_RESTART,X:STATUS ; Test and clear
 	JCS	BLOCK_TRANSFER_PCI	; Restart PCI burst
 
-	BCLR	#PCIDMA_RETRY,X:STATUS	; Test and clear
+	BCLR	#PCIDMA_RESUME,X:STATUS	; Test and clear
 	JCC	BLOCK_TRANSFER		; Error but no error? Redo this burst.
 
 	;; Update the PCI burst size and burst again.
@@ -1363,7 +1363,7 @@ CON_TRANSFER_HANDLE_ERRORS
 	BCLR	#PCIDMA_RESTART,X:STATUS ; Test and clear
 	JCS	CON_TRANSFER_PCI	; Restart PCI burst
 
-	BCLR	#PCIDMA_RETRY,X:STATUS	; Test and clear
+	BCLR	#PCIDMA_RESUME,X:STATUS	; Test and clear
 	JCC	CON_TRANSFER		; Error but no error? Redo this burst.
 
 	;; Update the PCI burst size and burst again.
