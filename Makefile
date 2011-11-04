@@ -18,7 +18,8 @@ ASM_FLAGS=-dDOWNLOAD ROM
 
 default: $(TARGET).s
 
-build.clb: header.asm init.asm main.asm build.asm vars.asm app.asm info.asm
+build.clb: header.asm init.asm main.asm build.asm vars.asm app.asm info.asm \
+	 hacking.asm
 
 %s : %lod
 	$(LOD) $< $@ UBC_MCE_PCI 4
