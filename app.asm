@@ -41,7 +41,4 @@ See info.asm for versioning and authors.
 	JMP	PACKET_IN
 
 		
-END_ADR	EQU	@LCV(L)		; End address of P: code written to ROM
-
-
 

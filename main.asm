@@ -816,9 +816,15 @@ QUIET_TRANSFER_SET
 	
 	CMP	#'RPE',A
 	JEQ	QUIET_TRANSFER_SET_RP_ENABLED
-	
-	MOVE	#'MTE',X0
-	JMP	VCOM_EXIT_ERROR_X0
+HACK_BACK
+	JMP	HACK_HACK
+	NOP
+;; 	CMP	#'BUR',A
+;; 	MOVE	#PCI_BURST_SIZE,R0
+;; 	JEQ	QUIET_TRANSFER_SET_R0_PERSISTENT
+
+;; 	MOVE	#'MTE',X0
+;; 	JMP	VCOM_EXIT_ERROR_X0
 	
 QUIET_TRANSFER_SET_RP_BASE
 	MOVE	X0,X:RP_BASE_LO
@@ -896,8 +902,6 @@ SEND_PACKET_TO_HOST
 ; word 2 = host high address
 ; word 3 = host low address
 ; word 4 = not used but read
-
-; save some registers but not B
 
 	JSR	<SAVE_REGISTERS		; save working registers
 	MOVE	#'HST',X1
@@ -1782,8 +1786,10 @@ SAVE_HILO_ADDRESS
 	MOVE	A0,X:(R0)
 	ASR	#8,B,A
 	RTS
+
 	
 	
+
 BOOTCODE_END
 BOOTEND_ADDR	EQU	@CVI(BOOTCODE_END)
 
