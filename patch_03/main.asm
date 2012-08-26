@@ -1207,7 +1207,7 @@ RD_DRXR
 ; actually reading as slave here so this shouldn't be necessary......?
 
 	BCLR	#FC1,X:DPMC		; 24 bit read FC1 = 0, FC1 = 0
-	BSET	#FC0,X:DPMC	
+	BCLR	#FC0,X:DPMC	
 
 
 	MOVEP	X:DRXR,X0		; Get word1
@@ -1406,18 +1406,25 @@ PCI_ERROR_CLEAR
 	;; Restart:	TRTY
 	;; Resume:	TDIS/TO
 
-	MOVE	X:DMA_ERRORS,A0
-	INC	A
+	;; MOVE	X:DMA_ERRORS,A0
+	;; INC	A
+	;; NOP
+	;; MOVE	A0,X:DMA_ERRORS
+
+	;; JMP HANDLE_ALL_ERRORS
+	JSSET	#TRTY,X:DPSR,ERROR_TRTY
+	JSSET	  #TO,X:DPSR,ERROR_TO
+	JSSET	#TDIS,X:DPSR,ERROR_TDIS
+	JSSET	 #TAB,X:DPSR,ERROR_TAB
+	JSSET	 #MAB,X:DPSR,ERROR_MAB
+	JSSET	#DPER,X:DPSR,ERROR_DPER
+	JSSET	#APER,X:DPSR,ERROR_APER 
+
+	JMP	>PCI_ERROR_CLEAR_1
 	NOP
-	MOVE	A0,X:DMA_ERRORS
-		
-	JSET	#TRTY,X:DPSR,ERROR_TRTY
-	JSET	  #TO,X:DPSR,ERROR_TO
-	JSET	#TDIS,X:DPSR,ERROR_TDIS
-	JSET	 #TAB,X:DPSR,ERROR_TAB
-	JSET	 #MAB,X:DPSR,ERROR_MAB
-	JSET	#DPER,X:DPSR,ERROR_DPER
-	JSET	#APER,X:DPSR,ERROR_APER
+	NOP
+	NOP
+	NOP
 	
 ERROR_TRTY
 	MOVE	X:EC_TRTY,A0
@@ -1470,149 +1477,9 @@ ERROR_APER
 	RTS
 
 
-;----------------------------------------------
-BLOCK_TRANSFER
-;----------------------------------------------
-;   In:
-;   - BLOCK_DEST_HI:BLOCK_DEST_LO is PC RAM address
-;   - BLOCK_SIZE is packet size, in bytes
-;   - BLOCK_SRC is start of data in Y memory
-;  Out:
-;   - BLOCK_SIZE will be decremented to zero.
-;   - BLOCK_DEST_HI:LO will be incremented by BLOCK_SIZE
-;   - BLOCK_SRC will be incremented by BLOCK_SIZE/2
-;  Trashes:
-;   - A and B
-	
-	;; DSP PCI burst limit is 256 bytes.
-	MOVE	X:BLOCK_SIZE,A	        ; A1 = BLOCK_SIZE
-	
-	CMP	#0,A
-	JEQ	BLOCK_DONE
-
-	;; Careful here, force long (24-bit) literal.
-
-	CLR	B
-	MOVE	X:PCI_BURST_SIZE,B1
-	
-	CMP	B,A			; A ? B
-	JGE	<BLOCK_TRANSFER1	; jump if A >= B
-	MOVE	A,B	
-BLOCK_TRANSFER1
-	SUB	B,A			; A -= B
-	ADD	#0,B			; Clear carry bit
-	MOVE	A,X:BLOCK_SIZE		; Updated BLOCK_SIZE
-	MOVE	B,X:BURST_SIZE		; BURST_SIZE ;= round32(min(BLOCK_SIZE,$100))
-	ASR	#25,B,B			; B0 = # of 16 bit words
-
-	;; Setup DMA from BURST_SRC to PCI tx
-	MOVEP	#DTXM,X:DDR0		; DMA dest'n
-	MOVE	X:BURST_SRC,A0
-	MOVEP	A0,X:DSR0		; DMA source
-	ADD	B,A
-	DEC	B
-	MOVE	A0,X:BURST_SRC		; BURST_SRC += BURST_SIZE/2
-	
-	MOVEP	B0,X:DCO0		; DMA length = BURST_SIZE/2 - 1
-
-	;; DMA go
-	MOVEP	#$8EFA51,X:DCR0
-
-BLOCK_PCI
-	;; Setup PCI burst using BURST_SIZE
-	CLR	A
-	CLR	B
-	MOVE	X:BURST_SIZE,B0		; B = n8
-	DEC	B			; n8 - 1
-	ADD	#0,B			; Clear carry
-	ASR	#2,B,B			; (n8 - 1)/4 = n32 - 1
-	ADD	#0,B			; Clear carry
-	ASL	#16,B,B			; B[23:16] = " "
-	
-	MOVE	X:BURST_DEST_HI,A0
-
-	ADD	B,A
+	DUP	$6A
 	NOP
-	MOVE	A0,X:DPMC		; PCI burst length and HI address
-
-	MOVE	#$07,A0
-	ADD	#0,B			; Clear carry
-	ASL	#16,A,A
-	MOVE	X:BURST_DEST_LO,B0
-	ADD	B,A
-	NOP
-	
-	MOVEP	A0,X:DPAR		; PCI LO address and GO
-
-BLOCK_CHECK
-	NOP
-	NOP
-	JCLR	#MARQ,X:DPSR,*		; Wait for burst termination
-
-	;; Check for error
-	JSET	#MDT,X:DPSR,BLOCK_OK
-
-	JSR	PCI_ERROR_CLEAR
-
-	BCLR	#PCIDMA_RESTART,X:STATUS ; Test and clear
-	JCS	<BLOCK_RESTART
-
-	BCLR	#PCIDMA_RESUME,X:STATUS	; Test and clear
-	JCS	<BLOCK_RESUME
-
-BLOCK_OK
-	MOVE	X:BURST_SIZE,A0		; Pass # of words written to updater
-	JSR	BLOCK_UPDATE
-	JMP	BLOCK_TRANSFER		; Finish the block
-BLOCK_DONE
-	RTS				; Done	
-	
-BLOCK_RESTART
-	JMP	BLOCK_PCI		; Recalculate pci and resend
-
-BLOCK_RESUME
-	CLR	A
-	CLR	B
-	MOVEP	X:DPSR,A0		; Get words left to write
-	JCLR	#15,X:DPSR,BLOCK_RESUME1
-	
-	INC	B
-	
-BLOCK_RESUME1
-
-	INC	B			; We want N, not N-1.
-	ADD	#0,B			; Clear carry
-	ASR	#16,A,A
-	ADD	A,B			; B is words remaining
-	ADD	#0,B			; Clear carry
-	ASL	#2,B,B			; Number of bytes left to transfer
-	MOVE	X:BURST_SIZE,A0
-	SUB	B,A			; A is words written
-
-	JSR	BLOCK_UPDATE
-	JMP	BLOCK_PCI		; Recalculate pci and resend
-
-;;; Subroutine:	subtract A from BURST_SIZE and add A to BURST_DEST_LO
-;;;  Caller can check Z flag to see if BURST_SIZE is 0 now.
-BLOCK_UPDATE
-	;; Use A (number of bytes bursted) to update
-	;;  BURST_DEST_HI:LO and BURST_SIZE
-
-	MOVE	A0,X1			; Save A
- 	MOVE	A0,B0			; Save A again...
- 	MOVE	A1,B1			; Save A again...
-	NOP
-	
-	MOVE	#BURST_DEST_LO,R2
-	JSR	ADD_HILO_ADDRESS	; This updates BURST_DEST
-
-	MOVE	X:BURST_SIZE,B
-	SUB	X1,B			; Zero flag must be preserved!
-	NOP
-	MOVE	B1,X:BURST_SIZE
-
-	RTS
-
+	ENDM
 	
 ;----------------------------------------------;
 ;  TIMER HANDLING                              ;
@@ -1994,8 +1861,161 @@ VAR_TBL_LENGTH EQU	VAR_TBL_END-VAR_TBL_START
 
 ;;; MFH -- HACKING AREA
 
+	ORG	P:$A00,P:$A02
+
+PCI_ERROR_CLEAR_1
+	MOVE	X:DMA_ERRORS,A0
+	INC	A
+	NOP
+	MOVE	A0,X:DMA_ERRORS
+
+	;; if Restart, then not resume:
+	BTST	#PCIDMA_RESTART,X:STATUS ; Test and clear
+	JCC	<PCI_ERROR_CLEAR_2
+
+	BCLR	#PCIDMA_RESUME,X:STATUS	 ; clear
+PCI_ERROR_CLEAR_2
+	CLR	A
+	RTS
+
+	
+;----------------------------------------------
+BLOCK_TRANSFER
+;----------------------------------------------
+;   In:
+;   - BLOCK_DEST_HI:BLOCK_DEST_LO is PC RAM address
+;   - BLOCK_SIZE is packet size, in bytes
+;   - BLOCK_SRC is start of data in Y memory
+;  Out:
+;   - BLOCK_SIZE will be decremented to zero.
+;   - BLOCK_DEST_HI:LO will be incremented by BLOCK_SIZE
+;   - BLOCK_SRC will be incremented by BLOCK_SIZE/2
+;  Trashes:
+;   - A and B.  And sometimes X1.
+	
+	;; DSP PCI burst limit is 256 bytes.
+	MOVE	X:BLOCK_SIZE,A	        ; A1 = BLOCK_SIZE
+	
+	CMP	#0,A
+	JEQ	BLOCK_DONE
+
+	;; Careful here, force long (24-bit) literal.
+
+	CLR	B
+	MOVE	X:PCI_BURST_SIZE,B1
+	
+	CMP	B,A			; A ? B
+	JGE	<BLOCK_TRANSFER1	; jump if A >= B
+	MOVE	A,B	
+BLOCK_TRANSFER1
+	SUB	B,A			; A -= B
+	ADD	#0,B			; Clear carry bit
+	MOVE	A,X:BLOCK_SIZE		; Updated BLOCK_SIZE
+	MOVE	B,X:BURST_SIZE		; BURST_SIZE ;= round32(min(BLOCK_SIZE,$100))
+	ASR	#25,B,B			; B0 = # of 16 bit words
+
+	;; Setup DMA from BURST_SRC to PCI tx
+	MOVEP	#DTXM,X:DDR0		; DMA dest'n
+	MOVE	X:BURST_SRC,A0
+	MOVEP	A0,X:DSR0		; DMA source
+	ADD	B,A
+	DEC	B
+	MOVE	A0,X:BURST_SRC		; BURST_SRC += BURST_SIZE/2
+	
+	MOVEP	B0,X:DCO0		; DMA length = BURST_SIZE/2 - 1
+
+	;; DMA go
+	MOVEP	#$8EFA51,X:DCR0
+
+BLOCK_PCI
+	;; Setup PCI burst using BURST_SIZE
+	CLR	A
+	CLR	B
+	MOVE	X:BURST_SIZE,B0		; B = n8
+	DEC	B			; n8 - 1
+	ASR	#2,B,B			; (n8 - 1)/4 = n32 - 1
+	
+	MOVE	X:BURST_DEST_HI,A0
+
+	;; Insert 8 bits from B0 at position 16 in A
+	INSERT	#>$008010,B0,A
+	NOP
+	MOVE	A0,X:DPMC		; PCI burst length and HI address
+
+	MOVE	#$07,A0
+	ADD	#0,B			; Clear carry
+	ASL	#16,A,A
+	MOVE	X:BURST_DEST_LO,B0
+	ADD	B,A
+	NOP
+	
+	MOVEP	A0,X:DPAR		; PCI LO address and GO
+
+BLOCK_CHECK
+	BSET	#PCI_BLOCKING,X:STATUS  ; Useful status indicator...
+	JCLR	#MARQ,X:DPSR,*		; Wait for burst termination
+	BCLR	#PCI_BLOCKING,X:STATUS
+	
+	;; Check for error
+	JSET	#MDT,X:DPSR,BLOCK_OK
+
+	JSR	PCI_ERROR_CLEAR
+
+	BCLR	#PCIDMA_RESTART,X:STATUS ; Test and clear
+	JCS	<BLOCK_RESTART
+
+	BCLR	#PCIDMA_RESUME,X:STATUS	; Test and clear
+	JCS	<BLOCK_RESUME
+
+BLOCK_OK
+	CLR	A			; Make sure A1 is 0 before calling BLOCK_UPDATE
+	MOVE	X:BURST_SIZE,A0		; Pass # of words written to updater
+	JSR	BLOCK_UPDATE
+	JMP	BLOCK_TRANSFER		; Finish the block
+
+BLOCK_DONE
+	RTS				; Done	
+	
+BLOCK_RESTART
+	JMP	BLOCK_PCI		; Recalculate pci and resend
+
+BLOCK_RESUME
+	;; CLR	A
+	CLR	B
+	MOVEP	X:DPSR,A0		; Get words left to write
+	EXTRACTU #>$006010,A,B		; Take 6 bits at position 16, put in B.
+	
+	JCLR	#15,X:DPSR,BLOCK_RESUME1 ; RDCQ bit
+	INC	B
+	
+BLOCK_RESUME1
+	INC	B			; We want N, not N-1.
+	ASL	#2,B,B			; Number of bytes left to transfer
+	MOVE	X:BURST_SIZE,A0
+	SUB	B,A			; A is bytes written
+
+	JSR	BLOCK_UPDATE
+	JMP	BLOCK_PCI		; Recalculate pci and resend
+
+;;; Subroutine:	subtract A from BURST_SIZE and add A to BURST_DEST_LO
+BLOCK_UPDATE
+	;; Use A (number of bytes bursted) to update
+	;;  BURST_DEST_HI:LO and BURST_SIZE
+
+	MOVE	A0,X1			; Save A
+	
+	MOVE	A0,B0			; Copy A to B for ADD_HILO
+	MOVE	A1,B1
+	MOVE	#BURST_DEST_LO,R2
+	JSR	ADD_HILO_ADDRESS	; This updates BURST_DEST
+
+	MOVE	X:BURST_SIZE,B
+	SUB	X1,B
+	NOP
+	MOVE	B1,X:BURST_SIZE
+
+	RTS
 
 
 	
-		
 END_ADR	EQU	@LCV(L)		; End address of P: code written to ROM
