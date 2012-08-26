@@ -1270,7 +1270,8 @@ GET_DAT	MOVEP	X:DRXR,X0		; Read 1st 16 bits of 32 bit word from host memory
 RESTORE_REGISTERS
 ;-------------------------------------------------------------------------------------
 
-	MOVEC	X:<SV_SR,SR	
+	;; Use this for R2 instead.
+	MOVEC	X:<SV_SR,R2
 
 	MOVE	X:<SV_A0,A0		
 	MOVE	X:<SV_A1,A1
@@ -1292,7 +1293,8 @@ RESTORE_REGISTERS
 SAVE_REGISTERS
 ;-------------------------------------------------------------------------------------
 
-	MOVEC	SR,X:<SV_SR		; save status register.  May jump to ISR during CMP
+	;; Use this for R2 instead.  SR is saved automatically.
+	MOVEC	R2,X:<SV_SR
 	
 	MOVE	A0,X:<SV_A0		
 	MOVE	A1,X:<SV_A1

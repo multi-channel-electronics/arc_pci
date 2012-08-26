@@ -1,0 +1,4 @@
+# Replacement data
+dsp_cmd -qx write P 0x04d7 0x62b200
+dsp_cmd -qx write P 0x04e3 0x623200
+# New data
