@@ -1279,8 +1279,10 @@ BLOCK_TRANSFER_PCI
 	MOVE	#BURST_DEST_LO,R0	; RAM address
 	JSR	PCI_GO			; Initiate PCI burst
 
+	JMP	X_BLOCK_TRANSFER_PCI_CONT
+	
 	;; Wait for completion
-	JCLR	#MARQ,X:DPSR,*
+	;; JCLR	#MARQ,X:DPSR,*
 
 	;; Check for errors:
 	JCLR	#MDT,X:DPSR,BLOCK_TRANSFER_HANDLE_ERRORS
@@ -1359,8 +1361,9 @@ CON_TRANSFER_PCI
 	MOVE	#BURST_SRC_LO,R0	; RAM address
 	JSR	PCI_GO			; Initiate PCI burst
 
+	JMP	X_CON_TRANSFER_PCI_CONT
 	;; Wait for completion
-	JCLR	#MARQ,X:DPSR,*
+	;; JCLR	#MARQ,X:DPSR,*
 
 	;; Check for errors:
 	JCLR	#MDT,X:DPSR,CON_TRANSFER_HANDLE_ERRORS
