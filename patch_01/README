@@ -1,0 +1,10 @@
+This is necessary because "BCLR" and "BSET" alter the Carry bit, so
+these instructions can't be in fast interrupts.  This patch moves them
+into a long interrupt, which causes auto-storage of the status
+register.
+
+It's important to create the new routines before activating them.
+
+This patch generates an ugly "rough" version... only the stuff before
+0x100 matters.
+
