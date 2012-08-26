@@ -1,4 +1,17 @@
-# New data
+#!/bin/bash
+#
+# This patch corrects a race condition that could disrupt fibre-optic
+# or PCI burst operations in an unpredictable way.
+#
+# This patch can be applied to DSP code versions:
+#  U0104
+#  U0105
+#  U0106
+#
+# It is ok to apply it multiple times.
+#
+
+# New long interrupt routines...
 dsp_cmd -qx write P 0x0090 0xa8506
 dsp_cmd -qx write P 0x0091 0x0000
 dsp_cmd -qx write P 0x0092 0x0004
@@ -9,7 +22,7 @@ dsp_cmd -qx write P 0x0096 0xa0022
 dsp_cmd -qx write P 0x0097 0x0000
 dsp_cmd -qx write P 0x0098 0x0004
 
-# Replacement data
+# Redirect vector interrupts.
 dsp_cmd -qx write P 0x0072 0xd0090
 dsp_cmd -qx write P 0x0074 0xd0093
 dsp_cmd -qx write P 0x0076 0xd0096
