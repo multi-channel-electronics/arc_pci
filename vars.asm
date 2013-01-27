@@ -155,13 +155,27 @@ TIMER_INDEX		DC	0
 BDEBUG0			DC	0
 BDEBUG1			DC	0
 BDEBUG2			DC	0
-BDEBUG3			DC	0
-BDEBUG4			DC	0
-BDEBUG5			DC	0
-BDEBUG6			DC	0
-BDEBUG7			DC	0
-BDEBUG8			DC	0
-BDEBUG9			DC	0
+;; BDEBUG3			DC	0
+;; BDEBUG4			DC	0
+;; BDEBUG5			DC	0
+;; BDEBUG6			DC	0
+;; BDEBUG7			DC	0
+;; BDEBUG8			DC	0
+;; BDEBUG9			DC	0
+	
+;;; WORD and DATA must be adjacent like this.
+TRIGGER_FAKE		DC	0
+	
+CMD_WORD		DC	0
+CMD_DATA		DC	0
+REP_WORD		DC	0
+REP_DATA		DC	0
+
+
+CMD_BUFFER 		EQU	$100
+REP_BUFFER		EQU	$200
+
+	
 
 ;----------------------------------------------------------
 

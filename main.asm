@@ -25,7 +25,7 @@ PACKET_IN
 	
 	;; Reinitialize if a serious error has been detected
  	JSET	#FATAL_ERROR,X:<STATUS,START 
-
+	
 	;; Jump to special application area if signalled to do so
 	JSET	#MODE_APPLICATION,X:<MODE,APPLICATION
 
@@ -44,8 +44,7 @@ PACKET_IN
 	JSSET	#CON_DEMAND,X:STATUS,CON_BUFFER
 
 	;; Hackers, welcome.
-	NOP
-	NOP
+	JSR	HACK_ENTRY
 	
 	;; Loop
 	JMP	PACKET_IN
@@ -1059,7 +1058,9 @@ PCI_MESSAGE_TO_HOST_10
 	BSET	#DCTR_HF3,X:DCTR	; Raise HF3 (handshake)
 	
 	; Only interrupt in irq mode
-	JSET	#DSR_HF2,X:DSR,PCI_MESSAGE_TO_HOST_20
+	;; JSET	#DSR_HF2,X:DSR,PCI_MESSAGE_TO_HOST_20
+	NOP
+	NOP
 	BSET	#INTA,X:DCTR		; Assert the interrupt
 	
 PCI_MESSAGE_TO_HOST_20
