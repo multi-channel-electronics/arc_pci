@@ -11,7 +11,7 @@ See info.asm for versioning and authors.
 ; eeprom / P memory after the main code (but before the application
 ; area).
 
-        ORG     X:VAR_TBL,P:
+        ORG X:VAR_TBL,P:
 
 
 	IF	@SCP("DOWNLOAD","ROM")	; Boot ROM code
@@ -166,17 +166,36 @@ BDEBUG2			DC	0
 ;;; WORD and DATA must be adjacent like this.
 TRIGGER_FAKE		DC	0
 	
+CMD_SIZE		DC	0
 CMD_WORD		DC	0
-CMD_DATA		DC	0
-REP_WORD		DC	0
-REP_DATA		DC	0
 
-
+REP_BUS_ADDR		DC	0,0
+	
+XMEM_SRC		DC	0
+	
 CMD_BUFFER 		EQU	$100
-REP_BUFFER		EQU	$200
 
 	
+;;; 
+;;; Reply/status buffer - this is a structure that is copied into PC RAM
+;;;  whenever the DSP needs to provide a command reply or other information
+;;;  (e.g. not notify of some event...).
+;;; 
+REP_BUFFER_SIZE		EQU	64 ; This MUST be even, so that effective number
+				   ; of 32-bit words is integral
+REP_BUFFER1		DS	REP_BUFFER_SIZE
 
+RB_VERSION		EQU	0
+RB_SIZE			EQU	1
+RB_DATA			EQU	16
+
+;;; Aliases into the RB_DATA sub-structure
+REP_RSTAT		EQU	REP_BUFFER1+RB_DATA
+REP_RSIZE		EQU	REP_BUFFER1+RB_DATA+1
+REP_RPAYLOAD		EQU	REP_BUFFER1+RB_DATA+2
+	
+
+	
 ;----------------------------------------------------------
 
 ;;; Bit defines for STATUS word
