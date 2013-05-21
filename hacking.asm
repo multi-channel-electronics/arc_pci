@@ -11,6 +11,8 @@
 HACK_ENTRY
 	;; Only enter if HF2 is high.
 	JCLR	#DSR_HF2,X:DSR,HACK_EXIT
+		
+HACK_INIT	
 	;; Set bit to indicate to host that we're in this loop.
 	BSET	#DCTR_HF4,X:DCTR
 	
@@ -30,7 +32,7 @@ HACK_LOOP
 	JSR	PROCESS_PC_CMD
 
 	;; Should we send a reply?
-	JSR	PROCESS_REPLY
+	JSSET	#COMM_REP,X:STATUS,PROCESS_REPLY
 	
 	;; Should we fake data?
 	;; JSR	FAKE_PACKET
@@ -41,17 +43,25 @@ HACK_LOOP
 HACK_EXIT
 	BCLR	#DCTR_HF4,X:DCTR
 	RTS
+	
+	
+;;;
+;;; New comms implementation
+;;; 
 
 	
 REPLY_BUFFER_INIT
 	;; initialize header of reply packet.
-	MOVE	#REP_BUFFER1,R0
-	MOVE	#>1,X0
-	MOVE	#>REP_BUFFER_SIZE,A0
-	MOVE	X0,X:(R0+RB_VERSION)
-	MOVE	A0,X:(R0+RB_SIZE)
-	MOVE	#>0,X0
-	MOVE	X0,X:REP_RSTAT
+	CLR	A
+	MOVE	#>REP_BUFFER1,R0
+	.loop	#RB_SIZE
+	MOVE	A0,X:(R0)+
+	.endl
+	MOVE	#>RB_VERSION,X0
+	MOVE	#>RB_SIZE,A1
+	MOVE	X0,X:REP_VERSION
+	MOVE	A1,X:REP_SIZE
+	BCLR	#COMM_REP,X:STATUS
 	RTS
 
 
@@ -140,13 +150,13 @@ BLOCK_TRANSFERX_HANDLE_ERRORS
 	ORG	P:$900,P:$902
 
 PROCESS_REPLY
-	CLR	A
-	MOVE	X:REP_RSTAT,A
-	CMP	#0,A
-	JNE	PROCESS_REPLY_1
-	RTS
+;; 	CLR	A
+;; 	MOVE	X:REP_RSTAT,A
+;; 	CMP	#0,A
+;; 	JNE	PROCESS_REPLY_1
+;; 	RTS
 
-PROCESS_REPLY_1
+;; PROCESS_REPLY_1
 	;; Set destination address
 	MOVE	#>REP_BUS_ADDR,R0
 	MOVE	#>BURST_DEST_LO,R1
@@ -154,17 +164,23 @@ PROCESS_REPLY_1
 	MOVE	X:(R0)+,X0
 	MOVE	X0,X:(R1)+
 	.endl
-	
-	MOVE	#>(REP_BUFFER_SIZE*2),X0
+
+	;; Set BLOCK_SIZE, in bytes
+	MOVE	#>(RB_SIZE*2),X0
 	MOVE	X0,X:BLOCK_SIZE
 	MOVE	#>REP_BUFFER1,X0
 	MOVE	X0,X:XMEM_SRC
 
 	;; Trigger writes as master.
 	JSR 	BLOCK_TRANSFERX
-
+	
+	;; Mark as sent
+	BCLR	#COMM_REP,X:STATUS
 	MOVE	#>0,X0
+	MOVE	X:CMD_WORD,X0
+	MOVE	#>1,A1
 	MOVE	X0,X:REP_RSTAT	; mark as sent!
+	MOVE	A1,X:REP_RSIZE
 	
 	;; Raise interrupt and wait for handshake.
 	BSET	#INTA,X:DCTR
@@ -176,45 +192,33 @@ PROCESS_REPLY_1
 	
 	RTS
 
-TOGGLED_HANDLER_WHY_DOES_THIS_NOT_WORK_QUESTION
-;;; Raise interrupt and wait for HF0 to change state.
-	JCLR	#DSR_HF0,X:DSR,INT_WAIT_SET
-	
-INT_WAIT_CLR
-	BSET	#INTA,X:DCTR		; Assert interrupt
-	JSET	#DSR_HF0,X:DSR,*
-	BCLR	#INTA,X:DCTR
-	RTS
-INT_WAIT_SET
-	BSET	#INTA,X:DCTR		; Assert interrupt
-	JCLR	#DSR_HF0,X:DSR,*
-	BCLR	#INTA,X:DCTR
-	RTS
 
 ;;;
 ;;; Command processing
 ;;;
 
 ;;; CMD identifiers
-CMD_READ_P	EQU	1
-CMD_READ_X	EQU	2
-CMD_READ_Y	EQU	3
-	
-CMD_WRITE_P	EQU	5
-CMD_WRITE_X	EQU	6
-CMD_WRITE_Y	EQU	7
-	
-CMD_SET_REP_BUF	EQU	9
-	
-CMD_READ_CODED	EQU	$11
-CMD_WRITE_CODED EQU	$12
-
-CMD_SEND_MCE	EQU	$21
-
-CMD_SEND_STUFF  EQU	$31
-	
-CMD_STATUS	EQU	$65
-CMD_RECV_MCE	EQU	$66
+CMD_READ_P		EQU	1
+CMD_READ_X		EQU	2
+CMD_READ_Y		EQU	3
+			
+CMD_WRITE_P		EQU	5
+CMD_WRITE_X		EQU	6
+CMD_WRITE_Y		EQU	7
+			
+CMD_SET_REP_BUF		EQU	9
+CMD_SET_DATA_BUF	EQU	$A
+			
+			
+CMD_READ_CODED		EQU	$11
+CMD_WRITE_CODED 	EQU	$12
+			
+CMD_SEND_MCE		EQU	$21
+			
+CMD_SEND_STUFF  	EQU	$31
+			
+CMD_STATUS		EQU	$65
+CMD_RECV_MCE		EQU	$66
 
 
 
@@ -244,8 +248,15 @@ PROCESS_PC_CMD_1
 	.endl
 	
 PROCESS_PC_CMD_2
-	;; Now distribute the command to a handler
+	;; Init the reply packet, even if there might not be a reply.
+	MOVE	#>RB_TYPE_DSP_REP,A1
 	MOVE	X:CMD_WORD,B
+	MOVE	A1,X:REP_TYPE	; type is "dsp reply"
+	MOVE	B1,X:REP_RCMD	; copy of command word
+	MOVE	B0,X:REP_RSTAT	; status = 0
+	MOVE	B0,X:REP_RSIZE	; data size = 0
+	
+	;; Now distribute the command to a handler
 	
 	;; Pre-load the first packet word into R0 and the second into X0.
 	MOVE	X:CMD_BUFFER,R0
@@ -273,7 +284,10 @@ PROCESS_PC_CMD_2
 	JEQ	PROCESS_SEND_MCE
 
 	CMP	#CMD_SET_REP_BUF,B
-	JEQ	PROCESS_SET_BUFFER
+	JEQ	PROCESS_SET_REP_BUFFER
+	
+	CMP	#CMD_SET_REP_BUF,B
+	JEQ	PROCESS_SET_DATA_BUFFER
 	
 	CMP	#CMD_SEND_STUFF,B
 	JEQ	PROCESS_SEND_STUFF
@@ -290,17 +304,17 @@ PROCESS_READ_X
 	JMP	PROCESS_READ_EXIT
 PROCESS_READ_Y
 	MOVE	Y:(R0),X0
-	;; JMP	PROCESS_READ_EXIT
-	;; Fall through
+	JMP	PROCESS_READ_EXIT
+	
 PROCESS_READ_EXIT
 	;; Store read word in reply buffer
 	MOVE 	#>REP_RPAYLOAD,R0
 	JSR	PROCESS_SPLIT_X0_XR0
-	;; Declare reply packet type and size
-	MOVE	X:CMD_WORD,X0
-	MOVE	X0,X:REP_RSTAT
+	;; Increment data size
 	MOVE	#>1,X0
 	MOVE	X0,X:REP_RSIZE
+	;; Mark reply-to-send
+	BSET	#COMM_REP,X:STATUS
 	RTS
 
 PROCESS_WRITE_P
@@ -314,7 +328,7 @@ PROCESS_WRITE_Y
 	JMP	PROCESS_SIMPLE_EXIT
 
 	
-PROCESS_SET_BUFFER
+PROCESS_SET_REP_BUFFER
 	;; Two data words, representing the upper and lower halfs of the
 	;; 32-bit bus address
 	MOVE	#CMD_BUFFER,R0
@@ -330,6 +344,22 @@ PROCESS_SET_BUFFER
 	.loop 	#2
 	MOVE	X:(R0)+,X0
 	MOVE	X0,Y:(R1)+
+	.endl
+	
+	;; No reply!
+	MOVE	#>0,X0
+	MOVE	X0,X:REP_RSTAT
+	MOVE	X0,X:REP_RSIZE
+	RTS
+
+PROCESS_SET_DATA_BUFFER
+	;; Two data words, representing the upper and lower halfs of the
+	;; 32-bit bus address
+	MOVE	#CMD_BUFFER,R0
+	MOVE	#DATA_BUS_ADDR,R1
+	.loop 	#2
+	MOVE	X:(R0)+,X0
+	MOVE	X0,X:(R1)+
 	.endl
 	
 	;; No reply!
@@ -363,11 +393,8 @@ PROCESS_SEND_MCE
 	JMP 	PROCESS_SIMPLE_EXIT
 
 PROCESS_SIMPLE_EXIT
-	;; Register a simple reply with no error, no data.
-	MOVE	X:CMD_WORD,X0
-	MOVE	X0,X:REP_RSTAT
-	MOVE	#>0,X0
-	MOVE	X0,X:REP_RSIZE
+	;; Mark reply-to-send
+	BSET	#COMM_REP,X:STATUS
 	RTS
 
 
@@ -416,7 +443,8 @@ PROCESS_SPLIT_X0_YR0
 ;;;
 ;;; Fake MCE data generator!
 ;;;
-
+;;; BROKEN
+	
 FAKE_PACKET
 	CLR	A
 	MOVE	X:TRIGGER_FAKE,A1
@@ -424,7 +452,7 @@ FAKE_PACKET
 	JEQ	FAKE_PACKET_2
 	
 ;;; JAM
-	JSR	PROCESS_REPLY_1
+	JSR	PROCESS_REPLY
 	MOVE	#>0,X0
 	MOVE	X0,X:TRIGGER_FAKE
 	RTS
@@ -437,7 +465,7 @@ FAKE_PACKET
 	MOVE	X0,X:(R1)+
 	.endl
 	
-	MOVE	#>(REP_BUFFER_SIZE*2),X0
+	MOVE	#>(RB_SIZE*2),X0
 	MOVE	X0,X:BLOCK_SIZE
 	MOVE	#>REP_BUFFER1,X0
 	MOVE	X0,X:XMEM_SRC

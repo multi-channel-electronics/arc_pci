@@ -1,4 +1,4 @@
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  build.asm  Page 1
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  build.asm  Page 1
 
 
 
@@ -64,7 +64,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  build.asm  Page
 60                                                                             ; command is sent
 61     
 62        000200           APPL_PARAM EQU    $200                              ; application parameters in x memory start here.
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  header.asm  Page 2
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  header.asm  Page 2
 
 
 
@@ -130,7 +130,7 @@ chip RAM
 121       000002           MRRQ      EQU     2                                 ; Master Receive Request (DPSR)
 122       00000A           TRTY      EQU     10                                ; PCI Target Retry (DPSR)
 123    
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  header.asm  Page 3
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  header.asm  Page 3
 
 
 
@@ -196,7 +196,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  header.asm  Pag
 183       FFFF8B           TCSR1     EQU     $FFFF8B                           ; Control and status register
 184       FFFF8A           TLR1      EQU     $FFFF8A                           ; Load register
 185       FFFF89           TCPR1     EQU     $FFFF89                           ; Compare register
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  header.asm  Page 4
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  header.asm  Page 4
 
 
 
@@ -262,7 +262,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  header.asm  Pag
 247                        ;  IPRC determines core interrupt modes and levels.
 248                        ;   - [5:3] IRQB mode|level - FIFO half full
 249                        ;   - [8:6] IRQC mode|level - reset switch
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  header.asm  Page 5
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  header.asm  Page 5
 
 
 
@@ -301,7 +301,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  header.asm  Pag
 282                        ; Special address for two words for the DSP to bootstrap code from the EEPROM
 283                                  IF      @SCP("ROM","ROM")                 ; Boot from ROM on power-on
 284       P:000000 P:000000                   ORG     P:0,P:0
-285  d    P:000000 P:000000 0009FA            DC      END_ADR-INIT-2                    ; Number of boot words
+285  d    P:000000 P:000000 000A01            DC      END_ADR-INIT-2                    ; Number of boot words
 286  d    P:000001 P:000001 000000            DC      INIT                              ; Starting address
 287       P:000000 P:000002                   ORG     P:0,P:2
 288       P:000000 P:000002 0C0030  INIT      JMP     <INIT_PCI                         ; Configure PCI port
@@ -328,7 +328,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  header.asm  Pag
      d                      000000
      d                      000000
      d                      000000
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  init.asm  Page 6
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  init.asm  Page 6
 
 
 
@@ -394,7 +394,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  init.asm  Page 
 334                                 ; Initialize the PLL - phase locked loop
 335                                 INIT_PCI
 336       P:000030 P:000032 08F4BD            MOVEP             #PLL_INIT,X:PCTL        ; Initialize PLL
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  init.asm  Page 7
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  init.asm  Page 7
 
 
 
@@ -460,7 +460,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  init.asm  Page 
      d                      000000
      d                      000000
 359    
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  init.asm  Page 8
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  init.asm  Page 8
 
 
 
@@ -526,7 +526,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  init.asm  Page 
 411                                 ; ***********************************************************************
 412                                 ; For now have boot code starting from P:$100
 413                                 ; just to make debugging tidier etc.
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  init.asm  Page 9
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  init.asm  Page 9
 
 
 
@@ -592,7 +592,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  init.asm  Page 
 ut)
                             00003C
 468       P:000114 P:000116 07F43D            MOVEP             #%000000,X:PDRC         ; Data Register - AUX3 = i/p, AUX1 not used
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  init.asm  Page 10
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  init.asm  Page 10
 
 
 
@@ -658,7 +658,7 @@ e
 511    
 512                                 ; Program the DRAM memory access and addressing
 513       P:000132 P:000134 08F4BB            MOVEP             #$020022,X:BCR          ; Bus Control Register
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  init.asm  Page 11
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  init.asm  Page 11
 
 
 
@@ -722,9 +722,9 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  init.asm  Page 
 559       P:000151 P:000153 61F400            MOVE              #VAR_TBL_START,R1       ; Start of parameter table in P
                             0006AC
 560       P:000153 P:000155 300000            MOVE              #VAR_TBL,R0             ; start of parameter table in X
-561       P:000154 P:000156 069680            DO      #VAR_TBL_LENGTH,X_WRITE
+561       P:000154 P:000156 069880            DO      #VAR_TBL_LENGTH,X_WRITE
                             000157
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  init.asm  Page 12
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  init.asm  Page 12
 
 
 
@@ -790,7 +790,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  init.asm  Page 
 614       
 615       P:000171 P:000173 0A00A2            JSET    #FATAL_ERROR,X:<STATUS,START
                             000100
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 13
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 13
 
 
 
@@ -856,7 +856,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 671                                 PCI_LOCKDOWN_ENTRY
 672       
 673       P:000186 P:000188 0A8500            BCLR    #DCTR_HCIE,X:DCTR                 ; Disable host IRQ
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 14
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 14
 
 
 
@@ -922,7 +922,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 716    
 717       
 718       P:0001B9 P:0001BB 50F000            MOVE              X:>(HEAD_W1_0+6),A0
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 15
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 15
 
 
 
@@ -988,7 +988,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 761    
 762    
 765    
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 16
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 16
 
 
 
@@ -1054,7 +1054,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 806       P:00020E P:000210 0BF080            JSR     TIMER_STORE
                             00064D
 807    
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 17
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 17
 
 
 
@@ -1120,7 +1120,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 854    
 855       
 856       P:000239 P:00023B 56F000            MOVE              X:QT_BUF_HEAD,A
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 18
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 18
 
 
 
@@ -1186,7 +1186,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 899    
 900       P:000265 P:000267 00000C            RTS
 901    
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 19
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 19
 
 
 
@@ -1252,7 +1252,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 945       P:00028A P:00028C 66F400            MOVE              #>COMMAND_BUFFER,R6
                             200000
 946       P:00028C P:00028E 068080            DO      #128,CON_TRANSMIT1                ; block size = 16bit x 128 (256 bytes)
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 20
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 20
 
 
 
@@ -1318,7 +1318,7 @@ not passed to driver.
 994       P:0002AE P:0002B0 440C00            MOVE              X0,X:<DTXS_WD2          ;2nd word transmitted to host in notify mess
 age
 995    
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 21
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 21
 
 
 
@@ -1384,7 +1384,7 @@ sage
 1042      P:0002D5 P:0002D7 61F400            MOVE              #DUMP_BUFF,R1           ; address where dumped words stored in Y mem
                             001000
 1043      P:0002D7 P:0002D9 44F400            MOVE              #MAX_DUMP,X0            ; put a limit to number of words read from f
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 22
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 22
 
 
 
@@ -1450,7 +1450,7 @@ eout.
                             00000B
 1095   
 1096      P:0002EF P:0002F1 56F400            MOVE              #'ACK',A                ; Note this sets A0 = 0
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 23
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 23
 
 
 
@@ -1516,7 +1516,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 1146                                ; c) Restore registers and RTI.
 1147   
 1148                                VCOM_EXIT_ERROR_X0
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 24
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 24
 
 
 
@@ -1582,7 +1582,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 1197      P:00032C P:00032E 0E2313            JNE     VCOM_EXIT
 1198   
 1199      P:00032D P:00032F 44F000            MOVE              X:REV_NUMBER,X0
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 25
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 25
 
 
 
@@ -1648,7 +1648,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 1246      P:000351 P:000353 60F000            MOVE              X:DRXR_WD3,R0
                             000009
 1247      P:000353 P:000355 44F000            MOVE              X:DRXR_WD4,X0
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 26
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 26
 
 
 
@@ -1714,7 +1714,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 1296                                ; word 2-4 unused
 1297   
 1298      P:000373 P:000375 0BF080            JSR     SAVE_REGISTERS
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 27
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 27
 
 
 
@@ -1780,7 +1780,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 1346                                QUIET_TRANSFER_SET
 1347                                ;-----------------------------------------------------------------------------
 1348                                ;Quiet transfer mode configuration
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 28
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 28
 
 
 
@@ -1846,7 +1846,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 1386      P:0003CB P:0003CD 0AF0AA            JEQ     QUIET_TRANSFER_SET_R0
                             000423
 1387   
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 29
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 29
 
 
 
@@ -1912,7 +1912,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 1423                                QUIET_TRANSFER_SET_RP_BASE
 1424      P:0003FE P:000400 447000            MOVE              X0,X:RP_BASE_LO
                             000048
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 30
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 30
 
 
 
@@ -1978,7 +1978,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 1470      P:00042A P:00042C 21F000            MOVE              B,R0
 **** 1471 [main.asm 874]: WARNING --- Pipeline stall reading register written in instruction at address: P:00042A (X data move field
 )
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 31
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 31
 
 
 
@@ -2044,7 +2044,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
                             00002F
 1523   
 1524      P:000447 P:000449 0A0021            BSET    #SEND_TO_HOST,X:<STATUS           ; tell main program to write packet to host 
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 32
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 32
 
 
 
@@ -2110,7 +2110,7 @@ memory
 1574      
 1575      P:000461 P:000463 44F400            MOVE              #'BUS',X0
                             425553
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 33
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 33
 
 
 
@@ -2176,7 +2176,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 1629                                ;----------------------------------------------------------------------------
 1630                                ; Subroutine to send 4 words as a reply from PCI to the Host
 1631                                ; using the DTXS-HRXS data path.  The DSP signals the host by raising
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 34
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 34
 
 
 
@@ -2242,7 +2242,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 1683      P:000496 P:000498 529100            MOVE              X:<SV_A2,A2
 1684   
 1685      P:000497 P:000499 519200            MOVE              X:<SV_B0,B0
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 35
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 35
 
 
 
@@ -2308,7 +2308,7 @@ ing CMP
                             00001C
 1739      P:0004BD P:0004BF 00000C            RTS
 1740   
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 36
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 36
 
 
 
@@ -2374,7 +2374,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
                             000800
 1786      P:0004E1 P:0004E3 507000            MOVE              A0,X:EC_TO
                             000036
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 37
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 37
 
 
 
@@ -2440,7 +2440,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 1825   
 1826   
 1827                                ;----------------------------------------------
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 38
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 38
 
 
 
@@ -2506,7 +2506,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
                             000007
 1877      P:000538 P:00053A 60F400            MOVE              #BURST_DEST_LO,R0       ; RAM address
                             00002F
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 39
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 39
 
 
 
@@ -2572,7 +2572,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 1926                                CON_TRANSFER0
 1927      
 1928      
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 40
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 40
 
 
 
@@ -2638,7 +2638,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 1972      
 1973      P:000581 P:000583 0D04BE            JSR     PCI_ERROR_CLEAR
 1974   
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 41
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 41
 
 
 
@@ -2704,7 +2704,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
                             0005A9
 2028      P:0005A8 P:0005AA 000009            INC     B
 2029                                PCI_RECOVER_COUNT1
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 42
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 42
 
 
 
@@ -2770,7 +2770,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 2081   
 2082                                ; BUFFER_PACKET
 2083                                ;
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 43
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 43
 
 
 
@@ -2836,7 +2836,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 2130      P:0005EE P:0005F0 00000C            RTS
 2131   
 2132                                ;---------------------------------------------------------
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 44
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 44
 
 
 
@@ -2902,7 +2902,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 2183                                ; In: TOTAL_BUFFS & LEFT_TO_READ
 2184                                ; Trashes: A0
 2185   
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 45
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 45
 
 
 
@@ -2968,7 +2968,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 2233      P:000632 P:000634 447000            MOVE              X0,X:TCPR0
                             FFFF8D
 2234      P:000634 P:000636 0D0622            JSR     TIMER_ENABLE
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 46
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 46
 
 
 
@@ -3034,7 +3034,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 2283                                ;  CIRCULAR BUFFER HANDLING                    ;
 2284                                ;----------------------------------------------;
 2285   
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 47
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 47
 
 
 
@@ -3100,7 +3100,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 2328                                ;---------------------------------------------------------------
 2329                                BUFFER_INFORM
 2330                                ;---------------------------------------------------------------
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 48
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 48
 
 
 
@@ -3166,7 +3166,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 2386      P:0006A2 P:0006A4 200010            ADD     B,A
 2387   
 2388                                SAVE_HILO_ADDRESS
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 49
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  main.asm  Page 49
 
 
 
@@ -3232,7 +3232,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  main.asm  Page 
 2448 d    X:000005 P:0006B3 2EF490  P_CHECKSUM DC     $2EF490                           ; Not used by UBC
 2449   
 2450                                ;-----------------------------------------------
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  vars.asm  Page 50
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  vars.asm  Page 50
 
 
 
@@ -3298,7 +3298,7 @@ eply
 2509 d                               PSIZE_ERRORS
 2510 d    X:000028 P:0006D6 000000            DC      0                                 ; Failed on packet size test
 2511   
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  vars.asm  Page 51
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  vars.asm  Page 51
 
 
 
@@ -3364,7 +3364,7 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  vars.asm  Page 
 2574 d    X:00004B P:0006F9 000000  RP_DROPS  DC      0                                 ; Dropped packet count
 2575   
 2576   
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  vars.asm  Page 52
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  vars.asm  Page 52
 
 
 
@@ -3387,738 +3387,783 @@ Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  vars.asm  Page 
 2603 d                               REP_BUS_ADDR
 2604 d    X:000053 P:000701 000000            DC      0,0
      d                      000000
-2605   
-2606 d    X:000055 P:000703 000000  XMEM_SRC  DC      0
+2605 d                               DATA_BUS_ADDR
+2606 d    X:000055 P:000703 000000            DC      0,0
+     d                      000000
 2607   
-2608      000100                    CMD_BUFFER EQU    $100
-2609   
+2609      000004                    COMM_REP  EQU     4                                 ; Reply needs to be sent
 2610   
-2616                                 REP_BUFFER_SIZE
-2617      000040                              EQU     64                                ; This MUST be even, so that effective numbe
+2611   
+2612 d    X:000057 P:000705 000000  XMEM_SRC  DC      0
+2613   
+2614      000100                    CMD_BUFFER EQU    $100
+2615   
+2616   
+2622   
+2623      000040                    RB_SIZE   EQU     64                                ; This MUST be even, so that effective numbe
 r
-2618                                                                                    ; of 32-bit words is integral
-2619                                 REP_BUFFER1
-2620      X:000056 P:000704                   DS      REP_BUFFER_SIZE
-2621   
-2622      000000                    RB_VERSION EQU    0
-2623      000001                    RB_SIZE   EQU     1
-2624      000010                    RB_DATA   EQU     16
+2624                                                                                    ; of 32-bit words is integral
 2625   
-2627      000066                    REP_RSTAT EQU     REP_BUFFER1+RB_DATA
-2628      000067                    REP_RSIZE EQU     REP_BUFFER1+RB_DATA+1
-2629                                 REP_RPAYLOAD
-2630      000068                              EQU     REP_BUFFER1+RB_DATA+2
-2631   
-2632   
+2626      000001                    RB_VERSION EQU    1                                 ; Version of this datagram
+2627                                 RB_TYPE_DSP_REP
+2628      000001                              EQU     1                                 ;
+2629                                 RB_TYPE_MCE_REP
+2630      000002                              EQU     2                                 ;
+2631                                 RB_TYPE_DATA_INF
+2632      000003                              EQU     3                                 ;
 2633   
-2634                                ;----------------------------------------------------------
-2635   
+2635                                 REP_BUFFER1
+2636      X:000058 P:000706                   DS      RB_SIZE
 2637   
-2638                                 APPLICATION_RUNNING
-2639      000000                              EQU     0                                 ; Indicates application is in progress
-2640                                 SEND_TO_HOST
-2641      000001                              EQU     1                                 ; set in HST ISR when host ready for packet 
-(stays set until after HST reply)
-2642                                 FATAL_ERROR
-2643      000002                              EQU     2                                 ; PCI message to host error detected by driv
-er....
-2644      000003                    FO_WRD_RCV EQU    3                                 ; set when packet detected in FIFO - stays s
-et till packet processed
-2645   
-2646      000009                    HST_NFYD  EQU     9                                 ; set after host notified (NFY message) of p
-acket (stays set until after HST reply)
-2647   
-2648      00000A                    CON_DEMAND EQU    10                                ; Host has requested an MCE command be sent
-2649      00000B                    CON_MCE   EQU     11                                ; Command has been copied to Y buffer and sh
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  vars.asm  Page 53
-
-
-
-ould be sent to MCE
+2639                                 REP_VERSION
+2640      000058                              EQU     REP_BUFFER1+0                     ;
+2641      000059                    REP_SIZE  EQU     REP_BUFFER1+1                     ;
+2642      00005A                    REP_TYPE  EQU     REP_BUFFER1+2                     ;
+2643      000068                    REP_DATA  EQU     REP_BUFFER1+16                    ; Start of DSP or MCE reply data
+2645      000068                    REP_RSTAT EQU     REP_DATA+0
+2646      000069                    REP_RSIZE EQU     REP_DATA+1
+2647      00006A                    REP_RCMD  EQU     REP_DATA+2
+2648                                 REP_RPAYLOAD
+2649      00006C                              EQU     REP_DATA+4
 2650   
-2651                                 PCIDMA_RESTART
-2652      000010                              EQU     16                                ; DMA flags used for error recovery
-2653                                 PCIDMA_RESUME
-2654      000011                              EQU     17
-2655   
-2656      000014                    QT_FLUSH  EQU     20                                ; Set when it is time to inform Host of curr
-ent buffer position.
-2657                                 RP_BUFFER_FULL
-2658      000015                              EQU     21                                ; Set when Quiet RP buffer is occupied.
-2659   
-2660      000016                    FREEZER   EQU     22                                ; Suspend operations and just idle in the ma
-in loop
-2661                                 MAIN_LOOP_POLL
-2662      000017                              EQU     23                                ; Cleared by the main loop, use to check for
- DSP lock-up
-2663   
+2651   
+2652   
+2653                                ;----------------------------------------------------------
+2654   
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  vars.asm  Page 53
+
+
+
+2656   
+2657                                 APPLICATION_RUNNING
+2658      000000                              EQU     0                                 ; Indicates application is in progress
+2659                                 SEND_TO_HOST
+2660      000001                              EQU     1                                 ; set in HST ISR when host ready for packet 
+(stays set until after HST reply)
+2661                                 FATAL_ERROR
+2662      000002                              EQU     2                                 ; PCI message to host error detected by driv
+er....
+2663      000003                    FO_WRD_RCV EQU    3                                 ; set when packet detected in FIFO - stays s
+et till packet processed
 2664   
+2665      000009                    HST_NFYD  EQU     9                                 ; set after host notified (NFY message) of p
+acket (stays set until after HST reply)
 2666   
-2667                                 MODE_APPLICATION
-2668      000000                              EQU     0                                 ; set if PCI application to run
-2669      000001                    MODE_MCE  EQU     1                                 ; process packets from MCE (!choke)
-2670      000002                    MODE_QT   EQU     2                                 ; Quiet transfer for data packets (QT mode)
-2671                                 MODE_RP_BUFFER
-2672      000003                              EQU     3                                 ; Quiet transfer for reply packets (Quiet-RP
-)
-2673   
+2667      00000A                    CON_DEMAND EQU    10                                ; Host has requested an MCE command be sent
+2668      00000B                    CON_MCE   EQU     11                                ; Command has been copied to Y buffer and sh
+ould be sent to MCE
+2669   
+2670                                 PCIDMA_RESTART
+2671      000010                              EQU     16                                ; DMA flags used for error recovery
+2672                                 PCIDMA_RESUME
+2673      000011                              EQU     17
 2674   
-2676   
-2677                                          IF      @SCP("ROM","ROM")                 ; Boot ROM code
-2678                                 VAR_TBL_END
-2679      000742                              EQU     @LCV(L)-2
-2680                                          ENDIF
-2681   
-2682                                          IF      @SCP("ROM","ONCE")                ; Download via ONCE debugger
-2684                                          ENDIF
+2675      000014                    QT_FLUSH  EQU     20                                ; Set when it is time to inform Host of curr
+ent buffer position.
+2676                                 RP_BUFFER_FULL
+2677      000015                              EQU     21                                ; Set when Quiet RP buffer is occupied.
+2678   
+2679      000016                    FREEZER   EQU     22                                ; Suspend operations and just idle in the ma
+in loop
+2680                                 MAIN_LOOP_POLL
+2681      000017                              EQU     23                                ; Cleared by the main loop, use to check for
+ DSP lock-up
+2682   
+2683   
 2685   
-2686                                 VAR_TBL_LENGTH
-2687      000096                              EQU     VAR_TBL_END-VAR_TBL_START
-2688                                          INCLUDE 'app.asm'
-2689                                        COMMENT *
-2690   
-2691                                Auxiliary application area.
-2692   
-2693                                See info.asm for versioning and authors.
-2694   
-2695                                        *
-2696                                          PAGE    132                               ; Printronix page width - 132 columns
-2697                                          OPT     CEX                               ; print DC evaluations
-2698   
-2699                                          IF      @CVS(N,*)>=APPLICATION
-2701                                          ENDIF
-2702   
-2703   
-2704                                ;--------------------------------------------
-2705                                ; APPLICATION AREA
-2706                                ;---------------------------------------------
-2707                                          IF      @SCP("ROM","ROM")                 ; Download via ONCE debugger
-2708      P:000800 P:000802                   ORG     P:APPLICATION,P:APPLICATION+2
-2709                                          ENDIF
-2710   
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  app.asm  Page 54
-
-
-
-2711                                          IF      @SCP("ROM","ONCE")                ; Download via ONCE debugger
-2713                                          ENDIF
-2714   
-2715                                ; starts with no application loaded
-2716                                ; so just reply with an error if we get a GOA command
-2717   
-2718      P:000800 P:000802 44F400            MOVE              #'REP',X0
-                            524550
-2719      P:000802 P:000804 440B00            MOVE              X0,X:<DTXS_WD1          ; REPly
-2720      P:000803 P:000805 44F400            MOVE              #'GOA',X0
-                            474F41
-2721      P:000805 P:000807 440C00            MOVE              X0,X:<DTXS_WD2          ; echo command sent
-2722      P:000806 P:000808 44F400            MOVE              #'ERR',X0
-                            455252
-2723      P:000808 P:00080A 440D00            MOVE              X0,X:<DTXS_WD3          ; No Application Loaded
-2724      P:000809 P:00080B 44F400            MOVE              #'NAL',X0
-                            4E414C
-2725      P:00080B P:00080D 440E00            MOVE              X0,X:<DTXS_WD4          ; write to PCI memory error;
-2726      P:00080C P:00080E 0D0493            JSR     <RESTORE_REGISTERS
-2727      P:00080D P:00080F 0D047A            JSR     <PCI_MESSAGE_TO_HOST
-2728      P:00080E P:000810 0A0100            BCLR    #MODE_APPLICATION,X:<MODE
-2729      P:00080F P:000811 0C016E            JMP     PACKET_IN
-2730   
-2731   
-2732   
-2733                                          INCLUDE 'hacking.asm'
-2734                                                COMMENT *
-2735   
-2736                                        This implementation does communication with the host using PCI
-2737                                        master writes only.
-2738   
-2739                                        *
-2740                                          PAGE    132                               ; Printronix page width - 132 columns
-2741                                          OPT     CEX                               ; print DC evaluations
-2742   
-2743   
-2744                                HACK_ENTRY
-2745      
-2746      P:000810 P:000812 0A8985            JCLR    #DSR_HF2,X:DSR,HACK_EXIT
-                            000821
-2747      
-2748      P:000812 P:000814 0A8524            BSET    #DCTR_HF4,X:DCTR
-2749   
-2750      
-2751      P:000813 P:000815 200013            CLR     A
-2752      P:000814 P:000816 000000            NOP
-2753      P:000815 P:000817 507000            MOVE              A0,X:CMD_WORD
-                            000052
-2754      P:000817 P:000819 507000            MOVE              A0,X:TRIGGER_FAKE
-                            000050
-2755   
-2756      P:000819 P:00081B 0BF080            JSR     REPLY_BUFFER_INIT
-                            000823
-2757   
-2758      
-2759      
-2760      
-2761                                HACK_LOOP
-2762      
-2763      P:00081B P:00081D 0BF080            JSR     PROCESS_PC_CMD
-                            00092E
-2764   
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  hacking.asm  Page 55
-
-
-
-2765      
-2766      P:00081D P:00081F 0BF080            JSR     PROCESS_REPLY
-                            000900
-2767   
-2768      
-2769      
-2770   
-2771      
-2772      P:00081F P:000821 0A89A5            JSET    #DSR_HF2,X:DSR,HACK_LOOP
-                            00081B
-2773   
-2774                                HACK_EXIT
-2775      P:000821 P:000823 0A8504            BCLR    #DCTR_HF4,X:DCTR
-2776      P:000822 P:000824 00000C            RTS
-2777   
-2778   
-2779                                REPLY_BUFFER_INIT
-2780      
-2781      P:000823 P:000825 305600            MOVE              #REP_BUFFER1,R0
-2782      P:000824 P:000826 44F400            MOVE              #>1,X0
-                            000001
-2783      P:000826 P:000828 50F400            MOVE              #>REP_BUFFER_SIZE,A0
-                            000040
-2784      P:000828 P:00082A 020084            MOVE              X0,X:(R0+RB_VERSION)
-2785      P:000829 P:00082B 0200C8            MOVE              A0,X:(R0+RB_SIZE)
-2786      P:00082A P:00082C 44F400            MOVE              #>0,X0
-                            000000
-2787      P:00082C P:00082E 447000            MOVE              X0,X:REP_RSTAT
-                            000066
-2788      P:00082E P:000830 00000C            RTS
-2789   
-2790   
-2791                                ;----------------------------------------------
-2792                                BLOCK_TRANSFERX
-2793                                ;----------------------------------------------
-2794                                ;   In:
-2795                                ;   - BURST_DEST_HI:BURST_DEST_LO is PC RAM address (16:16)
-2796                                ;   - BLOCK_SIZE is packet size, in bytes
-2797                                ;   - XMEM_SRC is start of data in X memory
-2798                                ;  Out:
-2799                                ;   - BLOCK_SIZE will be decremented to zero.
-2800                                ;   - BURST_DEST_HI:LO will be incremented by BLOCK_SIZE
-2801                                ;   - XMEM_SRC will be incremented by BLOCK_SIZE/2
-2802                                ;  Trashes:
-2803                                ;   - A and B at least
-2804   
-2805      P:00082F P:000831 200013            CLR     A
-2806      P:000830 P:000832 56AB00            MOVE              X:BLOCK_SIZE,A          ; A1 = BLOCK_SIZE
-2807      P:000831 P:000833 014085            CMP     #0,A                              ; Still bytes to transfer?
-2808      P:000832 P:000834 0AF0A2            JNE     BLOCK_TRANSFERX0
-                            000835
-2809      P:000834 P:000836 00000C            RTS
-2810   
-2811                                BLOCK_TRANSFERX0
-2812      
-2813      
-2814      P:000835 P:000837 57A900            MOVE              X:PCI_BURST_SIZE,B      ; B1 = burst size (256)
-2815   
-2816      P:000836 P:000838 200005            CMP     B,A                               ; A ? B
-2817      P:000837 P:000839 0E1839            JGE     <BLOCK_TRANSFERX1                 ; jump if A >= B
-2818      P:000838 P:00083A 21CF00            MOVE              A,B                     ; This only moves A1,B1.
-2819                                BLOCK_TRANSFERX1
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  hacking.asm  Page 56
-
-
-
-2820      
-2821      P:000839 P:00083B 200014            SUB     B,A                               ; A -= B
-2822      P:00083A P:00083C 014088            ADD     #0,B                              ; Clear carry bit
-2823      P:00083B P:00083D 562B00            MOVE              A,X:BLOCK_SIZE          ; Updated BLOCK_SIZE
-2824      P:00083C P:00083E 572A00            MOVE              B,X:BURST_SIZE          ; BURST_SIZE ;= round32(min(BLOCK_SIZE,$100)
+2686                                 MODE_APPLICATION
+2687      000000                              EQU     0                                 ; set if PCI application to run
+2688      000001                    MODE_MCE  EQU     1                                 ; process packets from MCE (!choke)
+2689      000002                    MODE_QT   EQU     2                                 ; Quiet transfer for data packets (QT mode)
+2690                                 MODE_RP_BUFFER
+2691      000003                              EQU     3                                 ; Quiet transfer for reply packets (Quiet-RP
 )
-2825      P:00083D P:00083F 0C1CB3            ASR     #25,B,B                           ; B0 = # of 16 bit words
-2826   
-2827      
-2828      P:00083E P:000840 08F4AE            MOVEP             #DTXM,X:DDR0            ; DMA dest'n
-                            FFFFCC
-2829      P:000840 P:000842 50F000            MOVE              X:XMEM_SRC,A0
-                            000055
-2830      P:000842 P:000844 08C82F            MOVEP             A0,X:DSR0               ; DMA source
-2831      P:000843 P:000845 200010            ADD     B,A
-2832      P:000844 P:000846 00000B            DEC     B
-2833      P:000845 P:000847 507000            MOVE              A0,X:XMEM_SRC           ; BURST_SRC += BURST_SIZE/2
-                            000055
-2834   
-2835      P:000847 P:000849 08C92D            MOVEP             B0,X:DCO0               ; DMA length = BURST_SIZE/2 - 1
-2836   
-2837      
-2838      P:000848 P:00084A 08F4AC            MOVEP             #$8EFA50,X:DCR0         ; X to X
-                            8EFA50
-2839   
-2840                                BLOCK_TRANSFERX_PCI
-2841      P:00084A P:00084C 44F400            MOVE              #>$7,X0                 ; Memory write
-                            000007
-2842      P:00084C P:00084E 302F00            MOVE              #BURST_DEST_LO,R0       ; RAM address
-2843      P:00084D P:00084F 0D058D            JSR     PCI_GO                            ; Initiate PCI burst
-2844   
-2845      
-2846      P:00084E P:000850 0A8A84            JCLR    #MARQ,X:DPSR,*
-                            00084E
-2847   
-2848      
-2849      P:000850 P:000852 0A8A8E            JCLR    #MDT,X:DPSR,BLOCK_TRANSFERX_HANDLE_ERRORS
-                            000856
-2850   
-2851      P:000852 P:000854 20001B            CLR     B
-2852      P:000853 P:000855 51AA00            MOVE              X:BURST_SIZE,B0         ; All bytes were transferred
-2853      P:000854 P:000856 0D06A1            JSR     ADD_HILO_ADDRESS                  ; Update source address
-2854      P:000855 P:000857 0C082F            JMP     BLOCK_TRANSFERX                   ; Next burst in block
-2855   
-2856                                BLOCK_TRANSFERX_HANDLE_ERRORS
-2857      
-2858      P:000856 P:000858 0D04BE            JSR     PCI_ERROR_CLEAR
-2859   
-2860      P:000857 P:000859 0A0010            BCLR    #PCIDMA_RESTART,X:STATUS          ; Test and clear
-2861      P:000858 P:00085A 0E884A            JCS     BLOCK_TRANSFERX_PCI               ; Restart PCI burst
-2862   
-2863      P:000859 P:00085B 0A0011            BCLR    #PCIDMA_RESUME,X:STATUS           ; Test and clear
-2864      P:00085A P:00085C 0E082F            JCC     BLOCK_TRANSFERX                   ; Error but no error? Redo this burst.
-2865   
-2866      
-2867      P:00085B P:00085D 0D05A3            JSR     PCI_RECOVER_COUNT                 ; Get transferred byte count in A.
-2868      P:00085C P:00085E 0D05B3            JSR     PCI_UPDATE_R0
-2869      P:00085D P:00085F 0C084A            JMP     BLOCK_TRANSFERX_PCI
-2870   
-2871   
-2873      P:000900 P:000902                   ORG     P:$900,P:$902
-2874   
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  hacking.asm  Page 57
+2692   
+2693   
+2695   
+2696                                          IF      @SCP("ROM","ROM")                 ; Boot ROM code
+2697                                 VAR_TBL_END
+2698      000744                              EQU     @LCV(L)-2
+2699                                          ENDIF
+2700   
+2701                                          IF      @SCP("ROM","ONCE")                ; Download via ONCE debugger
+2703                                          ENDIF
+2704   
+2705                                 VAR_TBL_LENGTH
+2706      000098                              EQU     VAR_TBL_END-VAR_TBL_START
+2707                                          INCLUDE 'app.asm'
+2708                                        COMMENT *
+2709   
+2710                                Auxiliary application area.
+2711   
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  app.asm  Page 54
 
 
 
-2875                                PROCESS_REPLY
-2876      P:000900 P:000902 200013            CLR     A
-2877      P:000901 P:000903 56F000            MOVE              X:REP_RSTAT,A
-                            000066
-2878      P:000903 P:000905 014085            CMP     #0,A
-2879      P:000904 P:000906 0AF0A2            JNE     PROCESS_REPLY_1
-                            000907
-2880      P:000906 P:000908 00000C            RTS
-2881   
-2882                                PROCESS_REPLY_1
-2883      
-2884      P:000907 P:000909 60F400            MOVE              #>REP_BUS_ADDR,R0
-                            000053
-2885      P:000909 P:00090B 61F400            MOVE              #>BURST_DEST_LO,R1
-                            00002F
-2886                                          .loop   #2
-2888      P:00090D P:00090F 44D800            MOVE              X:(R0)+,X0
-2889      P:00090E P:000910 445900            MOVE              X0,X:(R1)+
-2890                                          .endl
-2892   
-2893      P:00090F P:000911 44F400            MOVE              #>(REP_BUFFER_SIZE*2),X0
-                            000080
-2894      P:000911 P:000913 442B00            MOVE              X0,X:BLOCK_SIZE
-2895      P:000912 P:000914 44F400            MOVE              #>REP_BUFFER1,X0
-                            000056
-2896      P:000914 P:000916 447000            MOVE              X0,X:XMEM_SRC
-                            000055
-2897   
-2898      
-2899      P:000916 P:000918 0D082F            JSR     BLOCK_TRANSFERX
-2900   
-2901      P:000917 P:000919 44F400            MOVE              #>0,X0
-                            000000
-2902      P:000919 P:00091B 447000            MOVE              X0,X:REP_RSTAT          ; mark as sent!
-                            000066
-2903   
-2904      
-2905      P:00091B P:00091D 0A8526            BSET    #INTA,X:DCTR
-2906   
-2907      P:00091C P:00091E 0A8983            JCLR    #DSR_HF0,X:DSR,*
-                            00091C
-2908      P:00091E P:000920 0A8506            BCLR    #INTA,X:DCTR
-2909   
-2910      P:00091F P:000921 0A89A3            JSET    #DSR_HF0,X:DSR,*
-                            00091F
-2911   
-2912      P:000921 P:000923 00000C            RTS
-2913   
-2914                                TOGGLED_HANDLER_WHY_DOES_THIS_NOT_WORK_QUESTION
-2916      P:000922 P:000924 0A8983            JCLR    #DSR_HF0,X:DSR,INT_WAIT_SET
-                            000929
-2917   
-2918                                INT_WAIT_CLR
-2919      P:000924 P:000926 0A8526            BSET    #INTA,X:DCTR                      ; Assert interrupt
-2920      P:000925 P:000927 0A89A3            JSET    #DSR_HF0,X:DSR,*
-                            000925
-2921      P:000927 P:000929 0A8506            BCLR    #INTA,X:DCTR
-2922      P:000928 P:00092A 00000C            RTS
-2923                                INT_WAIT_SET
-2924      P:000929 P:00092B 0A8526            BSET    #INTA,X:DCTR                      ; Assert interrupt
-2925      P:00092A P:00092C 0A8983            JCLR    #DSR_HF0,X:DSR,*
-                            00092A
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  hacking.asm  Page 58
+2712                                See info.asm for versioning and authors.
+2713   
+2714                                        *
+2715                                          PAGE    132                               ; Printronix page width - 132 columns
+2716                                          OPT     CEX                               ; print DC evaluations
+2717   
+2718                                          IF      @CVS(N,*)>=APPLICATION
+2720                                          ENDIF
+2721   
+2722   
+2723                                ;--------------------------------------------
+2724                                ; APPLICATION AREA
+2725                                ;---------------------------------------------
+2726                                          IF      @SCP("ROM","ROM")                 ; Download via ONCE debugger
+2727      P:000800 P:000802                   ORG     P:APPLICATION,P:APPLICATION+2
+2728                                          ENDIF
+2729   
+2730                                          IF      @SCP("ROM","ONCE")                ; Download via ONCE debugger
+2732                                          ENDIF
+2733   
+2734                                ; starts with no application loaded
+2735                                ; so just reply with an error if we get a GOA command
+2736   
+2737      P:000800 P:000802 44F400            MOVE              #'REP',X0
+                            524550
+2738      P:000802 P:000804 440B00            MOVE              X0,X:<DTXS_WD1          ; REPly
+2739      P:000803 P:000805 44F400            MOVE              #'GOA',X0
+                            474F41
+2740      P:000805 P:000807 440C00            MOVE              X0,X:<DTXS_WD2          ; echo command sent
+2741      P:000806 P:000808 44F400            MOVE              #'ERR',X0
+                            455252
+2742      P:000808 P:00080A 440D00            MOVE              X0,X:<DTXS_WD3          ; No Application Loaded
+2743      P:000809 P:00080B 44F400            MOVE              #'NAL',X0
+                            4E414C
+2744      P:00080B P:00080D 440E00            MOVE              X0,X:<DTXS_WD4          ; write to PCI memory error;
+2745      P:00080C P:00080E 0D0493            JSR     <RESTORE_REGISTERS
+2746      P:00080D P:00080F 0D047A            JSR     <PCI_MESSAGE_TO_HOST
+2747      P:00080E P:000810 0A0100            BCLR    #MODE_APPLICATION,X:<MODE
+2748      P:00080F P:000811 0C016E            JMP     PACKET_IN
+2749   
+2750   
+2751   
+2752                                          INCLUDE 'hacking.asm'
+2753                                                COMMENT *
+2754   
+2755                                        This implementation does communication with the host using PCI
+2756                                        master writes only.
+2757   
+2758                                        *
+2759                                          PAGE    132                               ; Printronix page width - 132 columns
+2760                                          OPT     CEX                               ; print DC evaluations
+2761   
+2762   
+2763                                HACK_ENTRY
+2764      
+2765      P:000810 P:000812 0A8985            JCLR    #DSR_HF2,X:DSR,HACK_EXIT
+                            000821
+2766   
+2767                                HACK_INIT
+2768      
+2769      P:000812 P:000814 0A8524            BSET    #DCTR_HF4,X:DCTR
+2770   
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  hacking.asm  Page 55
 
 
 
-2926      P:00092C P:00092E 0A8506            BCLR    #INTA,X:DCTR
-2927      P:00092D P:00092F 00000C            RTS
-2928   
-2932   
-2934      000001                    CMD_READ_P EQU    1
-2935      000002                    CMD_READ_X EQU    2
-2936      000003                    CMD_READ_Y EQU    3
-2937   
-2938                                 CMD_WRITE_P
-2939      000005                              EQU     5
-2940                                 CMD_WRITE_X
-2941      000006                              EQU     6
-2942                                 CMD_WRITE_Y
-2943      000007                              EQU     7
-2944   
-2945                                 CMD_SET_REP_BUF
-2946      000009                              EQU     9
-2947   
-2948                                 CMD_READ_CODED
-2949      000011                              EQU     $11
-2950                                 CMD_WRITE_CODED
-2951      000012                              EQU     $12
-2952   
-2953                                 CMD_SEND_MCE
-2954      000021                              EQU     $21
-2955   
-2956                                 CMD_SEND_STUFF
-2957      000031                              EQU     $31
-2958   
-2959      000065                    CMD_STATUS EQU    $65
-2960                                 CMD_RECV_MCE
-2961      000066                              EQU     $66
-2962   
-2963   
-2964   
-2965                                PROCESS_PC_CMD
-2966      
-2967      P:00092E P:000930 0A89A2            JSET    #SRRQ,X:DSR,PROCESS_PC_CMD_1
-                            000931
-2968      P:000930 P:000932 00000C            RTS
-2969   
-2970                                PROCESS_PC_CMD_1
-2971      
-2972      P:000931 P:000933 08440B            MOVEP             X:DRXR,X0
-2973      P:000932 P:000934 305100            MOVE              #CMD_SIZE,R0
-2974      P:000933 P:000935 0BF080            JSR     PROCESS_SPLIT_X0_XR0
-                            0009C9
-2975   
-2976      
-2977      P:000935 P:000937 200013            CLR     A
-2978      P:000936 P:000938 60F400            MOVE              #CMD_BUFFER,R0
-                            000100
-2979      P:000938 P:00093A 54F000            MOVE              X:CMD_SIZE,A1
-                            000051
-2980      
-2981      P:00093A P:00093C 014085            CMP     #0,A
-2982      P:00093B P:00093D 0AF0AA            JEQ     PROCESS_PC_CMD_2
-                            000944
-2983                                          .loop   A1
-2985      P:00093F P:000941 0A8982            JCLR    #SRRQ,X:DSR,*
-                            00093F
-2986      P:000941 P:000943 08588B            MOVEP             X:DRXR,X:(R0)+
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  hacking.asm  Page 59
-
-
-
-2987      P:000942 P:000944 000000            NOP
-2988      P:000943 P:000945 000000            NOP
-2989                                          .endl
-2991   
-2992                                PROCESS_PC_CMD_2
-2993      
-2994      P:000944 P:000946 57F000            MOVE              X:CMD_WORD,B
+2771      
+2772      P:000813 P:000815 200013            CLR     A
+2773      P:000814 P:000816 000000            NOP
+2774      P:000815 P:000817 507000            MOVE              A0,X:CMD_WORD
                             000052
-2995   
-2996      
-2997      P:000946 P:000948 60F000            MOVE              X:CMD_BUFFER,R0
-                            000100
-2998      P:000948 P:00094A 44F000            MOVE              X:(CMD_BUFFER+1),X0
-                            000101
-2999   
-3000      P:00094A P:00094C 01418D            CMP     #CMD_READ_P,B
-3001      P:00094B P:00094D 0AF0AA            JEQ     PROCESS_READ_P
-                            000966
-3002   
-3003      P:00094D P:00094F 01428D            CMP     #CMD_READ_X,B
-3004      P:00094E P:000950 0AF0AA            JEQ     PROCESS_READ_X
-                            000969
-3005   
-3006      P:000950 P:000952 01438D            CMP     #CMD_READ_Y,B
-3007      P:000951 P:000953 0AF0AA            JEQ     PROCESS_READ_Y
-                            00096C
-3008   
-3009      P:000953 P:000955 01458D            CMP     #CMD_WRITE_P,B
-3010      P:000954 P:000956 0AF0AA            JEQ     PROCESS_WRITE_P
-                            00097A
-3011   
-3012      P:000956 P:000958 01468D            CMP     #CMD_WRITE_X,B
-3013      P:000957 P:000959 0AF0AA            JEQ     PROCESS_WRITE_X
-                            00097D
-3014   
-3015      P:000959 P:00095B 01478D            CMP     #CMD_WRITE_Y,B
-3016      P:00095A P:00095C 0AF0AA            JEQ     PROCESS_WRITE_Y
-                            000980
-3017   
-3018      P:00095C P:00095E 01618D            CMP     #CMD_SEND_MCE,B
-3019      P:00095D P:00095F 0AF0AA            JEQ     PROCESS_SEND_MCE
-                            0009A2
-3020   
-3021      P:00095F P:000961 01498D            CMP     #CMD_SET_REP_BUF,B
-3022      P:000960 P:000962 0AF0AA            JEQ     PROCESS_SET_BUFFER
-                            000983
-3023   
-3024      P:000962 P:000964 01718D            CMP     #CMD_SEND_STUFF,B
-3025      P:000963 P:000965 0AF0AA            JEQ     PROCESS_SEND_STUFF
-                            000999
-3026   
-3027   
-3028      
-3029      P:000965 P:000967 00000C            RTS
-3030   
-3031                                PROCESS_READ_P
-3032      P:000966 P:000968 07E084            MOVE              P:(R0),X0
-3033      P:000967 P:000969 0AF080            JMP     PROCESS_READ_EXIT
-                            00096D
-3034                                PROCESS_READ_X
-3035      P:000969 P:00096B 44E000            MOVE              X:(R0),X0
-3036      P:00096A P:00096C 0AF080            JMP     PROCESS_READ_EXIT
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  hacking.asm  Page 60
-
-
-
-                            00096D
-3037                                PROCESS_READ_Y
-3038      P:00096C P:00096E 4CE000            MOVE                          Y:(R0),X0
-3039      
-3040      
-3041                                PROCESS_READ_EXIT
-3042      
-3043      P:00096D P:00096F 60F400            MOVE              #>REP_RPAYLOAD,R0
-                            000068
-3044      P:00096F P:000971 0BF080            JSR     PROCESS_SPLIT_X0_XR0
-                            0009C9
-3045      
-3046      P:000971 P:000973 44F000            MOVE              X:CMD_WORD,X0
-                            000052
-3047      P:000973 P:000975 447000            MOVE              X0,X:REP_RSTAT
-                            000066
-3048      P:000975 P:000977 44F400            MOVE              #>1,X0
-                            000001
-3049      P:000977 P:000979 447000            MOVE              X0,X:REP_RSIZE
-                            000067
-3050      P:000979 P:00097B 00000C            RTS
-3051   
-3052                                PROCESS_WRITE_P
-3053      P:00097A P:00097C 076084            MOVE              X0,P:(R0)
-3054      P:00097B P:00097D 0AF080            JMP     PROCESS_SIMPLE_EXIT
-                            0009B0
-3055                                PROCESS_WRITE_X
-3056      P:00097D P:00097F 446000            MOVE              X0,X:(R0)
-3057      P:00097E P:000980 0AF080            JMP     PROCESS_SIMPLE_EXIT
-                            0009B0
-3058                                PROCESS_WRITE_Y
-3059      P:000980 P:000982 4C6000            MOVE                          X0,Y:(R0)
-3060      P:000981 P:000983 0AF080            JMP     PROCESS_SIMPLE_EXIT
-                            0009B0
-3061   
-3062   
-3063                                PROCESS_SET_BUFFER
-3064      
-3065      
-3066      P:000983 P:000985 60F400            MOVE              #CMD_BUFFER,R0
-                            000100
-3067      P:000985 P:000987 315300            MOVE              #REP_BUS_ADDR,R1
-3068                                          .loop   #2
-3070      P:000988 P:00098A 44D800            MOVE              X:(R0)+,X0
-3071      P:000989 P:00098B 445900            MOVE              X0,X:(R1)+
-3072                                          .endl
-3074   
-3075      
-3076      P:00098A P:00098C 60F400            MOVE              #CMD_BUFFER,R0
-                            000100
-3077      P:00098C P:00098E 61F400            MOVE              #>$100,R1
-                            000100
-3078                                          .loop   #2
-3080      P:000990 P:000992 44D800            MOVE              X:(R0)+,X0
-3081      P:000991 P:000993 4C5900            MOVE                          X0,Y:(R1)+
-3082                                          .endl
-3084   
-3085      
-3086      P:000992 P:000994 44F400            MOVE              #>0,X0
-                            000000
-3087      P:000994 P:000996 447000            MOVE              X0,X:REP_RSTAT
-                            000066
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  hacking.asm  Page 61
-
-
-
-3088      P:000996 P:000998 447000            MOVE              X0,X:REP_RSIZE
-                            000067
-3089      P:000998 P:00099A 00000C            RTS
-3090   
-3091                                PROCESS_SEND_STUFF
-3092      
-3093      P:000999 P:00099B 0A7021            BSET    #1,X:TRIGGER_FAKE
+2775      P:000817 P:000819 507000            MOVE              A0,X:TRIGGER_FAKE
                             000050
-3094   
-3095      P:00099B P:00099D 44F400            MOVE              #>0,X0
+2776   
+2777      P:000819 P:00081B 0BF080            JSR     REPLY_BUFFER_INIT
+                            000823
+2778   
+2779      
+2780      
+2781      
+2782                                HACK_LOOP
+2783      
+2784      P:00081B P:00081D 0BF080            JSR     PROCESS_PC_CMD
+                            000922
+2785   
+2786      
+2787      P:00081D P:00081F 0B00A4            JSSET   #COMM_REP,X:STATUS,PROCESS_REPLY
+                            000900
+2788   
+2789      
+2790      
+2791   
+2792      
+2793      P:00081F P:000821 0A89A5            JSET    #DSR_HF2,X:DSR,HACK_LOOP
+                            00081B
+2794   
+2795                                HACK_EXIT
+2796      P:000821 P:000823 0A8504            BCLR    #DCTR_HF4,X:DCTR
+2797      P:000822 P:000824 00000C            RTS
+2798   
+2799   
+2803   
+2804   
+2805                                REPLY_BUFFER_INIT
+2806      
+2807      P:000823 P:000825 200013            CLR     A
+2808      P:000824 P:000826 60F400            MOVE              #>REP_BUFFER1,R0
+                            000058
+2809                                          .loop   #RB_SIZE
+2811      P:000828 P:00082A 505800            MOVE              A0,X:(R0)+
+2812                                          .endl
+2814      P:000829 P:00082B 44F400            MOVE              #>RB_VERSION,X0
+                            000001
+2815      P:00082B P:00082D 54F400            MOVE              #>RB_SIZE,A1
+                            000040
+2816      P:00082D P:00082F 447000            MOVE              X0,X:REP_VERSION
+                            000058
+2817      P:00082F P:000831 547000            MOVE              A1,X:REP_SIZE
+                            000059
+2818      P:000831 P:000833 0A0004            BCLR    #COMM_REP,X:STATUS
+2819      P:000832 P:000834 00000C            RTS
+2820   
+2821   
+2822                                ;----------------------------------------------
+2823                                BLOCK_TRANSFERX
+2824                                ;----------------------------------------------
+2825                                ;   In:
+2826                                ;   - BURST_DEST_HI:BURST_DEST_LO is PC RAM address (16:16)
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  hacking.asm  Page 56
+
+
+
+2827                                ;   - BLOCK_SIZE is packet size, in bytes
+2828                                ;   - XMEM_SRC is start of data in X memory
+2829                                ;  Out:
+2830                                ;   - BLOCK_SIZE will be decremented to zero.
+2831                                ;   - BURST_DEST_HI:LO will be incremented by BLOCK_SIZE
+2832                                ;   - XMEM_SRC will be incremented by BLOCK_SIZE/2
+2833                                ;  Trashes:
+2834                                ;   - A and B at least
+2835   
+2836      P:000833 P:000835 200013            CLR     A
+2837      P:000834 P:000836 56AB00            MOVE              X:BLOCK_SIZE,A          ; A1 = BLOCK_SIZE
+2838      P:000835 P:000837 014085            CMP     #0,A                              ; Still bytes to transfer?
+2839      P:000836 P:000838 0AF0A2            JNE     BLOCK_TRANSFERX0
+                            000839
+2840      P:000838 P:00083A 00000C            RTS
+2841   
+2842                                BLOCK_TRANSFERX0
+2843      
+2844      
+2845      P:000839 P:00083B 57A900            MOVE              X:PCI_BURST_SIZE,B      ; B1 = burst size (256)
+2846   
+2847      P:00083A P:00083C 200005            CMP     B,A                               ; A ? B
+2848      P:00083B P:00083D 0E183D            JGE     <BLOCK_TRANSFERX1                 ; jump if A >= B
+2849      P:00083C P:00083E 21CF00            MOVE              A,B                     ; This only moves A1,B1.
+2850                                BLOCK_TRANSFERX1
+2851      
+2852      P:00083D P:00083F 200014            SUB     B,A                               ; A -= B
+2853      P:00083E P:000840 014088            ADD     #0,B                              ; Clear carry bit
+2854      P:00083F P:000841 562B00            MOVE              A,X:BLOCK_SIZE          ; Updated BLOCK_SIZE
+2855      P:000840 P:000842 572A00            MOVE              B,X:BURST_SIZE          ; BURST_SIZE ;= round32(min(BLOCK_SIZE,$100)
+)
+2856      P:000841 P:000843 0C1CB3            ASR     #25,B,B                           ; B0 = # of 16 bit words
+2857   
+2858      
+2859      P:000842 P:000844 08F4AE            MOVEP             #DTXM,X:DDR0            ; DMA dest'n
+                            FFFFCC
+2860      P:000844 P:000846 50F000            MOVE              X:XMEM_SRC,A0
+                            000057
+2861      P:000846 P:000848 08C82F            MOVEP             A0,X:DSR0               ; DMA source
+2862      P:000847 P:000849 200010            ADD     B,A
+2863      P:000848 P:00084A 00000B            DEC     B
+2864      P:000849 P:00084B 507000            MOVE              A0,X:XMEM_SRC           ; BURST_SRC += BURST_SIZE/2
+                            000057
+2865   
+2866      P:00084B P:00084D 08C92D            MOVEP             B0,X:DCO0               ; DMA length = BURST_SIZE/2 - 1
+2867   
+2868      
+2869      P:00084C P:00084E 08F4AC            MOVEP             #$8EFA50,X:DCR0         ; X to X
+                            8EFA50
+2870   
+2871                                BLOCK_TRANSFERX_PCI
+2872      P:00084E P:000850 44F400            MOVE              #>$7,X0                 ; Memory write
+                            000007
+2873      P:000850 P:000852 302F00            MOVE              #BURST_DEST_LO,R0       ; RAM address
+2874      P:000851 P:000853 0D058D            JSR     PCI_GO                            ; Initiate PCI burst
+2875   
+2876      
+2877      P:000852 P:000854 0A8A84            JCLR    #MARQ,X:DPSR,*
+                            000852
+2878   
+2879      
+2880      P:000854 P:000856 0A8A8E            JCLR    #MDT,X:DPSR,BLOCK_TRANSFERX_HANDLE_ERRORS
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  hacking.asm  Page 57
+
+
+
+                            00085A
+2881   
+2882      P:000856 P:000858 20001B            CLR     B
+2883      P:000857 P:000859 51AA00            MOVE              X:BURST_SIZE,B0         ; All bytes were transferred
+2884      P:000858 P:00085A 0D06A1            JSR     ADD_HILO_ADDRESS                  ; Update source address
+2885      P:000859 P:00085B 0C0833            JMP     BLOCK_TRANSFERX                   ; Next burst in block
+2886   
+2887                                BLOCK_TRANSFERX_HANDLE_ERRORS
+2888      
+2889      P:00085A P:00085C 0D04BE            JSR     PCI_ERROR_CLEAR
+2890   
+2891      P:00085B P:00085D 0A0010            BCLR    #PCIDMA_RESTART,X:STATUS          ; Test and clear
+2892      P:00085C P:00085E 0E884E            JCS     BLOCK_TRANSFERX_PCI               ; Restart PCI burst
+2893   
+2894      P:00085D P:00085F 0A0011            BCLR    #PCIDMA_RESUME,X:STATUS           ; Test and clear
+2895      P:00085E P:000860 0E0833            JCC     BLOCK_TRANSFERX                   ; Error but no error? Redo this burst.
+2896   
+2897      
+2898      P:00085F P:000861 0D05A3            JSR     PCI_RECOVER_COUNT                 ; Get transferred byte count in A.
+2899      P:000860 P:000862 0D05B3            JSR     PCI_UPDATE_R0
+2900      P:000861 P:000863 0C084E            JMP     BLOCK_TRANSFERX_PCI
+2901   
+2902   
+2904      P:000900 P:000902                   ORG     P:$900,P:$902
+2905   
+2906                                PROCESS_REPLY
+2912   
+2914      
+2915      P:000900 P:000902 60F400            MOVE              #>REP_BUS_ADDR,R0
+                            000053
+2916      P:000902 P:000904 61F400            MOVE              #>BURST_DEST_LO,R1
+                            00002F
+2917                                          .loop   #2
+2919      P:000906 P:000908 44D800            MOVE              X:(R0)+,X0
+2920      P:000907 P:000909 445900            MOVE              X0,X:(R1)+
+2921                                          .endl
+2923   
+2924      
+2925      P:000908 P:00090A 44F400            MOVE              #>(RB_SIZE*2),X0
+                            000080
+2926      P:00090A P:00090C 442B00            MOVE              X0,X:BLOCK_SIZE
+2927      P:00090B P:00090D 44F400            MOVE              #>REP_BUFFER1,X0
+                            000058
+2928      P:00090D P:00090F 447000            MOVE              X0,X:XMEM_SRC
+                            000057
+2929   
+2930      
+2931      P:00090F P:000911 0D0833            JSR     BLOCK_TRANSFERX
+2932   
+2933      
+2934      P:000910 P:000912 0A0004            BCLR    #COMM_REP,X:STATUS
+2935      P:000911 P:000913 44F400            MOVE              #>0,X0
                             000000
-3096      P:00099D P:00099F 447000            MOVE              X0,X:REP_RSTAT
-                            000066
-3097      P:00099F P:0009A1 447000            MOVE              X0,X:REP_RSIZE
-                            000067
-3098      P:0009A1 P:0009A3 00000C            RTS
-3099   
-3100   
-3101                                PROCESS_SEND_MCE
-3102      
-3103      
-3104      
-3105      P:0009A2 P:0009A4 60F400            MOVE              #CMD_BUFFER,R0
-                            000100
-3106                                          .loop   #128
-3108      P:0009A6 P:0009A8 54D800            MOVE              X:(R0)+,A1              ; b2, b1  (lsb)
-3109      P:0009A7 P:0009A9 0C1C11            ASR     #8,A,B                            ; Shift b2 into B1
-3110      P:0009A8 P:0009AA 0140C6            AND     #>$FF,A
-                            0000FF
-3111      P:0009AA P:0009AC 547000            MOVE              A1,X:FO_SEND
-                            FFF000
-3112      P:0009AC P:0009AE 557000            MOVE              B1,X:FO_SEND
-                            FFF000
-3113                                          .endl
-3115      P:0009AE P:0009B0 0AF080            JMP     PROCESS_SIMPLE_EXIT
-                            0009B0
-3116   
-3117                                PROCESS_SIMPLE_EXIT
-3118      
-3119      P:0009B0 P:0009B2 44F000            MOVE              X:CMD_WORD,X0
+2936      P:000913 P:000915 44F000            MOVE              X:CMD_WORD,X0
                             000052
-3120      P:0009B2 P:0009B4 447000            MOVE              X0,X:REP_RSTAT
-                            000066
-3121      P:0009B4 P:0009B6 44F400            MOVE              #>0,X0
+2937      P:000915 P:000917 54F400            MOVE              #>1,A1
+                            000001
+2938      P:000917 P:000919 447000            MOVE              X0,X:REP_RSTAT          ; mark as sent!
+                            000068
+2939      P:000919 P:00091B 547000            MOVE              A1,X:REP_RSIZE
+                            000069
+2940   
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  hacking.asm  Page 58
+
+
+
+2941      
+2942      P:00091B P:00091D 0A8526            BSET    #INTA,X:DCTR
+2943   
+2944      P:00091C P:00091E 0A8983            JCLR    #DSR_HF0,X:DSR,*
+                            00091C
+2945      P:00091E P:000920 0A8506            BCLR    #INTA,X:DCTR
+2946   
+2947      P:00091F P:000921 0A89A3            JSET    #DSR_HF0,X:DSR,*
+                            00091F
+2948   
+2949      P:000921 P:000923 00000C            RTS
+2950   
+2951   
+2955   
+2957      000001                    CMD_READ_P EQU    1
+2958      000002                    CMD_READ_X EQU    2
+2959      000003                    CMD_READ_Y EQU    3
+2960   
+2961                                 CMD_WRITE_P
+2962      000005                              EQU     5
+2963                                 CMD_WRITE_X
+2964      000006                              EQU     6
+2965                                 CMD_WRITE_Y
+2966      000007                              EQU     7
+2967   
+2968                                 CMD_SET_REP_BUF
+2969      000009                              EQU     9
+2970                                 CMD_SET_DATA_BUF
+2971      00000A                              EQU     $A
+2972   
+2973   
+2974                                 CMD_READ_CODED
+2975      000011                              EQU     $11
+2976                                 CMD_WRITE_CODED
+2977      000012                              EQU     $12
+2978   
+2979                                 CMD_SEND_MCE
+2980      000021                              EQU     $21
+2981   
+2982                                 CMD_SEND_STUFF
+2983      000031                              EQU     $31
+2984   
+2985      000065                    CMD_STATUS EQU    $65
+2986                                 CMD_RECV_MCE
+2987      000066                              EQU     $66
+2988   
+2989   
+2990   
+2991                                PROCESS_PC_CMD
+2992      
+2993      P:000922 P:000924 0A89A2            JSET    #SRRQ,X:DSR,PROCESS_PC_CMD_1
+                            000925
+2994      P:000924 P:000926 00000C            RTS
+2995   
+2996                                PROCESS_PC_CMD_1
+2997      
+2998      P:000925 P:000927 08440B            MOVEP             X:DRXR,X0
+2999      P:000926 P:000928 305100            MOVE              #CMD_SIZE,R0
+3000      P:000927 P:000929 0BF080            JSR     PROCESS_SPLIT_X0_XR0
+                            0009D0
+3001   
+3002      
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  hacking.asm  Page 59
+
+
+
+3003      P:000929 P:00092B 200013            CLR     A
+3004      P:00092A P:00092C 60F400            MOVE              #CMD_BUFFER,R0
+                            000100
+3005      P:00092C P:00092E 54F000            MOVE              X:CMD_SIZE,A1
+                            000051
+3006      
+3007      P:00092E P:000930 014085            CMP     #0,A
+3008      P:00092F P:000931 0AF0AA            JEQ     PROCESS_PC_CMD_2
+                            000938
+3009                                          .loop   A1
+3011      P:000933 P:000935 0A8982            JCLR    #SRRQ,X:DSR,*
+                            000933
+3012      P:000935 P:000937 08588B            MOVEP             X:DRXR,X:(R0)+
+3013      P:000936 P:000938 000000            NOP
+3014      P:000937 P:000939 000000            NOP
+3015                                          .endl
+3017   
+3018                                PROCESS_PC_CMD_2
+3019      
+3020      P:000938 P:00093A 54F400            MOVE              #>RB_TYPE_DSP_REP,A1
+                            000001
+3021      P:00093A P:00093C 57F000            MOVE              X:CMD_WORD,B
+                            000052
+3022      P:00093C P:00093E 547000            MOVE              A1,X:REP_TYPE           ; type is "dsp reply"
+                            00005A
+3023      P:00093E P:000940 557000            MOVE              B1,X:REP_RCMD           ; copy of command word
+                            00006A
+3024      P:000940 P:000942 517000            MOVE              B0,X:REP_RSTAT          ; status = 0
+                            000068
+3025      P:000942 P:000944 517000            MOVE              B0,X:REP_RSIZE          ; data size = 0
+                            000069
+3026   
+3027      
+3028   
+3029      
+3030      P:000944 P:000946 60F000            MOVE              X:CMD_BUFFER,R0
+                            000100
+3031      P:000946 P:000948 44F000            MOVE              X:(CMD_BUFFER+1),X0
+                            000101
+3032   
+3033      P:000948 P:00094A 01418D            CMP     #CMD_READ_P,B
+3034      P:000949 P:00094B 0AF0AA            JEQ     PROCESS_READ_P
+                            000967
+3035   
+3036      P:00094B P:00094D 01428D            CMP     #CMD_READ_X,B
+3037      P:00094C P:00094E 0AF0AA            JEQ     PROCESS_READ_X
+                            00096A
+3038   
+3039      P:00094E P:000950 01438D            CMP     #CMD_READ_Y,B
+3040      P:00094F P:000951 0AF0AA            JEQ     PROCESS_READ_Y
+                            00096D
+3041   
+3042      P:000951 P:000953 01458D            CMP     #CMD_WRITE_P,B
+3043      P:000952 P:000954 0AF0AA            JEQ     PROCESS_WRITE_P
+                            00097A
+3044   
+3045      P:000954 P:000956 01468D            CMP     #CMD_WRITE_X,B
+3046      P:000955 P:000957 0AF0AA            JEQ     PROCESS_WRITE_X
+                            00097D
+3047   
+3048      P:000957 P:000959 01478D            CMP     #CMD_WRITE_Y,B
+3049      P:000958 P:00095A 0AF0AA            JEQ     PROCESS_WRITE_Y
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  hacking.asm  Page 60
+
+
+
+                            000980
+3050   
+3051      P:00095A P:00095C 01618D            CMP     #CMD_SEND_MCE,B
+3052      P:00095B P:00095D 0AF0AA            JEQ     PROCESS_SEND_MCE
+                            0009B0
+3053   
+3054      P:00095D P:00095F 01498D            CMP     #CMD_SET_REP_BUF,B
+3055      P:00095E P:000960 0AF0AA            JEQ     PROCESS_SET_REP_BUFFER
+                            000983
+3056   
+3057      P:000960 P:000962 01498D            CMP     #CMD_SET_REP_BUF,B
+3058      P:000961 P:000963 0AF0AA            JEQ     PROCESS_SET_DATA_BUFFER
+                            000999
+3059   
+3060      P:000963 P:000965 01718D            CMP     #CMD_SEND_STUFF,B
+3061      P:000964 P:000966 0AF0AA            JEQ     PROCESS_SEND_STUFF
+                            0009A7
+3062   
+3063   
+3064      
+3065      P:000966 P:000968 00000C            RTS
+3066   
+3067                                PROCESS_READ_P
+3068      P:000967 P:000969 07E084            MOVE              P:(R0),X0
+3069      P:000968 P:00096A 0AF080            JMP     PROCESS_READ_EXIT
+                            000970
+3070                                PROCESS_READ_X
+3071      P:00096A P:00096C 44E000            MOVE              X:(R0),X0
+3072      P:00096B P:00096D 0AF080            JMP     PROCESS_READ_EXIT
+                            000970
+3073                                PROCESS_READ_Y
+3074      P:00096D P:00096F 4CE000            MOVE                          Y:(R0),X0
+3075      P:00096E P:000970 0AF080            JMP     PROCESS_READ_EXIT
+                            000970
+3076   
+3077                                PROCESS_READ_EXIT
+3078      
+3079      P:000970 P:000972 60F400            MOVE              #>REP_RPAYLOAD,R0
+                            00006C
+3080      P:000972 P:000974 0BF080            JSR     PROCESS_SPLIT_X0_XR0
+                            0009D0
+3081      
+3082      P:000974 P:000976 44F400            MOVE              #>1,X0
+                            000001
+3083      P:000976 P:000978 447000            MOVE              X0,X:REP_RSIZE
+                            000069
+3084      
+3085      P:000978 P:00097A 0A0024            BSET    #COMM_REP,X:STATUS
+3086      P:000979 P:00097B 00000C            RTS
+3087   
+3088                                PROCESS_WRITE_P
+3089      P:00097A P:00097C 076084            MOVE              X0,P:(R0)
+3090      P:00097B P:00097D 0AF080            JMP     PROCESS_SIMPLE_EXIT
+                            0009BE
+3091                                PROCESS_WRITE_X
+3092      P:00097D P:00097F 446000            MOVE              X0,X:(R0)
+3093      P:00097E P:000980 0AF080            JMP     PROCESS_SIMPLE_EXIT
+                            0009BE
+3094                                PROCESS_WRITE_Y
+3095      P:000980 P:000982 4C6000            MOVE                          X0,Y:(R0)
+3096      P:000981 P:000983 0AF080            JMP     PROCESS_SIMPLE_EXIT
+                            0009BE
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  hacking.asm  Page 61
+
+
+
+3097   
+3098   
+3099                                PROCESS_SET_REP_BUFFER
+3100      
+3101      
+3102      P:000983 P:000985 60F400            MOVE              #CMD_BUFFER,R0
+                            000100
+3103      P:000985 P:000987 315300            MOVE              #REP_BUS_ADDR,R1
+3104                                          .loop   #2
+3106      P:000988 P:00098A 44D800            MOVE              X:(R0)+,X0
+3107      P:000989 P:00098B 445900            MOVE              X0,X:(R1)+
+3108                                          .endl
+3110   
+3111      
+3112      P:00098A P:00098C 60F400            MOVE              #CMD_BUFFER,R0
+                            000100
+3113      P:00098C P:00098E 61F400            MOVE              #>$100,R1
+                            000100
+3114                                          .loop   #2
+3116      P:000990 P:000992 44D800            MOVE              X:(R0)+,X0
+3117      P:000991 P:000993 4C5900            MOVE                          X0,Y:(R1)+
+3118                                          .endl
+3120   
+3121      
+3122      P:000992 P:000994 44F400            MOVE              #>0,X0
                             000000
-3122      P:0009B6 P:0009B8 447000            MOVE              X0,X:REP_RSIZE
-                            000067
-3123      P:0009B8 P:0009BA 00000C            RTS
-3124   
-3125   
-3126                                OLD_PROCESS_SPLIT_X0_XR0
-3127      
+3123      P:000994 P:000996 447000            MOVE              X0,X:REP_RSTAT
+                            000068
+3124      P:000996 P:000998 447000            MOVE              X0,X:REP_RSIZE
+                            000069
+3125      P:000998 P:00099A 00000C            RTS
+3126   
+3127                                PROCESS_SET_DATA_BUFFER
 3128      
-3129      P:0009B9 P:0009BB 208800            MOVE              X0,A0
-3130      P:0009BA P:0009BC 0C1881            EXTRACTU #$008010,A,B                     ; Put
-                            008010
-3131      P:0009BC P:0009BE 0C1880            EXTRACTU #$010000,A,A
-                            010000
-3132      P:0009BE P:0009C0 515800            MOVE              B0,X:(R0)+
-3133      P:0009BF P:0009C1 505800            MOVE              A0,X:(R0)+
-3134      P:0009C0 P:0009C2 00000C            RTS
-3135   
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  hacking.asm  Page 62
+3129      
+3130      P:000999 P:00099B 60F400            MOVE              #CMD_BUFFER,R0
+                            000100
+3131      P:00099B P:00099D 315500            MOVE              #DATA_BUS_ADDR,R1
+3132                                          .loop   #2
+3134      P:00099E P:0009A0 44D800            MOVE              X:(R0)+,X0
+3135      P:00099F P:0009A1 445900            MOVE              X0,X:(R1)+
+3136                                          .endl
+3138   
+3139      
+3140      P:0009A0 P:0009A2 44F400            MOVE              #>0,X0
+                            000000
+3141      P:0009A2 P:0009A4 447000            MOVE              X0,X:REP_RSTAT
+                            000068
+3142      P:0009A4 P:0009A6 447000            MOVE              X0,X:REP_RSIZE
+                            000069
+3143      P:0009A6 P:0009A8 00000C            RTS
+3144   
+3145                                PROCESS_SEND_STUFF
+3146      
+3147      P:0009A7 P:0009A9 0A7021            BSET    #1,X:TRIGGER_FAKE
+                            000050
+3148   
+3149      P:0009A9 P:0009AB 44F400            MOVE              #>0,X0
+                            000000
+3150      P:0009AB P:0009AD 447000            MOVE              X0,X:REP_RSTAT
+                            000068
+3151      P:0009AD P:0009AF 447000            MOVE              X0,X:REP_RSIZE
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  hacking.asm  Page 62
 
 
 
-3136                                OLD_PROCESS_SPLIT_X0_YR0
-3137      
-3138      
-3139      P:0009C1 P:0009C3 208800            MOVE              X0,A0
-3140      P:0009C2 P:0009C4 0C1881            EXTRACTU #$008010,A,B                     ; Put
-                            008010
-3141      P:0009C4 P:0009C6 0C1880            EXTRACTU #$010000,A,A
-                            010000
-3142      P:0009C6 P:0009C8 595800            MOVE                          B0,Y:(R0)+
-3143      P:0009C7 P:0009C9 585800            MOVE                          A0,Y:(R0)+
-3144      P:0009C8 P:0009CA 00000C            RTS
-3145   
-3146                                PROCESS_SPLIT_X0_XR0
-3147      
-3148      
-3149      P:0009C9 P:0009CB 208800            MOVE              X0,A0
-3150      P:0009CA P:0009CC 0C1881            EXTRACTU #$010000,A,B
-                            010000
-3151      P:0009CC P:0009CE 0C1880            EXTRACTU #$008010,A,A                     ; Put
-                            008010
-3152      P:0009CE P:0009D0 515800            MOVE              B0,X:(R0)+
-3153      P:0009CF P:0009D1 505800            MOVE              A0,X:(R0)+
-3154      P:0009D0 P:0009D2 00000C            RTS
-3155   
-3156                                PROCESS_SPLIT_X0_YR0
+                            000069
+3152      P:0009AF P:0009B1 00000C            RTS
+3153   
+3154   
+3155                                PROCESS_SEND_MCE
+3156      
 3157      
 3158      
-3159      P:0009D1 P:0009D3 208800            MOVE              X0,A0
-3160      P:0009D2 P:0009D4 0C1881            EXTRACTU #$010000,A,B
-                            010000
-3161      P:0009D4 P:0009D6 0C1880            EXTRACTU #$008010,A,A                     ; Put
+3159      P:0009B0 P:0009B2 60F400            MOVE              #CMD_BUFFER,R0
+                            000100
+3160                                          .loop   #128
+3162      P:0009B4 P:0009B6 54D800            MOVE              X:(R0)+,A1              ; b2, b1  (lsb)
+3163      P:0009B5 P:0009B7 0C1C11            ASR     #8,A,B                            ; Shift b2 into B1
+3164      P:0009B6 P:0009B8 0140C6            AND     #>$FF,A
+                            0000FF
+3165      P:0009B8 P:0009BA 547000            MOVE              A1,X:FO_SEND
+                            FFF000
+3166      P:0009BA P:0009BC 557000            MOVE              B1,X:FO_SEND
+                            FFF000
+3167                                          .endl
+3169      P:0009BC P:0009BE 0AF080            JMP     PROCESS_SIMPLE_EXIT
+                            0009BE
+3170   
+3171                                PROCESS_SIMPLE_EXIT
+3172      
+3173      P:0009BE P:0009C0 0A0024            BSET    #COMM_REP,X:STATUS
+3174      P:0009BF P:0009C1 00000C            RTS
+3175   
+3176   
+3177                                OLD_PROCESS_SPLIT_X0_XR0
+3178      
+3179      
+3180      P:0009C0 P:0009C2 208800            MOVE              X0,A0
+3181      P:0009C1 P:0009C3 0C1881            EXTRACTU #$008010,A,B                     ; Put
                             008010
-3162      P:0009D6 P:0009D8 595800            MOVE                          B0,Y:(R0)+
-3163      P:0009D7 P:0009D9 585800            MOVE                          A0,Y:(R0)+
-3164      P:0009D8 P:0009DA 00000C            RTS
-3165   
-3166   
-3167   
-3171   
-3172                                FAKE_PACKET
-3173      P:0009D9 P:0009DB 200013            CLR     A
-3174      P:0009DA P:0009DC 54F000            MOVE              X:TRIGGER_FAKE,A1
-                            000050
-3175      P:0009DC P:0009DE 014085            CMP     #0,A
-3176      P:0009DD P:0009DF 0AF0AA            JEQ     FAKE_PACKET_2
-                            0009F5
-3177   
-3179      P:0009DF P:0009E1 0D0907            JSR     PROCESS_REPLY_1
-3180      P:0009E0 P:0009E2 44F400            MOVE              #>0,X0
-                            000000
-3181      P:0009E2 P:0009E4 447000            MOVE              X0,X:TRIGGER_FAKE
-                            000050
-3182      P:0009E4 P:0009E6 00000C            RTS
-3183   
-3184      
-3185      P:0009E5 P:0009E7 60F400            MOVE              #>REP_BUS_ADDR,R0
-                            000053
-3186      P:0009E7 P:0009E9 61F400            MOVE              #>BURST_DEST_LO,R1
-                            00002F
-3187                                          .loop   #2
-3189      P:0009EB P:0009ED 44D800            MOVE              X:(R0)+,X0
-3190      P:0009EC P:0009EE 445900            MOVE              X0,X:(R1)+
-Motorola DSP56300 Assembler  Version 6.3.4   13-05-20  12:47:42  hacking.asm  Page 63
-
-
-
-3191                                          .endl
-3193   
-3194      P:0009ED P:0009EF 44F400            MOVE              #>(REP_BUFFER_SIZE*2),X0
-                            000080
-3195      P:0009EF P:0009F1 442B00            MOVE              X0,X:BLOCK_SIZE
-3196      P:0009F0 P:0009F2 44F400            MOVE              #>REP_BUFFER1,X0
-                            000056
-3197      P:0009F2 P:0009F4 447000            MOVE              X0,X:XMEM_SRC
-                            000055
-3198   
+3182      P:0009C3 P:0009C5 0C1880            EXTRACTU #$010000,A,A
+                            010000
+3183      P:0009C5 P:0009C7 515800            MOVE              B0,X:(R0)+
+3184      P:0009C6 P:0009C8 505800            MOVE              A0,X:(R0)+
+3185      P:0009C7 P:0009C9 00000C            RTS
+3186   
+3187                                OLD_PROCESS_SPLIT_X0_YR0
+3188      
+3189      
+3190      P:0009C8 P:0009CA 208800            MOVE              X0,A0
+3191      P:0009C9 P:0009CB 0C1881            EXTRACTU #$008010,A,B                     ; Put
+                            008010
+3192      P:0009CB P:0009CD 0C1880            EXTRACTU #$010000,A,A
+                            010000
+3193      P:0009CD P:0009CF 595800            MOVE                          B0,Y:(R0)+
+3194      P:0009CE P:0009D0 585800            MOVE                          A0,Y:(R0)+
+3195      P:0009CF P:0009D1 00000C            RTS
+3196   
+3197                                PROCESS_SPLIT_X0_XR0
+3198      
 3199      
-3200      P:0009F4 P:0009F6 0D082F            JSR     BLOCK_TRANSFERX
-3201                                FAKE_PACKET_2
-3202      P:0009F5 P:0009F7 00000C            RTS
-3203   
-3204   
-3205                                DEBUG_UP
-3206      P:0009F6 P:0009F8 0A8525            BSET    #DCTR_HF5,X:DCTR
-3207      P:0009F7 P:0009F9 00000C            RTS
-3208   
-3209                                DEBUG_DOWN
-3210      P:0009F8 P:0009FA 0A8505            BCLR    #DCTR_HF5,X:DCTR
-3211      P:0009F9 P:0009FB 00000C            RTS
-3212   
-3213      0009FC                    END_ADR   EQU     @LCV(L)                           ; End address of P: code written to ROM
+3200      P:0009D0 P:0009D2 208800            MOVE              X0,A0
+3201      P:0009D1 P:0009D3 0C1881            EXTRACTU #$010000,A,B
+                            010000
+3202      P:0009D3 P:0009D5 0C1880            EXTRACTU #$008010,A,A                     ; Put
+                            008010
+3203      P:0009D5 P:0009D7 515800            MOVE              B0,X:(R0)+
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  hacking.asm  Page 63
+
+
+
+3204      P:0009D6 P:0009D8 505800            MOVE              A0,X:(R0)+
+3205      P:0009D7 P:0009D9 00000C            RTS
+3206   
+3207                                PROCESS_SPLIT_X0_YR0
+3208      
+3209      
+3210      P:0009D8 P:0009DA 208800            MOVE              X0,A0
+3211      P:0009D9 P:0009DB 0C1881            EXTRACTU #$010000,A,B
+                            010000
+3212      P:0009DB P:0009DD 0C1880            EXTRACTU #$008010,A,A                     ; Put
+                            008010
+3213      P:0009DD P:0009DF 595800            MOVE                          B0,Y:(R0)+
+3214      P:0009DE P:0009E0 585800            MOVE                          A0,Y:(R0)+
+3215      P:0009DF P:0009E1 00000C            RTS
+3216   
+3217   
+3218   
+3223   
+3224                                FAKE_PACKET
+3225      P:0009E0 P:0009E2 200013            CLR     A
+3226      P:0009E1 P:0009E3 54F000            MOVE              X:TRIGGER_FAKE,A1
+                            000050
+3227      P:0009E3 P:0009E5 014085            CMP     #0,A
+3228      P:0009E4 P:0009E6 0AF0AA            JEQ     FAKE_PACKET_2
+                            0009FC
+3229   
+3231      P:0009E6 P:0009E8 0D0900            JSR     PROCESS_REPLY
+3232      P:0009E7 P:0009E9 44F400            MOVE              #>0,X0
+                            000000
+3233      P:0009E9 P:0009EB 447000            MOVE              X0,X:TRIGGER_FAKE
+                            000050
+3234      P:0009EB P:0009ED 00000C            RTS
+3235   
+3236      
+3237      P:0009EC P:0009EE 60F400            MOVE              #>REP_BUS_ADDR,R0
+                            000053
+3238      P:0009EE P:0009F0 61F400            MOVE              #>BURST_DEST_LO,R1
+                            00002F
+3239                                          .loop   #2
+3241      P:0009F2 P:0009F4 44D800            MOVE              X:(R0)+,X0
+3242      P:0009F3 P:0009F5 445900            MOVE              X0,X:(R1)+
+3243                                          .endl
+3245   
+3246      P:0009F4 P:0009F6 44F400            MOVE              #>(RB_SIZE*2),X0
+                            000080
+3247      P:0009F6 P:0009F8 442B00            MOVE              X0,X:BLOCK_SIZE
+3248      P:0009F7 P:0009F9 44F400            MOVE              #>REP_BUFFER1,X0
+                            000058
+3249      P:0009F9 P:0009FB 447000            MOVE              X0,X:XMEM_SRC
+                            000057
+3250   
+3251      
+3252      P:0009FB P:0009FD 0D0833            JSR     BLOCK_TRANSFERX
+3253                                FAKE_PACKET_2
+3254      P:0009FC P:0009FE 00000C            RTS
+3255   
+3256   
+3257                                DEBUG_UP
+3258      P:0009FD P:0009FF 0A8525            BSET    #DCTR_HF5,X:DCTR
+3259      P:0009FE P:000A00 00000C            RTS
+3260   
+3261                                DEBUG_DOWN
+Motorola DSP56300 Assembler  Version 6.3.4   13-05-21  13:28:43  hacking.asm  Page 64
+
+
+
+3262      P:0009FF P:000A01 0A8505            BCLR    #DCTR_HF5,X:DCTR
+3263      P:000A00 P:000A02 00000C            RTS
+3264   
+3265      000A03                    END_ADR   EQU     @LCV(L)                           ; End address of P: code written to ROM
 
 0    Errors
 3    Warnings

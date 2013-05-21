@@ -170,6 +170,11 @@ CMD_SIZE		DC	0
 CMD_WORD		DC	0
 
 REP_BUS_ADDR		DC	0,0
+DATA_BUS_ADDR		DC	0,0
+	
+;;; Bits in STATUS... watch for conflicts.
+COMM_REP		EQU	4 ; Reply needs to be sent
+	
 	
 XMEM_SRC		DC	0
 	
@@ -181,19 +186,29 @@ CMD_BUFFER 		EQU	$100
 ;;;  whenever the DSP needs to provide a command reply or other information
 ;;;  (e.g. not notify of some event...).
 ;;; 
-REP_BUFFER_SIZE		EQU	64 ; This MUST be even, so that effective number
+
+RB_SIZE			EQU	64 ; This MUST be even, so that effective number
 				   ; of 32-bit words is integral
-REP_BUFFER1		DS	REP_BUFFER_SIZE
-
-RB_VERSION		EQU	0
-RB_SIZE			EQU	1
-RB_DATA			EQU	16
-
-;;; Aliases into the RB_DATA sub-structure
-REP_RSTAT		EQU	REP_BUFFER1+RB_DATA
-REP_RSIZE		EQU	REP_BUFFER1+RB_DATA+1
-REP_RPAYLOAD		EQU	REP_BUFFER1+RB_DATA+2
 	
+RB_VERSION		EQU	1  ; Version of this datagram
+RB_TYPE_DSP_REP		EQU     1  ;
+RB_TYPE_MCE_REP		EQU     2  ;
+RB_TYPE_DATA_INF	EQU     3  ;
+
+;;; The actualy buffer storage.
+REP_BUFFER1		DS	RB_SIZE
+
+;;; Aliases into the structure.
+REP_VERSION		EQU	REP_BUFFER1+0  ;
+REP_SIZE		EQU	REP_BUFFER1+1  ;
+REP_TYPE		EQU	REP_BUFFER1+2  ;
+REP_DATA		EQU	REP_BUFFER1+16 ; Start of DSP or MCE reply data
+;;; For DSP reply packets:
+REP_RSTAT		EQU	REP_DATA+0
+REP_RSIZE		EQU	REP_DATA+1
+REP_RCMD		EQU	REP_DATA+2
+REP_RPAYLOAD		EQU	REP_DATA+4
+
 
 	
 ;----------------------------------------------------------

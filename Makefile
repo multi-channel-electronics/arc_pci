@@ -19,8 +19,8 @@ ASM_FLAGS=-dDOWNLOAD ROM
 #default: $(TARGET).s
 default: patch
 
-patch: $(TARGET).s
-	python ../../tools/live_patch.py | tee patch
+patch: $(TARGET).lod
+	python ../../tools/live_patch.py | tee patch || ( rm patch && false )
 
 build.clb: header.asm init.asm main.asm build.asm vars.asm app.asm info.asm \
 	 hacking.asm
