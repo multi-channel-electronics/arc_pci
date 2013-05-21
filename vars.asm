@@ -174,7 +174,7 @@ DATA_BUS_ADDR		DC	0,0
 	
 ;;; Bits in STATUS... watch for conflicts.
 COMM_REP		EQU	4 ; Reply needs to be sent
-	
+COMM_CMD		EQU	7 ; Command needs to be processed
 	
 XMEM_SRC		DC	0
 	

@@ -88,11 +88,18 @@ INIT_PCI
 	MOVE	P:(*+3),X0		; Trick to write "JMP <START" to P:0
 	MOVE	X0,P:(0)
 	JMP	<START
-
+	
 	DC	0,0,0,0,0,0,0,0,0,0,0,0		; Filler
 	DC	0,0,0,0,0,0,0,0,0,0,0,0		; Filler
-	DC	0,0,0,0,0,0,0,0,0,0,0,0		; $60-$71 Reserved PCI
-
+	;; DC	0,0,0,0,0,0,0,0,0,0,0,0		; $60-$71 Reserved PCI
+	DC	0,0,0,0,0,0,0,0,0,0,0
+	
+	;; ORG	P:$6A,P:$6C
+	;; IF	@SCP("DOWNLOAD","ONCE")		; Download via ONCE debugger
+	;; ORG	P:$6A,P:$6A
+	;; ENDIF
+	JSR	PROCESS_PC_CMD_INT             ; PCI slave req vector
+	
 ;**************************************************************************
 ; Check for program space overwriting of ISR starting at P:$72
        IF      @CVS(N,*)>$71

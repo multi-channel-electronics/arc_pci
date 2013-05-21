@@ -11,7 +11,7 @@
 HACK_ENTRY
 	;; Only enter if HF2 is high.
 	JCLR	#DSR_HF2,X:DSR,HACK_EXIT
-		
+	
 HACK_INIT	
 	;; Set bit to indicate to host that we're in this loop.
 	BSET	#DCTR_HF4,X:DCTR
@@ -24,12 +24,22 @@ HACK_INIT
 
 	JSR	REPLY_BUFFER_INIT
 	
+	;; hacking storage
+	MOVE	#>TIMER_BUFFER_END,X0
+	MOVE	X0,Y:TIMER_BUFFER_END
+	
+	;; Enable PCI slave receive interrupt to handle commands from host
+	BSET	#DCTR_SRIE,X:DCTR
+	
 	;;
 	;; Main loop
 	;; 
 HACK_LOOP
 	;; Check for command from PC.  Sets CMD_WORD.
-	JSR	PROCESS_PC_CMD
+;;; Polling:
+	;; JSR	PROCESS_PC_CMD
+;;; Interrupt driven
+	JSSET 	#COMM_CMD,X:STATUS,PROCESS_PC_CMD_2
 
 	;; Should we send a reply?
 	JSSET	#COMM_REP,X:STATUS,PROCESS_REPLY
@@ -41,6 +51,9 @@ HACK_LOOP
 	JSET	#DSR_HF2,X:DSR,HACK_LOOP
 	
 HACK_EXIT
+	;; Disable PCI slave receive interrupt
+	BCLR	#DCTR_SRIE,X:DCTR
+	
 	BCLR	#DCTR_HF4,X:DCTR
 	RTS
 	
@@ -221,7 +234,44 @@ CMD_STATUS		EQU	$65
 CMD_RECV_MCE		EQU	$66
 
 
+PROCESS_PC_CMD_INT
+	;; Push all and disable further SRRQ ints
+	JSR	SAVE_REGISTERS
+	BCLR	#DCTR_SRIE,X:DCTR
 
+	;; Is there data?
+	JCLR	#SRRQ,X:DSR,PROCESS_PC_CMD_INT_EXIT
+	
+	;; Ok, you asked for it.
+	;; Read the command word (cmd|length)
+	MOVEP	X:DRXR,X0
+	MOVE	#CMD_SIZE,R0
+	JSR	PROCESS_SPLIT_X0_XR0
+	
+	;; Read the packet data into a buffer.
+	CLR	A
+	MOVE	#CMD_BUFFER,R0
+	MOVE	X:CMD_SIZE,A1
+	;; Don't call .loop with 0 argument!
+	CMP	#0,A
+	JEQ	PROCESS_PC_CMD_INT_OK
+	.loop	A1
+	JCLR	#SRRQ,X:DSR,*
+	MOVEP	X:DRXR,X:(R0)+
+	NOP
+	NOP
+	.endl
+	
+PROCESS_PC_CMD_INT_OK
+	BSET	#COMM_CMD,X:STATUS
+
+PROCESS_PC_CMD_INT_EXIT	
+	;; Re-enable int and pop all
+	BSET	#DCTR_SRIE,X:DCTR
+	JSR	RESTORE_REGISTERS
+	RTI
+	
+	
 PROCESS_PC_CMD
 	;; Is there data?
 	JSET	#SRRQ,X:DSR,PROCESS_PC_CMD_1
@@ -314,6 +364,7 @@ PROCESS_READ_EXIT
 	MOVE	#>1,X0
 	MOVE	X0,X:REP_RSIZE
 	;; Mark reply-to-send
+	BCLR	#COMM_CMD,X:STATUS
 	BSET	#COMM_REP,X:STATUS
 	RTS
 
@@ -350,6 +401,7 @@ PROCESS_SET_REP_BUFFER
 	MOVE	#>0,X0
 	MOVE	X0,X:REP_RSTAT
 	MOVE	X0,X:REP_RSIZE
+	BCLR	#COMM_CMD,X:STATUS
 	RTS
 
 PROCESS_SET_DATA_BUFFER
@@ -366,6 +418,7 @@ PROCESS_SET_DATA_BUFFER
 	MOVE	#>0,X0
 	MOVE	X0,X:REP_RSTAT
 	MOVE	X0,X:REP_RSIZE
+	BCLR	#COMM_CMD,X:STATUS
 	RTS
 
 PROCESS_SEND_STUFF
@@ -394,30 +447,11 @@ PROCESS_SEND_MCE
 
 PROCESS_SIMPLE_EXIT
 	;; Mark reply-to-send
+	BCLR	#COMM_CMD,X:STATUS
 	BSET	#COMM_REP,X:STATUS
 	RTS
 
-
-OLD_PROCESS_SPLIT_X0_XR0
-	;; Split the 24-bit contents in X0 into 8: and :16 bits, placed into
-	;; X:R0 and R0+1 resp.  Advances R0 accordingly.  Trashes A,B.
-	MOVE	X0,A0
-	EXTRACTU #$008010,A,B	; Put
-	EXTRACTU #$010000,A,A
-	MOVE	B0,X:(R0)+
-	MOVE	A0,X:(R0)+
-	RTS
-
-OLD_PROCESS_SPLIT_X0_YR0
-	;; Split the 24-bit contents in X0 into 8: and :16 bits, placed into
-	;; X:R0 and R0+1 resp.  Advances R0 accordingly.  Trashes A,B.
-	MOVE	X0,A0
-	EXTRACTU #$008010,A,B	; Put
-	EXTRACTU #$010000,A,A
-	MOVE	B0,Y:(R0)+
-	MOVE	A0,Y:(R0)+
-	RTS
-
+	
 PROCESS_SPLIT_X0_XR0
 	;; Split the 24-bit contents in X0 into 8: and :16 bits, placed into
 	;; X:R0 and R0+1 resp.  Advances R0 accordingly.  Trashes A,B.

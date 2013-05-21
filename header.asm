@@ -102,6 +102,7 @@ DCR0	EQU	$FFFFEC		; Control register
 
 ; DCTR bits
 DCTR_HCIE	EQU	0 	; Interrupt enable
+DCTR_SRIE	EQU	2	; Slave request interrupt enable
 DCTR_HF3	EQU	3	; Semaphore for INTA handshaking
 DCTR_HF4  	EQU	4	; 
 DCTR_HF5  	EQU	5	; 
