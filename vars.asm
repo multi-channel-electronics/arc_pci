@@ -175,6 +175,7 @@ DATA_BUS_ADDR		DC	0,0
 ;;; Bits in STATUS... watch for conflicts.
 COMM_REP		EQU	4 ; Reply needs to be sent
 COMM_CMD		EQU	7 ; Command needs to be processed
+COMM_ERR		EQU	5 ; Command not recognized or whatever
 	
 XMEM_SRC		DC	0
 	
@@ -209,7 +210,17 @@ REP_RSIZE		EQU	REP_DATA+1
 REP_RCMD		EQU	REP_DATA+2
 REP_RPAYLOAD		EQU	REP_DATA+4
 
+	
+DEBUG_BUF		EQU 	$2000
 
+;;; 
+;;; Large circular buffer for frame and reply data from MCE.
+;;; 
+CIRCBUF_HEAD		DC	0 ; Write index
+CIRCBUF_TAIL		DC	0 ; Read  index
+CIRCBUF_START		EQU	0 ; Buffer start in Y mem.
+CIRCBUF_SIZE		EQU	$100000	; 1 million locations = 2 MB
+	
 	
 ;----------------------------------------------------------
 

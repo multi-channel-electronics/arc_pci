@@ -94,10 +94,11 @@ INIT_PCI
 	;; DC	0,0,0,0,0,0,0,0,0,0,0,0		; $60-$71 Reserved PCI
 	DC	0,0,0,0,0,0,0,0,0,0,0
 	
-	;; ORG	P:$6A,P:$6C
-	;; IF	@SCP("DOWNLOAD","ONCE")		; Download via ONCE debugger
-	;; ORG	P:$6A,P:$6A
-	;; ENDIF
+	ORG	P:$6A,P:$6C
+	IF	@SCP("DOWNLOAD","ONCE")		; Download via ONCE debugger
+	ORG	P:$6A,P:$6A
+	ENDIF
+	
 	JSR	PROCESS_PC_CMD_INT             ; PCI slave req vector
 	
 ;**************************************************************************
