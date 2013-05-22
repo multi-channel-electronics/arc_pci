@@ -27,6 +27,7 @@ HACK_INIT
 	
 	MOVE	#DEBUG_BUF,R0
 	MOVE	R0,X0
+	NOP
 	MOVE	X0,Y:(R0)
 	;; hacking storage
 	MOVE	#>TIMER_BUFFER_END,X0
@@ -52,7 +53,10 @@ HACK_LOOP
 	JSSET	#COMM_REP,X:STATUS,PROCESS_REPLY
 	
 	;; FIFO action?
-	JSR CHECK_FIFO
+	JSR 	CHECK_FOR_DATA
+
+	;; Transmit to host?
+	JSSET	#COMM_MCEREP,X:STATUS,PROCESS_MCE_REPLY
 
 	;; Should we fake data?
 	;; JSR	FAKE_PACKET
@@ -190,13 +194,6 @@ BLOCK_TRANSFERX_HANDLE_ERRORS
 	ORG	P:$900,P:$902
 
 PROCESS_REPLY
-;; 	CLR	A
-;; 	MOVE	X:REP_RSTAT,A
-;; 	CMP	#0,A
-;; 	JNE	PROCESS_REPLY_1
-;; 	RTS
-
-;; PROCESS_REPLY_1
 	;; Set destination address
 	MOVE	#>REP_BUS_ADDR,R0
 	MOVE	#>BURST_DEST_LO,R1
@@ -216,6 +213,58 @@ PROCESS_REPLY
 	
 	;; Mark as sent
 	BCLR	#COMM_REP,X:STATUS
+	
+	;; Raise interrupt and wait for handshake.
+	BSET	#INTA,X:DCTR
+	
+	JCLR	#DSR_HF0,X:DSR,*
+	BCLR	#INTA,X:DCTR
+	
+	JSET	#DSR_HF0,X:DSR,*
+	
+	RTS
+
+PROCESS_MCE_REPLY
+	;; Copy data into the reply buffer, starting at the "type" field
+	MOVE	#(MCEREP_BUF+MCEREP_TYPE),R3
+	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),Y1
+	MOVE	#(REP_DATA),R0
+	.loop	#4
+	MOVE	Y:(R3)+,Y0
+	MOVE	Y0,X:(R0)+
+	.endl
+	.loop	#2
+	.loop 	Y1
+	MOVE	Y:(R3)+,Y0
+	MOVE	Y0,X:(R0)+
+	.endl
+	nop
+	.endl
+
+	;; Mark the packet type
+	MOVE	#>RB_TYPE_MCE_REP,A1
+	NOP
+	MOVE	A1,X:REP_TYPE
+	
+	;; Set destination address
+	MOVE	#>REP_BUS_ADDR,R0
+	MOVE	#>BURST_DEST_LO,R1
+	.loop	#2
+	MOVE	X:(R0)+,X0
+	MOVE	X0,X:(R1)+
+	.endl
+
+	;; Set BLOCK_SIZE, in bytes
+	MOVE	#>(RB_SIZE*2),X0
+	MOVE	X0,X:BLOCK_SIZE
+	MOVE	#>REP_BUFFER1,X0
+	MOVE	X0,X:XMEM_SRC
+
+	;; Trigger writes as master.
+	JSR 	BLOCK_TRANSFERX
+	
+	;; Mark as sent
+	BCLR	#COMM_MCEREP,X:STATUS
 	
 	;; Raise interrupt and wait for handshake.
 	BSET	#INTA,X:DCTR
@@ -528,27 +577,15 @@ PROCESS_SEND_STUFF
 PROCESS_SEND_MCE
 	;; The packet data is a command for the MCE.  Send it.
 	;; The data should be stored as 128 x 16bit units.
-	;; Send the highest order byte first.
 	MOVE	#CMD_BUFFER,R0
-	.loop	#64
-	MOVE	X:(R0)+,X0	        ; store low 16
-	
+	.loop	#128
 	MOVE	X:(R0)+,A1		; get hi 16
-	ASR	#8,A,B		        ; Shift b2 into B1
-	AND	#>$FF,A
-	MOVE	A1,X:FO_SEND
-	MOVE	B1,X:FO_SEND
-	
-	MOVE	X0,A1
 	ASR	#8,A,B		        ; Shift b2 into B1
 	AND	#>$FF,A
 	MOVE	A1,X:FO_SEND
 	MOVE	B1,X:FO_SEND
 	.endl
 
-	;; Just acq the request.
-	
-	
 	NOP
 	BCLR	#COMM_CMD,X:STATUS
 	BSET	#COMM_REP,X:STATUS
@@ -590,6 +627,61 @@ PROCESS_JOIN_XR0_A
 	INSERT	#$010010,X0,A
 	RTS
 
+
+
+;;; FIFO handling
+
+CHECK_FOR_DATA
+	JCLR	#EF,X:PDRD,CHECK_FOR_DATA_EXIT
+	NOP
+	NOP
+	JCLR	#EF,X:PDRD,CHECK_FOR_DATA_EXIT
+	;; The FIFO is non-empty.
+
+	;; Poll for 8 words -- the preamble and packet size.
+	MOVE	#>MCEREP_BUF,R4
+	MOVE	#>$00FFFF,X0		; Mask lower 16 bits
+	.loop	#8
+	JCLR	#EF,X:PDRD,HANDLE_FIFO_WAIT
+	NOP
+	NOP
+	JCLR	#EF,X:PDRD,HANDLE_FIFO_WAIT
+	MOVEP	Y:RDFIFO,A
+	AND	#>$00ffff,A
+	NOP
+	MOVE	A1,Y:(R4)+
+	.endl
+	
+	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),X0
+	MOVE	#(MCEREP_BUF+MCEREP_PAYLOAD),R4
+	
+	.loop   #2
+	.loop	X0
+	JCLR	#EF,X:PDRD,*
+	MOVEP	Y:RDFIFO,A
+	AND	#>$00ffff,A
+	NOP
+	MOVE	A1,Y:(R4)+
+	.endl
+	NOP
+	.endl
+
+	MOVE	#$ff1111,X0
+	MOVE	X0,Y:(R4)
+
+	;; Mark to-be-transmitted-to-host
+	BSET	#COMM_MCEREP,X:STATUS
+	
+
+CHECK_FOR_DATA_EXIT
+	RTS
+
+
+
+
+	
+
+	
 ;;;
 ;;; Fake MCE data generator!
 ;;;

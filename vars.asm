@@ -174,8 +174,9 @@ DATA_BUS_ADDR		DC	0,0
 	
 ;;; Bits in STATUS... watch for conflicts.
 COMM_REP		EQU	4 ; Reply needs to be sent
-COMM_CMD		EQU	7 ; Command needs to be processed
-COMM_ERR		EQU	5 ; Command not recognized or whatever
+COMM_CMD		EQU	5 ; Command needs to be processed
+COMM_MCEREP		EQU	6 ; MCE reply has been buffered for send to host
+COMM_ERR		EQU	7 ; Command not recognized or whatever
 	
 XMEM_SRC		DC	0
 	
@@ -209,6 +210,16 @@ REP_RSTAT		EQU	REP_DATA+0
 REP_RSIZE		EQU	REP_DATA+1
 REP_RCMD		EQU	REP_DATA+2
 REP_RPAYLOAD		EQU	REP_DATA+4
+
+
+
+MCEREP_BUF		EQU	0
+;;; Indices int MCEREP_BUF
+MCEREP_PRE0		EQU	0
+MCEREP_PRE1		EQU	2
+MCEREP_TYPE		EQU	4
+MCEREP_SIZE		EQU	6
+MCEREP_PAYLOAD		EQU	8
 
 	
 DEBUG_BUF		EQU 	$2000
