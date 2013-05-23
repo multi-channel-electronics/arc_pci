@@ -103,7 +103,7 @@ REPLY_BUFFER_INIT
 	MOVE	X0,X:(R0)+
 	.endl
 	MOVE	#>RB_VERSION,X0
-	MOVE	#>RB_SIZE,X1
+	MOVE	#>RB_REP_SIZE,X1
 	MOVE	X0,X:REP_VERSION
 	MOVE	X1,X:REP_SIZE
 	RTS
@@ -194,6 +194,12 @@ BLOCK_TRANSFERX_HANDLE_ERRORS
 	ORG	P:$900,P:$902
 
 PROCESS_REPLY
+	;; Mark the packet type and size
+	MOVE	#>RB_TYPE_DSP_REP,A1
+	MOVE	#>RB_REP_SIZE,X1
+	MOVE	A1,X:REP_TYPE
+	MOVE	X1,X:REP_SIZE
+
 	;; Set destination address
 	MOVE	#>REP_BUS_ADDR,R0
 	MOVE	#>BURST_DEST_LO,R1
@@ -203,7 +209,10 @@ PROCESS_REPLY
 	.endl
 
 	;; Set BLOCK_SIZE, in bytes
-	MOVE	#>(RB_SIZE*2),X0
+	MOVE	X:REP_SIZE,A
+	ASL	#1,A,A
+	NOP
+	MOVE	A1,X0
 	MOVE	X0,X:BLOCK_SIZE
 	MOVE	#>REP_BUFFER1,X0
 	MOVE	X0,X:XMEM_SRC
@@ -241,10 +250,11 @@ PROCESS_MCE_REPLY
 	nop
 	.endl
 
-	;; Mark the packet type
+	;; Mark the packet type and size
 	MOVE	#>RB_TYPE_MCE_REP,A1
-	NOP
+	MOVE	#>RB_MCE_SIZE,X1
 	MOVE	A1,X:REP_TYPE
+	MOVE	X1,X:REP_SIZE
 	
 	;; Set destination address
 	MOVE	#>REP_BUS_ADDR,R0
@@ -255,7 +265,10 @@ PROCESS_MCE_REPLY
 	.endl
 
 	;; Set BLOCK_SIZE, in bytes
-	MOVE	#>(RB_SIZE*2),X0
+	MOVE	X:REP_SIZE,A
+	ASL	#1,A,A
+	NOP
+	MOVE	A1,X0
 	MOVE	X0,X:BLOCK_SIZE
 	MOVE	#>REP_BUFFER1,X0
 	MOVE	X0,X:XMEM_SRC
@@ -509,14 +522,20 @@ PROCESS_READ_EXIT
 
 PROCESS_WRITE_P
 	MOVE	X1,P:(R1)
-	JMP	PROCESS_SIMPLE_EXIT
+	JMP	PROCESS_WRITE_EXIT
 PROCESS_WRITE_X
 	MOVE	X1,X:(R1)
-	JMP	PROCESS_SIMPLE_EXIT
+	JMP	PROCESS_WRITE_EXIT
 PROCESS_WRITE_Y
 	MOVE	X1,Y:(R1)
-	JMP	PROCESS_SIMPLE_EXIT
-
+	JMP	PROCESS_WRITE_EXIT
+	
+PROCESS_WRITE_EXIT
+	;; Mark reply-to-send
+	BCLR	#COMM_CMD,X:STATUS
+	BSET	#COMM_REP,X:STATUS
+	RTS
+	
 	
 PROCESS_SET_REP_BUFFER
 	;; Two data words, representing the upper and lower halfs of the
@@ -528,40 +547,39 @@ PROCESS_SET_REP_BUFFER
 	MOVE	X0,X:(R1)+
 	.endl
 	
-	;; CHECK -- also store in Y mem where we can find it...
-	MOVE	#CMD_BUFFER,R0
-	MOVE	#>$100,R1
-	.loop 	#2
-	MOVE	X:(R0)+,X0
-	MOVE	X0,Y:(R1)+
-	.endl
-	
 	;; No reply!
 	BCLR	#COMM_CMD,X:STATUS
 	RTS
 
 PROCESS_SET_DATA_BUFFER
-	;; Two data words, representing the upper and lower halfs of the
-	;; 32-bit bus address
+	;; Lots of good stuff in here.
 	MOVE	#CMD_BUFFER,R0
-	MOVE	#DATA_BUS_ADDR,R1
-	.loop 	#2
-	MOVE	X:(R0)+,X0
-	MOVE	X0,X:(R1)+
-	.endl
-	
-	MOVE	#(DEBUG_BUF+16),R0
-	MOVE	#DATA_BUS_ADDR,R1
-	.loop 	#2
-	MOVE	X:(R1)+,X0
-	MOVE	X0,X:(R0)+
-	.endl
-	
-	;; No reply!
+	NOP
+	NOP
+	MOVE	X:(R0)+,X0	; 0
+	MOVE	X0,X:QT_BASE_LO	
+	MOVE	X:(R0)+,X0	; 1
+	MOVE	X0,X:QT_BASE_HI
+	MOVE	X:(R0)+,X0	; 2
+	MOVE	X0,X:QT_BUF_MAX
+	MOVE	X:(R0)+,X0	; 3
+	MOVE	X0,X:QT_BUF_SIZE
+	MOVE	X:(R0)+,X0	; 4
+	MOVE	X0,X:QT_FRAME_SIZE
+	MOVE	X:(R0)+,X0	; 5
+	MOVE	X0,X:TCPR0	;  ->Right into the time-out counter
+	MOVE	X:(R0)+,X0	; 6
+	MOVE	X0,X:QT_BUF_HEAD
+	MOVE	X:(R0)+,X0	; 7
+	MOVE	X0,X:QT_BUF_TAIL
+	MOVE	X:(R0)+,X0	; 8
+	MOVE	X0,X:QT_DROPS
+
+	;; Yes reply.
 	MOVE	#>0,X0
 	MOVE	X0,X:REP_RSTAT
 	MOVE	X0,X:REP_RSIZE
-	BCLR	#COMM_CMD,X:STATUS
+	BSET	#COMM_CMD,X:STATUS
 	RTS
 
 PROCESS_SEND_STUFF
@@ -588,16 +606,10 @@ PROCESS_SEND_MCE
 
 	NOP
 	BCLR	#COMM_CMD,X:STATUS
-	BSET	#COMM_REP,X:STATUS
+	BCLR	#COMM_REP,X:STATUS
 	RTS
 
-PROCESS_SIMPLE_EXIT
-	;; Mark reply-to-send
-	BCLR	#COMM_CMD,X:STATUS
-	BSET	#COMM_REP,X:STATUS
-	RTS
 
-	
 PROCESS_SPLIT_X0_XR0
 	;; Split the 24-bit contents in X0 into 8: and :16 bits, placed into
 	;; X:R0 and R0+1 resp.  Advances R0 accordingly.  Trashes A,B.
@@ -674,56 +686,6 @@ CHECK_FOR_DATA
 	
 
 CHECK_FOR_DATA_EXIT
-	RTS
-
-
-
-
-	
-
-	
-;;;
-;;; Fake MCE data generator!
-;;;
-;;; BROKEN
-	
-FAKE_PACKET
-	CLR	A
-	MOVE	X:TRIGGER_FAKE,A1
-	CMP	#0,A
-	JEQ	FAKE_PACKET_2
-	
-;;; JAM
-	JSR	PROCESS_REPLY
-	MOVE	#>0,X0
-	MOVE	X0,X:TRIGGER_FAKE
-	RTS
-
-	;; Set destination address
-	MOVE	#>REP_BUS_ADDR,R0
-	MOVE	#>BURST_DEST_LO,R1
-	.loop	#2
-	MOVE	X:(R0)+,X0
-	MOVE	X0,X:(R1)+
-	.endl
-	
-	MOVE	#>(RB_SIZE*2),X0
-	MOVE	X0,X:BLOCK_SIZE
-	MOVE	#>REP_BUFFER1,X0
-	MOVE	X0,X:XMEM_SRC
-	
-	;; Trigger writes as master.
-	JSR 	BLOCK_TRANSFERX
-FAKE_PACKET_2
-	RTS
-
-
-DEBUG_UP
-	BSET    #DCTR_HF5,X:DCTR
-	RTS
-	
-DEBUG_DOWN
-	BCLR	#DCTR_HF5,X:DCTR
 	RTS
 
 

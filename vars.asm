@@ -188,9 +188,10 @@ CMD_BUFFER 		EQU	$100
 ;;;  whenever the DSP needs to provide a command reply or other information
 ;;;  (e.g. not notify of some event...).
 ;;; 
+;;; Also, make it large enough for MCE replies...
 
-RB_SIZE			EQU	64 ; This MUST be even, so that effective number
-				   ; of 32-bit words is integral
+RB_SIZE			EQU	128+32 ; This MUST be even, so that effective number
+				       ; of 32-bit words is integral
 	
 RB_VERSION		EQU	1  ; Version of this datagram
 RB_TYPE_DSP_REP		EQU     1  ;
@@ -211,9 +212,11 @@ REP_RSIZE		EQU	REP_DATA+1
 REP_RCMD		EQU	REP_DATA+2
 REP_RPAYLOAD		EQU	REP_DATA+4
 
+RB_REP_SIZE		EQU	(REP_RPAYLOAD-REP_BUFFER1) ; not incl. data...
+RB_MCE_SIZE		EQU	(130+REP_DATA-REP_BUFFER1)
+	
 
-
-MCEREP_BUF		EQU	0
+MCEREP_BUF		EQU	0 ; Y-mem location for mce reply buffer?
 ;;; Indices int MCEREP_BUF
 MCEREP_PRE0		EQU	0
 MCEREP_PRE1		EQU	2
