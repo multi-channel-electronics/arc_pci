@@ -15,8 +15,8 @@ HACK_ENTRY
 	JCLR	#DSR_HF2,X:DSR,HACK_EXIT
 	
 HACK_INIT	
-	;; Set bit to indicate to host that we're in this loop.
-	BSET	#DCTR_HF4,X:DCTR
+	;; ;; Set bit to indicate to host that we're in this loop.
+	;; BSET	#DCTR_HF4,X:DCTR
 	
 	;; Nothing to handle
 	BCLR	#COMM_CMD,X:STATUS
@@ -25,16 +25,55 @@ HACK_INIT
 	;; Init the datagram structure
 	JSR	REPLY_BUFFER_INIT
 	
+	;; Init debug buffers (which track their own length)
+	MOVE	#INT_DEBUG_BUF,R0
+	MOVE	R0,X0
+	NOP
+	MOVE	X0,Y:(R0)
 	MOVE	#DEBUG_BUF,R0
 	MOVE	R0,X0
 	NOP
 	MOVE	X0,Y:(R0)
+	
 	;; hacking storage
 	MOVE	#>TIMER_BUFFER_END,X0
 	MOVE	X0,Y:TIMER_BUFFER_END
+
+	MOVE	#>INT_DEBUG_BUF,X0
+	MOVE	X0,X:INT_DEBUG_BUF_IDX
+	
+	MOVE	#>TIMER_BUFFER,X0
+	MOVE	X0,X:TIMER_INDEX
+
+	;; Quick timing test...
+	;; MOVE	#>TIMER_BUFFER,R1
+	
+	;; MOVE	X:TIMER_SOURCE,X0
+	;; MOVE	X0,Y:(R1)+
+	;; MOVE	#>0,R3
+	;; MOVE	#0,R0
+	;; .loop	#256
+	;; MOVE	X:(R0)+,Y0
+	;; MOVE	Y0,Y:(R3)
+	;; .endl
+	;; MOVE	X:TIMER_SOURCE,X0
+	;; MOVE	X0,Y:(R1)+
+
+	;; MOVE	#>$1000,R3
+	;; MOVE	#0,R0
+	;; .loop 	#256
+	;; MOVE	X:(R0)+,Y0
+	;; MOVE	Y0,Y:(R3)
+	;; .endl
+	;; MOVE	X:TIMER_SOURCE,X0
+	;; MOVE	X0,Y:(R1)+
+
 		
 	;; Enable PCI slave receive interrupt to handle commands from host
 	BSET	#DCTR_SRIE,X:DCTR
+	
+	;; Set bit to indicate to host that we're in this loop.
+	BSET	#DCTR_HF4,X:DCTR
 	
 	;; Empty the FIFO into a buffer
 	MOVE	#>$2000,R3
@@ -103,7 +142,7 @@ REPLY_BUFFER_INIT
 	MOVE	X0,X:(R0)+
 	.endl
 	MOVE	#>RB_VERSION,X0
-	MOVE	#>RB_REP_SIZE,X1
+	MOVE	#>(RB_REP_SIZE/2),X1
 	MOVE	X0,X:REP_VERSION
 	MOVE	X1,X:REP_SIZE
 	RTS
@@ -196,7 +235,7 @@ BLOCK_TRANSFERX_HANDLE_ERRORS
 PROCESS_REPLY
 	;; Mark the packet type and size
 	MOVE	#>RB_TYPE_DSP_REP,A1
-	MOVE	#>RB_REP_SIZE,X1
+	MOVE	#>(RB_REP_SIZE/2),X1
 	MOVE	A1,X:REP_TYPE
 	MOVE	X1,X:REP_SIZE
 
@@ -210,7 +249,7 @@ PROCESS_REPLY
 
 	;; Set BLOCK_SIZE, in bytes
 	MOVE	X:REP_SIZE,A
-	ASL	#1,A,A
+	ASL	#2,A,A
 	NOP
 	MOVE	A1,X0
 	MOVE	X0,X:BLOCK_SIZE
@@ -252,7 +291,7 @@ PROCESS_MCE_REPLY
 
 	;; Mark the packet type and size
 	MOVE	#>RB_TYPE_MCE_REP,A1
-	MOVE	#>RB_MCE_SIZE,X1
+	MOVE	#>(RB_MCE_SIZE/2),X1 ; size in 32-bit words.
 	MOVE	A1,X:REP_TYPE
 	MOVE	X1,X:REP_SIZE
 	
@@ -266,7 +305,7 @@ PROCESS_MCE_REPLY
 
 	;; Set BLOCK_SIZE, in bytes
 	MOVE	X:REP_SIZE,A
-	ASL	#1,A,A
+	ASL	#2,A,A
 	NOP
 	MOVE	A1,X0
 	MOVE	X0,X:BLOCK_SIZE
@@ -277,7 +316,9 @@ PROCESS_MCE_REPLY
 	JSR 	BLOCK_TRANSFERX
 	
 	;; Mark as sent
-	BCLR	#COMM_MCEREP,X:STATUS
+	;; BCLR	#COMM_MCEREP,X:STATUS
+	NOP
+	NOP
 	
 	;; Raise interrupt and wait for handshake.
 	BSET	#INTA,X:DCTR
@@ -339,7 +380,7 @@ CMD_RECV_MCE		EQU	$66
 	
 PROCESS_PC_CMD_INT
 	;; Push all and disable further SRRQ ints
-	JSR	SAVE_REGISTERS
+	JSR	SAVE_REGISTERS	; This does not save all the registers...
 	BCLR	#DCTR_SRIE,X:DCTR
 
 	;; Is there data?
@@ -351,13 +392,14 @@ PROCESS_PC_CMD_INT
 	;; MOVE	#CMD_SIZE,R0
 	;; JSR	PROCESS_SPLIT_X0_XR0
 
-	MOVEP	X:DRXR,X0
+	MOVEP	X:DRXR,X0	; 16-bit word #0 = the command
 	MOVE	X0,X:CMD_WORD
 	NOP
 	NOP
 	JCLR	#SRRQ,X:DSR,*
 	MOVEP	X:DRXR,X0
-	MOVE	X0,X:CMD_SIZE	;size in 32-bit words.
+	MOVE	X0,X:CMD_SIZE	; 16-bit word #1 = size of upcoming data,
+				; in 32-bit words.
 	
 	;; Read the packet data into a buffer.
 	CLR	A
@@ -394,13 +436,20 @@ PROCESS_PC_CMD_INT
 	.endl
 	
 PROCESS_PC_CMD_INT_OK
-	MOVE	#DEBUG_BUF,R0
+	MOVE	X:INT_DEBUG_BUF_IDX,R0
+	;; MOVE	#INT_DEBUG_BUF,R0
 	MOVE	X:CMD_WORD,X0
 	MOVE	X0,Y:(R0)+
 	MOVE	X:CMD_SIZE,X0
 	MOVE	X0,Y:(R0)+
 	MOVE	X:CMD_BUFFER,X0
 	MOVE	X0,Y:(R0)+
+	MOVE	X:(CMD_BUFFER+1),X0
+	MOVE	X0,Y:(R0)+
+	MOVE	#>$aabbcc,X0	; end-of-data
+	MOVE	X0,Y:(R0)+
+	
+	MOVE	R0,X:INT_DEBUG_BUF_IDX
 	
 	;; Mark cmd-to-process
 	BSET	#COMM_CMD,X:STATUS
@@ -547,6 +596,23 @@ PROCESS_SET_REP_BUFFER
 	MOVE	X0,X:(R1)+
 	.endl
 	
+	MOVE	X:CMD_SIZE,X0
+	MOVE	X0,Y:(R0)+
+	MOVE	X:CMD_BUFFER,X0
+	MOVE	X0,Y:(R0)+
+	
+	;; This seems to fail sometimes.  Load into debug vars
+	MOVE	#DEBUG_BUF,R0
+	MOVE	X:(CMD_BUFFER+0),X0
+	MOVE	X0,Y:(R0)+
+	MOVE	X:(CMD_BUFFER+1),X0
+	MOVE	X0,Y:(R0)+
+	
+	MOVE	X:(REP_BUS_ADDR+0),X0
+	MOVE	X0,Y:(R0)+
+	MOVE	X:(REP_BUS_ADDR+1),X0
+	MOVE	X0,Y:(R0)+
+	
 	;; No reply!
 	BCLR	#COMM_CMD,X:STATUS
 	RTS
@@ -558,22 +624,40 @@ PROCESS_SET_DATA_BUFFER
 	NOP
 	MOVE	X:(R0)+,X0	; 0
 	MOVE	X0,X:QT_BASE_LO	
-	MOVE	X:(R0)+,X0	; 1
+	MOVE	X:(R0)+,X0
 	MOVE	X0,X:QT_BASE_HI
-	MOVE	X:(R0)+,X0	; 2
+
+	MOVE	X:(R0)+,X0	; 1
 	MOVE	X0,X:QT_BUF_MAX
-	MOVE	X:(R0)+,X0	; 3
+	MOVE	X:(R0)+,X0	; 
+
+	MOVE	X:(R0)+,X0	; 2
 	MOVE	X0,X:QT_BUF_SIZE
-	MOVE	X:(R0)+,X0	; 4
+	MOVE	X:(R0)+,X0
+
+	MOVE	X:(R0)+,X0	; 3
 	MOVE	X0,X:QT_FRAME_SIZE
+	MOVE	X:(R0)+,X0
+
+	MOVE	X:(R0)+,X0	; 4
+	MOVE	X0,X:QT_INFORM
+	MOVE	X:(R0)+,X0
+
 	MOVE	X:(R0)+,X0	; 5
 	MOVE	X0,X:TCPR0	;  ->Right into the time-out counter
+	MOVE	X:(R0)+,X0
+	
 	MOVE	X:(R0)+,X0	; 6
 	MOVE	X0,X:QT_BUF_HEAD
+	MOVE	X:(R0)+,X0
+	
 	MOVE	X:(R0)+,X0	; 7
 	MOVE	X0,X:QT_BUF_TAIL
+	MOVE	X:(R0)+,X0
+	
 	MOVE	X:(R0)+,X0	; 8
 	MOVE	X0,X:QT_DROPS
+	MOVE	X:(R0)+,X0
 
 	;; Yes reply.
 	MOVE	#>0,X0
@@ -649,23 +733,123 @@ CHECK_FOR_DATA
 	NOP
 	JCLR	#EF,X:PDRD,CHECK_FOR_DATA_EXIT
 	;; The FIFO is non-empty.
-
-	;; Poll for 8 words -- the preamble and packet size.
+	
+	JSR	TIMER_STORE_NOW
+	
+	;; Eat words until we match the packet preamble.
 	MOVE	#>MCEREP_BUF,R4
-	MOVE	#>$00FFFF,X0		; Mask lower 16 bits
-	.loop	#8
-	JCLR	#EF,X:PDRD,HANDLE_FIFO_WAIT
+	
+	MOVEP	Y:RDFIFO,A
+	AND	#>$00FFFF,A
+	MOVE	A1,Y:(R4)+
+	CMP	#>$00A5A5,A
+	JNE	RESET_FIFO	; Empty the FIFO, and return to main loop.
+	
+	JCLR	#EF,X:PDRD,*
 	NOP
 	NOP
-	JCLR	#EF,X:PDRD,HANDLE_FIFO_WAIT
+	JCLR	#EF,X:PDRD,*
+	
+	MOVEP	Y:RDFIFO,A
+	AND	#>$00FFFF,A
+	MOVE	A1,Y:(R4)+
+	CMP	#>$00A5A5,A
+	JNE	RESET_FIFO
+
+	JCLR	#EF,X:PDRD,*
+	NOP
+	NOP
+	JCLR	#EF,X:PDRD,*
+	
+	MOVEP	Y:RDFIFO,A
+	AND	#>$00FFFF,A
+	MOVE	A1,Y:(R4)+
+	CMP	#>$005A5A,A
+	JNE	RESET_FIFO
+
+	JCLR	#EF,X:PDRD,*
+	NOP
+	NOP
+	JCLR	#EF,X:PDRD,*
+	
+	MOVEP	Y:RDFIFO,A
+	AND	#>$00FFFF,A
+	MOVE	A1,Y:(R4)+
+	CMP	#>$005A5A,A
+	JNE	RESET_FIFO
+
+	;; We made it; read 4 more 16-bit words, which are the packet type and size.
+	.loop	#4
+	JCLR	#EF,X:PDRD,*
+	NOP
+	NOP
+	JCLR	#EF,X:PDRD,*
 	MOVEP	Y:RDFIFO,A
 	AND	#>$00ffff,A
 	NOP
 	MOVE	A1,Y:(R4)+
 	.endl
 	
+	;; Compute packet divisions
+	;; -- sets TOTAL_BUFFS (half-fifos) and LEFT_TO_READ (single fifo reads)
+	CLR	A
+	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),A0
+	JSR	PACKET_PARTITIONS
+	
+	;; Is this a data or reply packet?
+	MOVE	Y:(MCEREP_BUF+MCEREP_TYPE),A
+	CMP	#'RP',A
+	JEQ	CHECK_FOR_DATA__BUFFER_REPLY
+	
+	CMP	#'DA',A
+	JEQ	CHECK_FOR_DATA__BUFFER_DATA
+	
+	;; Weird packet.  Make a note.  Reset the FIFO, return.
+	MOVE	X:PTYPE_FAILS,A0
+	INC	A
+	NOP
+	MOVE	A0,X:PTYPE_FAILS
+	JSR	RESET_FIFO
+	JMP	CHECK_FOR_DATA_EXIT
+	
+	
+CHECK_FOR_DATA__BUFFER_REPLY
+	;; BSET	#COMM_MCEREP,X:STATUS
 	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),X0
 	MOVE	#(MCEREP_BUF+MCEREP_PAYLOAD),R4
+	JSR	CHECK_FOR_DATA__BUFFER_LARGE
+	;; JSR	CHECK_FOR_DATA__BUFFER
+	JMP	CHECK_FOR_DATA_EXIT
+	
+CHECK_FOR_DATA__BUFFER_DATA
+	;; 	Increment data frame counter
+	MOVE	X:DA_COUNT,A0
+	INC	A
+	NOP
+	MOVE	A0,X:DA_COUNT
+	
+	;; BSET	#COMM_MCEDATA,X:STATUS
+	;; Packet size in dwords -> X0
+	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),X0
+	;; Dump it to temp buf...
+	MOVE	#MCEDATA_BUF,R4
+	
+	JSR	CHECK_FOR_DATA__BUFFER_LARGE
+	;; JSR	CHECK_FOR_DATA__BUFFER ; DEBUG
+	;; End marker for debugging; not a protocol signifier.
+	MOVE	#$ff1112,X0
+	MOVE	X0,Y:(R4)
+	
+	JMP	CHECK_FOR_DATA_EXIT
+	
+;;; Original, slow, working buffer routine.
+CHECK_FOR_DATA__BUFFER
+	;; Buffer a set number of words from the FIFO.
+	;; 
+	;; In:  X0 is the packet size in 32-bit words
+	;;      R4 is the pointer into Y memory.
+	;;
+	;; Out: fills the buffer and advances R4.  Probably trashes some stuff.
 	
 	.loop   #2
 	.loop	X0
@@ -677,18 +861,124 @@ CHECK_FOR_DATA
 	.endl
 	NOP
 	.endl
-
+	
+	;; End marker for debugging; not a protocol signifier.
 	MOVE	#$ff1111,X0
 	MOVE	X0,Y:(R4)
 
-	;; Mark to-be-transmitted-to-host
-	BSET	#COMM_MCEREP,X:STATUS
-	
+	RTS
 
 CHECK_FOR_DATA_EXIT
 	RTS
+	
+;----------------------------------------------
+RESET_FIFO
+;----------------------------------------------
+	MOVE	X:FIFO_FAILS,A0
+	INC	A
+	NOP
+	MOVE	A0,X:FIFO_FAILS
+	MOVEP	#%011000,X:PDRD			; clear FIFO RESET* briefly.
+	MOVE	#>25000,X0
+	.loop	X0
+	NOP
+	.endl
+	MOVEP	#%011100,X:PDRD
+	RTS
+
+;;;
+;;; Large packet buffering.
+;;;
+	
+;---------------------------
+CHECK_FOR_DATA__BUFFER_LARGE
+;---------------------------
+	;; Buffer all half-fifos by waiting for half full, and streaming.
+	MOVE	X:TOTAL_BUFFS,A
+	CMP	#0,A
+	JEQ	FINISHED_BUFFS
+
+	DO	A1,FINISHED_BUFFS
+	;; .loop	X:TOTAL_BUFFS
+;; CHECK_WAIT_X
+	JSET 	#HF,X:PDRD,*
+	;; JSET	#HF,X:PDRD,CHECK_WAIT_X	; Wait for half full+1
+	;; NOP
+	;; NOP
+	;; JSET	#HF,X:PDRD,CHECK_WAIT_X	; Protect against metastability
+	.loop	#512
+	MOVEP	Y:RDFIFO,Y:(R4)+
+	.endl
+	NOP
+	
+FINISHED_BUFFS	
+	;; .endl
+	JSR	TIMER_STORE_NOW
+	
+	;; For remaining words, don't do a polled read.  Either:
+	;; 1. If the FIFO is half full, read our part of it at full speed.
+	;; 2. If it is not, do a timed read; this assumes that the data are
+	;;    arriving at 25 MB/s (or a bit slower, there's overhead).
+	
+;;; HOTWIRE, always do timed reads.
+	JMP	BUFFER_PACKET_SINGLES_TIMED
+	
+	JSET	#HF,X:PDRD,BUFFER_PACKET_SINGLES_TIMED
+	;; JSET	#HF,X:PDRD,BUFFER_PACKET_SINGLES_POLLED
+	
+	;; Quick
+	.loop	X:LEFT_TO_READ
+	MOVEP	Y:RDFIFO,Y:(R4)+
+	.endl
+	NOP
+	NOP
+	JSR	TIMER_STORE_NOW
+	RTS
+
+BUFFER_PACKET_SINGLES_TIMED	
+	;;    This is non-polling!  The 50 MHz timer must be set up.
+	CLR	A
+	CLR	B
+	MOVE	X:TCR0,B0		; Store timer value (50 MHz)
+	ASR	#2,B,B			; / 4
+	.loop	X:LEFT_TO_READ
+BUFFER_PACKET_SINGLES_WAIT_X
+	MOVE	X:TCR0,A0
+	ASR	#2,A,A
+	CMP	A,B
+	JEQ	BUFFER_PACKET_SINGLES_WAIT_X
+ 	MOVEP	Y:RDFIFO,Y:(R4)+
+	ASL	#0,A,B			; MOVE A,B
+	.endl
+	NOP
+	NOP
+	RTS
+	
+BUFFER_PACKET_SINGLES_POLLED
+	.loop	X:LEFT_TO_READ
+	JCLR	#EF,X:PDRD,*
+ 	MOVEP	Y:RDFIFO,Y:(R4)+
+	.endl
+	NOP
+	NOP
+	RTS
+	
 
 
+TIMER_STORE_NOW
+	MOVE	X:TIMER_INDEX,R5
+	NOP
+	MOVE	X:TCR0,Y0
+	MOVE	Y0,Y:(R5)+
+	MOVE	R5,X:TIMER_INDEX
+	RTS
+	
+
+;;;
+;;;  UNUSED CODE below here
+;;; 
+	
+	
 ;;;
 ;;; Simple buffer for MCE data...
 ;;; 

@@ -163,9 +163,13 @@ BDEBUG2			DC	0
 ;; BDEBUG8			DC	0
 ;; BDEBUG9			DC	0
 	
-;;; WORD and DATA must be adjacent like this.
 TRIGGER_FAKE		DC	0
+
+FIFO_FAILS		DC	0
+PTYPE_FAILS		DC	0
+DA_COUNT		DC	0
 	
+;;; WORD and SIZE must be adjacent like this.
 CMD_SIZE		DC	0
 CMD_WORD		DC	0
 
@@ -179,6 +183,8 @@ COMM_MCEREP		EQU	6 ; MCE reply has been buffered for send to host
 COMM_ERR		EQU	7 ; Command not recognized or whatever
 	
 XMEM_SRC		DC	0
+	
+INT_DEBUG_BUF_IDX	DC	0
 	
 CMD_BUFFER 		EQU	$100
 
@@ -206,14 +212,14 @@ REP_VERSION		EQU	REP_BUFFER1+0  ;
 REP_SIZE		EQU	REP_BUFFER1+1  ;
 REP_TYPE		EQU	REP_BUFFER1+2  ;
 REP_DATA		EQU	REP_BUFFER1+16 ; Start of DSP or MCE reply data
+REP_HEADER_SIZE		EQU	(REP_DATA-REP_VERSION) ; Whatever
+	
 ;;; For DSP reply packets:
 REP_RSTAT		EQU	REP_DATA+0
 REP_RSIZE		EQU	REP_DATA+1
 REP_RCMD		EQU	REP_DATA+2
 REP_RPAYLOAD		EQU	REP_DATA+4
-
-RB_REP_SIZE		EQU	(REP_RPAYLOAD-REP_BUFFER1) ; not incl. data...
-RB_MCE_SIZE		EQU	(130+REP_DATA-REP_BUFFER1)
+REP_REND		EQU	REP_RPAYLOAD+16 ; Whatever.
 	
 
 MCEREP_BUF		EQU	0 ; Y-mem location for mce reply buffer?
@@ -223,9 +229,21 @@ MCEREP_PRE1		EQU	2
 MCEREP_TYPE		EQU	4
 MCEREP_SIZE		EQU	6
 MCEREP_PAYLOAD		EQU	8
+MCEREP_END		EQU	MCEREP_PAYLOAD+128 ; MCE replies are max 256 bytes
+	
+;; MCEDATA_BUF		EQU	$1000
+MCEDATA_BUF		EQU	$8 ;Debugging.
+	
+;;; Datagram sizes for reply and MCE packets.
+;;; Must be even; divide by two to get 32-bit words; mul by two to get bytes.
+RB_REP_SIZE		EQU	(REP_REND-REP_DATA+REP_HEADER_SIZE)
+RB_MCE_SIZE		EQU	(MCEREP_END+REP_HEADER_SIZE)
 
 	
 DEBUG_BUF		EQU 	$2000
+DEBUG_DUMP		EQU	$2100
+INT_DEBUG_BUF		EQU 	$8000
+
 
 ;;; 
 ;;; Large circular buffer for frame and reply data from MCE.
