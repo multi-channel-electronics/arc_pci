@@ -15,32 +15,25 @@ HACK_ENTRY
 	JCLR	#DSR_HF2,X:DSR,HACK_EXIT
 	
 HACK_INIT	
-	;; ;; Set bit to indicate to host that we're in this loop.
-	;; BSET	#DCTR_HF4,X:DCTR
-	
+	;; Reset the FO receiver
+	JSR	RESET_FIFO
+
 	;; Nothing to handle
 	BCLR	#COMM_CMD,X:STATUS
 	BCLR	#COMM_REP,X:STATUS
+	BCLR	#COMM_MCEREP,X:STATUS
+	BCLR	#COMM_MCEDATA,X:STATUS
+	BCLR	#COMM_ERR,X:STATUS
+	BCLR	#COMM_REP_ENABLED,X:STATUS
 	
 	;; Init the datagram structure
 	JSR	REPLY_BUFFER_INIT
 	
-	;; Init debug buffers (which track their own length)
-	MOVE	#INT_DEBUG_BUF,R0
-	MOVE	R0,X0
-	NOP
-	MOVE	X0,Y:(R0)
-	MOVE	#DEBUG_BUF,R0
-	MOVE	R0,X0
-	NOP
-	MOVE	X0,Y:(R0)
-	
-	;; hacking storage
-	MOVE	#>TIMER_BUFFER_END,X0
-	MOVE	X0,Y:TIMER_BUFFER_END
-
+	;; Init debug buffer indices
 	MOVE	#>INT_DEBUG_BUF,X0
 	MOVE	X0,X:INT_DEBUG_BUF_IDX
+	MOVE	#>DEBUG_BUF,X0
+	MOVE	X0,X:DEBUG_BUF_IDX
 	
 	MOVE	#>TIMER_BUFFER,X0
 	MOVE	X0,X:TIMER_INDEX
@@ -75,9 +68,6 @@ HACK_INIT
 	;; Set bit to indicate to host that we're in this loop.
 	BSET	#DCTR_HF4,X:DCTR
 	
-	;; Empty the FIFO into a buffer
-	MOVE	#>$2000,R3
-	
 	;;
 	;; Main loop
 	;; 
@@ -96,12 +86,18 @@ HACK_LOOP
 
 	;; Transmit to host?
 	JSSET	#COMM_MCEREP,X:STATUS,PROCESS_MCE_REPLY
+	JSSET	#COMM_MCEDATA,X:STATUS,PROCESS_MCE_DATA
 
-	;; Should we fake data?
-	;; JSR	FAKE_PACKET
-
+	;; ;; Check for timer expiry
+	JSSET	#TCF,X:TCSR0,TIMER_ACTION_X
+	
+	;; ;; Issue information?
+	JSSET	#QT_FLUSH,X:STATUS,SEND_BUF_INFO
+	
 	;; LOOP UNTIL host gives up.
 	JSET	#DSR_HF2,X:DSR,HACK_LOOP
+	
+	BCLR	#QT_FLUSH,X:STATUS
 	
 HACK_EXIT
 	;; Disable PCI slave receive interrupt
@@ -111,24 +107,21 @@ HACK_EXIT
 	BCLR	#DCTR_HF4,X:DCTR
 	RTS
 	
-
-CHECK_FIFO
-	JCLR	#EF,X:PDRD,RD_LP1
-	MOVEP	Y:RDFIFO,Y:(R3)+
-	NOP
-	NOP
-	NOP
-	NOP
-	NOP
-
-RD_LP1
-	MOVE	#>$ffffdd,X0
-	MOVE	X0,Y:(R3)
+	
+TIMER_ACTION_X
+	MOVEP	#$300201,X:TCSR0	; Clear TOF, TCF, leave timer enabled.
+	MOVE	X:QT_INFORM_IDX,A
+	ADD	#1,A
+	MOVE	X:QT_INFORM,B
+	SUB	A,B
+	JNE	TIMER_ACTION_X_OK
+	ASL	#0,B,A		   	; MOVE A,B
+	BSET	#QT_FLUSH,X:STATUS	;    schedule inform
+TIMER_ACTION_X_OK
+	MOVE	A,X:QT_INFORM_IDX
 	RTS
 
-
-
-
+	
 ;;;
 ;;; New comms implementation
 ;;; 
@@ -316,9 +309,7 @@ PROCESS_MCE_REPLY
 	JSR 	BLOCK_TRANSFERX
 	
 	;; Mark as sent
-	;; BCLR	#COMM_MCEREP,X:STATUS
-	NOP
-	NOP
+	BCLR	#COMM_MCEREP,X:STATUS
 	
 	;; Raise interrupt and wait for handshake.
 	BSET	#INTA,X:DCTR
@@ -329,6 +320,95 @@ PROCESS_MCE_REPLY
 	JSET	#DSR_HF0,X:DSR,*
 	
 	RTS
+
+
+PROCESS_MCE_DATA
+	;; Send out the data directly
+	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),A
+	ASL	#2,A,A
+	NOP
+	MOVE	A1,X:BLOCK_SIZE
+	
+	;; Set destination address
+	MOVE	#>QT_BASE_LO,R0
+	MOVE	#>BURST_DEST_LO,R1
+	.loop	#2
+	MOVE	X:(R0)+,X0
+	MOVE	X0,X:(R1)+
+	.endl
+
+	MOVE	#(MCEREP_BUF+MCEREP_PAYLOAD),X0
+	MOVE	X0,X:YMEM_SRC
+
+	;; Trigger writes as master.
+	JSR 	BLOCK_TRANSFER
+	
+	;; Mark as sent
+	BCLR	#COMM_MCEDATA,X:STATUS
+	
+	RTS
+
+
+
+;--------------------
+SEND_BUF_INFO
+;--------------------
+	BCLR	#QT_FLUSH,X:STATUS
+	;; Debug, click the buf head up and send inform.
+	MOVE	X:QT_BUF_HEAD,A1
+	ADD	#1,A
+	NOP
+	MOVE	A1,X:QT_BUF_HEAD
+	;; RTS
+	JCLR	#COMM_REP_ENABLED,X:STATUS,SEND_BUF_INFO_EXIT
+	
+	
+	MOVE	X:QT_BUF_HEAD,X0
+	MOVE	X0,X:REP_DATA
+	MOVE	#0,X0
+	MOVE	X0,X:(REP_DATA+1)
+	
+	;; Mark the packet type and size
+	MOVE	#>RB_TYPE_BUF_INF,A1
+	MOVE	#>(RB_INF_SIZE/2),X1 ; size in 32-bit words.
+	MOVE	A1,X:REP_TYPE
+	MOVE	X1,X:REP_SIZE
+	
+	;; Set destination address
+	MOVE	#>REP_BUS_ADDR,R0
+	MOVE	#>BURST_DEST_LO,R1
+	.loop	#2
+	MOVE	X:(R0)+,X0
+	MOVE	X0,X:(R1)+
+	.endl
+	
+	;; Set BLOCK_SIZE, in bytes
+	MOVE	X:REP_SIZE,A
+	ASL	#2,A,A
+	NOP
+	MOVE	A1,X0
+	MOVE	X0,X:BLOCK_SIZE
+	MOVE	#>REP_BUFFER1,X0
+	MOVE	X0,X:XMEM_SRC
+
+	;; Trigger writes as master.
+	JSR 	BLOCK_TRANSFERX
+	
+	;; Raise interrupt and wait for handshake.
+	BSET	#INTA,X:DCTR
+	JCLR	#DSR_HF0,X:DSR,*
+	BCLR	#INTA,X:DCTR
+	JSET	#DSR_HF0,X:DSR,*
+	
+SEND_BUF_INFO_EXIT
+	;; Mark as sent
+	BCLR	#QT_FLUSH,X:STATUS
+	RTS
+	
+
+
+
+
 
 
 ;;;
@@ -346,18 +426,11 @@ CMD_WRITE_Y		EQU	7
 			
 CMD_SET_REP_BUF		EQU	9
 CMD_SET_DATA_BUF	EQU	$A
-			
-			
-CMD_READ_CODED		EQU	$11
-CMD_WRITE_CODED 	EQU	$12
+	
+CMD_SET_TAIL		EQU	$11		
 			
 CMD_SEND_MCE		EQU	$21
 			
-CMD_SEND_STUFF  	EQU	$31
-			
-CMD_STATUS		EQU	$65
-CMD_RECV_MCE		EQU	$66
-
 
 ;; PROCESS_PC_CMD_POLL
 ;; 	MOVE	#DEBUG_BUF,R0
@@ -437,7 +510,6 @@ PROCESS_PC_CMD_INT
 	
 PROCESS_PC_CMD_INT_OK
 	MOVE	X:INT_DEBUG_BUF_IDX,R0
-	;; MOVE	#INT_DEBUG_BUF,R0
 	MOVE	X:CMD_WORD,X0
 	MOVE	X0,Y:(R0)+
 	MOVE	X:CMD_SIZE,X0
@@ -542,6 +614,9 @@ PROCESS_PC_CMD_2
 	CMP	#>CMD_SEND_MCE,B
 	JEQ	PROCESS_SEND_MCE
 	
+	CMP	#>CMD_SET_TAIL,B
+	JEQ	PROCESS_SET_TAIL
+	
 	;; No match... error?
 	BCLR	#COMM_CMD,X:STATUS
 	BSET	#COMM_ERR,X:STATUS
@@ -589,32 +664,27 @@ PROCESS_WRITE_EXIT
 PROCESS_SET_REP_BUFFER
 	;; Two data words, representing the upper and lower halfs of the
 	;; 32-bit bus address
+	CLR	A
 	MOVE	#CMD_BUFFER,R0
 	MOVE	#REP_BUS_ADDR,R1
 	.loop 	#2
 	MOVE	X:(R0)+,X0
 	MOVE	X0,X:(R1)+
+	OR	X0,A		; If there is a 1 in that address, we will find it.
 	.endl
-	
-	MOVE	X:CMD_SIZE,X0
-	MOVE	X0,Y:(R0)+
-	MOVE	X:CMD_BUFFER,X0
-	MOVE	X0,Y:(R0)+
-	
-	;; This seems to fail sometimes.  Load into debug vars
-	MOVE	#DEBUG_BUF,R0
-	MOVE	X:(CMD_BUFFER+0),X0
-	MOVE	X0,Y:(R0)+
-	MOVE	X:(CMD_BUFFER+1),X0
-	MOVE	X0,Y:(R0)+
-	
-	MOVE	X:(REP_BUS_ADDR+0),X0
-	MOVE	X0,Y:(R0)+
-	MOVE	X:(REP_BUS_ADDR+1),X0
-	MOVE	X0,Y:(R0)+
 	
 	;; No reply!
 	BCLR	#COMM_CMD,X:STATUS
+	
+	;; Enable / disable replies based on whether that address was 0 or not.
+	CMP	#0,A
+	JEQ	PROCESS_SET_REP_BUFFER_DISABLE
+
+	BSET	#COMM_REP_ENABLED,X:STATUS
+	RTS
+	
+PROCESS_SET_REP_BUFFER_DISABLE
+	BCLR	#COMM_REP_ENABLED,X:STATUS
 	RTS
 
 PROCESS_SET_DATA_BUFFER
@@ -666,15 +736,6 @@ PROCESS_SET_DATA_BUFFER
 	BSET	#COMM_CMD,X:STATUS
 	RTS
 
-PROCESS_SEND_STUFF
-	;; No data, no reply
-	BSET	#1,X:TRIGGER_FAKE
-	
-	MOVE	#>0,X0
-	MOVE	X0,X:REP_RSTAT
-	MOVE	X0,X:REP_RSIZE
-	RTS
-
 	
 PROCESS_SEND_MCE
 	;; The packet data is a command for the MCE.  Send it.
@@ -689,6 +750,17 @@ PROCESS_SEND_MCE
 	.endl
 
 	NOP
+	BCLR	#COMM_CMD,X:STATUS
+	BCLR	#COMM_REP,X:STATUS
+	RTS
+
+	
+PROCESS_SET_TAIL
+	;; Update tail index from the first datum
+	MOVE	X:CMD_BUFFER,X0
+	MOVE	X0,X:QT_BUF_TAIL
+
+	;; No reply.
 	BCLR	#COMM_CMD,X:STATUS
 	BCLR	#COMM_REP,X:STATUS
 	RTS
@@ -725,21 +797,23 @@ PROCESS_JOIN_XR0_A
 
 
 
-;;; FIFO handling
-
+;------------------------
 CHECK_FOR_DATA
+;------------------------
 	JCLR	#EF,X:PDRD,CHECK_FOR_DATA_EXIT
 	NOP
 	NOP
 	JCLR	#EF,X:PDRD,CHECK_FOR_DATA_EXIT
 	;; The FIFO is non-empty.
 	
-	JSR	TIMER_STORE_NOW
-	
-	;; Eat words until we match the packet preamble.
+	;; Read FIFO words into A1.  Reading into A causes weird sign
+	;; extension effects.  If we encounter any unexpected data,
+	;; reset the FIFO.
+
+	CLR	A		; A0=0
 	MOVE	#>MCEREP_BUF,R4
 	
-	MOVEP	Y:RDFIFO,A
+	MOVEP	Y:RDFIFO,A1
 	AND	#>$00FFFF,A
 	MOVE	A1,Y:(R4)+
 	CMP	#>$00A5A5,A
@@ -750,20 +824,21 @@ CHECK_FOR_DATA
 	NOP
 	JCLR	#EF,X:PDRD,*
 	
-	MOVEP	Y:RDFIFO,A
+	MOVEP	Y:RDFIFO,A1
 	AND	#>$00FFFF,A
 	MOVE	A1,Y:(R4)+
 	CMP	#>$00A5A5,A
-	JNE	RESET_FIFO
+	JNE	FIFO_RESYNC	; Sure, give simple resync a chance
 
 	JCLR	#EF,X:PDRD,*
 	NOP
 	NOP
 	JCLR	#EF,X:PDRD,*
 	
-	MOVEP	Y:RDFIFO,A
+	MOVEP	Y:RDFIFO,A1
 	AND	#>$00FFFF,A
 	MOVE	A1,Y:(R4)+
+FIFO_RESYNC
 	CMP	#>$005A5A,A
 	JNE	RESET_FIFO
 
@@ -772,7 +847,7 @@ CHECK_FOR_DATA
 	NOP
 	JCLR	#EF,X:PDRD,*
 	
-	MOVEP	Y:RDFIFO,A
+	MOVEP	Y:RDFIFO,A1
 	AND	#>$00FFFF,A
 	MOVE	A1,Y:(R4)+
 	CMP	#>$005A5A,A
@@ -784,7 +859,7 @@ CHECK_FOR_DATA
 	NOP
 	NOP
 	JCLR	#EF,X:PDRD,*
-	MOVEP	Y:RDFIFO,A
+	MOVEP	Y:RDFIFO,A1
 	AND	#>$00ffff,A
 	NOP
 	MOVE	A1,Y:(R4)+
@@ -797,7 +872,8 @@ CHECK_FOR_DATA
 	JSR	PACKET_PARTITIONS
 	
 	;; Is this a data or reply packet?
-	MOVE	Y:(MCEREP_BUF+MCEREP_TYPE),A
+	CLR	A
+	MOVE	Y:(MCEREP_BUF+MCEREP_TYPE),A1
 	CMP	#'RP',A
 	JEQ	CHECK_FOR_DATA__BUFFER_REPLY
 	
@@ -814,11 +890,12 @@ CHECK_FOR_DATA
 	
 	
 CHECK_FOR_DATA__BUFFER_REPLY
-	;; BSET	#COMM_MCEREP,X:STATUS
+	BSET	#COMM_MCEREP,X:STATUS
 	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),X0
 	MOVE	#(MCEREP_BUF+MCEREP_PAYLOAD),R4
 	JSR	CHECK_FOR_DATA__BUFFER_LARGE
-	;; JSR	CHECK_FOR_DATA__BUFFER
+	
+	;; JSR	TIMER_STORE_NOW
 	JMP	CHECK_FOR_DATA_EXIT
 	
 CHECK_FOR_DATA__BUFFER_DATA
@@ -828,18 +905,18 @@ CHECK_FOR_DATA__BUFFER_DATA
 	NOP
 	MOVE	A0,X:DA_COUNT
 	
-	;; BSET	#COMM_MCEDATA,X:STATUS
+	BSET	#COMM_MCEDATA,X:STATUS
 	;; Packet size in dwords -> X0
 	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),X0
 	;; Dump it to temp buf...
 	MOVE	#MCEDATA_BUF,R4
 	
 	JSR	CHECK_FOR_DATA__BUFFER_LARGE
-	;; JSR	CHECK_FOR_DATA__BUFFER ; DEBUG
 	;; End marker for debugging; not a protocol signifier.
 	MOVE	#$ff1112,X0
 	MOVE	X0,Y:(R4)
 	
+	;; JSR	TIMER_STORE_NOW
 	JMP	CHECK_FOR_DATA_EXIT
 	
 ;;; Original, slow, working buffer routine.
@@ -867,13 +944,35 @@ CHECK_FOR_DATA__BUFFER
 	MOVE	X0,Y:(R4)
 
 	RTS
-
+	
 CHECK_FOR_DATA_EXIT
 	RTS
 	
 ;----------------------------------------------
 RESET_FIFO
 ;----------------------------------------------
+	;; Investigate mysterious error data; first one is in A1
+	MOVE	X:DEBUG_BUF_IDX,R3
+	NOP
+	NOP
+	MOVE	A0,Y:(R3)+
+	MOVE	A1,Y:(R3)+
+	CMP	#>$00A5A5,A
+	JEQ	RESET_FIFO1
+	MOVE	R3,Y:(R3)+
+RESET_FIFO1
+	NOP
+	NOP
+	MOVE	Y:RDFIFO,A
+	MOVE	A1,Y:(R3)+
+	JSET	#EF,X:PDRD,RESET_FIFO1
+
+	MOVE	#>$aa1122,A
+	NOP
+	MOVE	A1,Y:(R3)+
+	MOVE	R3,X:DEBUG_BUF_IDX
+	
+	;; Increment counter
 	MOVE	X:FIFO_FAILS,A0
 	INC	A
 	NOP
@@ -913,26 +1012,16 @@ CHECK_FOR_DATA__BUFFER_LARGE
 	
 FINISHED_BUFFS	
 	;; .endl
-	JSR	TIMER_STORE_NOW
+	;; JSR	TIMER_STORE_NOW
 	
-	;; For remaining words, don't do a polled read.  Either:
-	;; 1. If the FIFO is half full, read our part of it at full speed.
-	;; 2. If it is not, do a timed read; this assumes that the data are
-	;;    arriving at 25 MB/s (or a bit slower, there's overhead).
-	
-;;; HOTWIRE, always do timed reads.
-	JMP	BUFFER_PACKET_SINGLES_TIMED
-	
+	;; If the FIFO is half full, read the remaining words as
+	;; quickly as possible.  Otherwise, do a timed read.
 	JSET	#HF,X:PDRD,BUFFER_PACKET_SINGLES_TIMED
-	;; JSET	#HF,X:PDRD,BUFFER_PACKET_SINGLES_POLLED
 	
 	;; Quick
 	.loop	X:LEFT_TO_READ
 	MOVEP	Y:RDFIFO,Y:(R4)+
 	.endl
-	NOP
-	NOP
-	JSR	TIMER_STORE_NOW
 	RTS
 
 BUFFER_PACKET_SINGLES_TIMED	
@@ -966,6 +1055,7 @@ BUFFER_PACKET_SINGLES_POLLED
 
 
 TIMER_STORE_NOW
+	;; Not safe!  No bounds checking.
 	MOVE	X:TIMER_INDEX,R5
 	NOP
 	MOVE	X:TCR0,Y0

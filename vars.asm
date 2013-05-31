@@ -176,15 +176,19 @@ CMD_WORD		DC	0
 REP_BUS_ADDR		DC	0,0
 DATA_BUS_ADDR		DC	0,0
 	
-;;; Bits in STATUS... watch for conflicts.
+;;; Bits in STATUS... watch for conflicts. (4-8, 12-15 are free)
 COMM_REP		EQU	4 ; Reply needs to be sent
 COMM_CMD		EQU	5 ; Command needs to be processed
 COMM_MCEREP		EQU	6 ; MCE reply has been buffered for send to host
-COMM_ERR		EQU	7 ; Command not recognized or whatever
+COMM_MCEDATA		EQU	7 ; MCE data " "
+COMM_ERR		EQU	8 ; Command not recognized or whatever
+COMM_REP_ENABLED	EQU	12 ;
+
 	
 XMEM_SRC		DC	0
 	
 INT_DEBUG_BUF_IDX	DC	0
+DEBUG_BUF_IDX		DC	0
 	
 CMD_BUFFER 		EQU	$100
 
@@ -202,7 +206,7 @@ RB_SIZE			EQU	128+32 ; This MUST be even, so that effective number
 RB_VERSION		EQU	1  ; Version of this datagram
 RB_TYPE_DSP_REP		EQU     1  ;
 RB_TYPE_MCE_REP		EQU     2  ;
-RB_TYPE_DATA_INF	EQU     3  ;
+RB_TYPE_BUF_INF		EQU     3  ;
 
 ;;; The actualy buffer storage.
 REP_BUFFER1		DS	RB_SIZE
@@ -238,6 +242,7 @@ MCEDATA_BUF		EQU	$8 ;Debugging.
 ;;; Must be even; divide by two to get 32-bit words; mul by two to get bytes.
 RB_REP_SIZE		EQU	(REP_REND-REP_DATA+REP_HEADER_SIZE)
 RB_MCE_SIZE		EQU	(MCEREP_END+REP_HEADER_SIZE)
+RB_INF_SIZE		EQU	(REP_REND-REP_DATA+2)
 
 	
 DEBUG_BUF		EQU 	$2000
