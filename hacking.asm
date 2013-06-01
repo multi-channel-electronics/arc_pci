@@ -39,30 +39,6 @@ HACK_INIT
 	MOVE	#>TIMER_BUFFER,X0
 	MOVE	X0,X:TIMER_INDEX
 
-	;; Quick timing test...
-	;; MOVE	#>TIMER_BUFFER,R1
-	
-	;; MOVE	X:TIMER_SOURCE,X0
-	;; MOVE	X0,Y:(R1)+
-	;; MOVE	#>0,R3
-	;; MOVE	#0,R0
-	;; .loop	#256
-	;; MOVE	X:(R0)+,Y0
-	;; MOVE	Y0,Y:(R3)
-	;; .endl
-	;; MOVE	X:TIMER_SOURCE,X0
-	;; MOVE	X0,Y:(R1)+
-
-	;; MOVE	#>$1000,R3
-	;; MOVE	#0,R0
-	;; .loop 	#256
-	;; MOVE	X:(R0)+,Y0
-	;; MOVE	Y0,Y:(R3)
-	;; .endl
-	;; MOVE	X:TIMER_SOURCE,X0
-	;; MOVE	X0,Y:(R1)+
-
-		
 	;; Enable PCI slave receive interrupt to handle commands from host
 	BSET	#DCTR_SRIE,X:DCTR
 	
@@ -73,10 +49,7 @@ HACK_INIT
 	;; Main loop
 	;; 
 HACK_LOOP
-;;; Polling:
- 	;; JSR	PROCESS_PC_CMD_POLL
-	
-;;; Interrupt driven: process command in buffer
+	;; Interrupt driven: process command in buffer
 	JSSET 	#COMM_CMD,X:STATUS,PROCESS_PC_CMD_2
 
 	;; Should we send a reply?
@@ -113,20 +86,11 @@ HACK_EXIT
 	
 TIMER_ACTION_X
 	MOVEP	#$300201,X:TCSR0	; Clear TOF, TCF, leave timer enabled.
-;;; Testing...
-	;; MOVE	X:QT_INFORM_IDX,A
-	;; ADD	#1,A
-	;; MOVE	X:QT_INFORM,B
-	;; SUB	A,B
-	;; JNE	TIMER_ACTION_X_OK
-	;; ASL	#0,B,A		   	; MOVE A,B
-	
 	;; If new data, schedule a flush.
 	BCLR	#COMM_BUF_UPDATE,X:STATUS
 	JCC	TIMER_ACTION_X_OK
 	BSET	#QT_FLUSH,X:STATUS	;    schedule inform
 TIMER_ACTION_X_OK
-	;; MOVE	A,X:QT_INFORM_IDX
 	RTS
 
 	
@@ -531,20 +495,6 @@ PROCESS_PC_CMD_INT
 	MOVE	#CMD_BUFFER,R0
 	MOVE	X:CMD_SIZE,A1
 	
-	;; ;; WTF
-	;; ;; .loop	#1
-	;; JCLR	#SRRQ,X:DSR,*
-	;; MOVEP	X:DRXR,X:(R0)+
-	;; NOP
-	;; NOP
-	;; JCLR	#SRRQ,X:DSR,*
-	;; MOVEP	X:DRXR,X:(R0)+
-	;; NOP
-	;; NOP
-	;; ;; .endl
-	
-	;; jmp	PROCESS_PC_CMD_INT_EXIT
-
 	;; Don't call .loop with 0 argument!
 	CMP	#0,A
 	JEQ	PROCESS_PC_CMD_INT_OK
@@ -814,9 +764,9 @@ PROCESS_SET_TAIL
 	MOVE	X:CMD_BUFFER,X0
 	MOVE	X0,X:QT_BUF_TAIL
 
-	;; No reply.
+	;; Yes, reply.  Everything replies.
 	BCLR	#COMM_CMD,X:STATUS
-	BCLR	#COMM_REP,X:STATUS
+	BSET	#COMM_REP,X:STATUS
 	RTS
 
 
@@ -949,7 +899,6 @@ CHECK_FOR_DATA__BUFFER_REPLY
 	MOVE	#(MCEREP_BUF+MCEREP_PAYLOAD),R4
 	JSR	CHECK_FOR_DATA__BUFFER_LARGE
 	
-	;; JSR	TIMER_STORE_NOW
 	JMP	CHECK_FOR_DATA_EXIT
 	
 CHECK_FOR_DATA__BUFFER_DATA
@@ -970,7 +919,6 @@ CHECK_FOR_DATA__BUFFER_DATA
 	MOVE	#$ff1112,X0
 	MOVE	X0,Y:(R4)
 	
-	;; JSR	TIMER_STORE_NOW
 	JMP	CHECK_FOR_DATA_EXIT
 	
 ;;; Original, slow, working buffer routine.
@@ -1066,7 +1014,6 @@ CHECK_FOR_DATA__BUFFER_LARGE
 	
 FINISHED_BUFFS	
 	;; .endl
-	;; JSR	TIMER_STORE_NOW
 	
 	;; If the FIFO is half full, read the remaining words as
 	;; quickly as possible.  Otherwise, do a timed read.
@@ -1106,116 +1053,3 @@ BUFFER_PACKET_SINGLES_POLLED
 	NOP
 	RTS
 	
-
-
-TIMER_STORE_NOW
-	;; Not safe!  No bounds checking.
-	MOVE	X:TIMER_INDEX,R5
-	NOP
-	MOVE	X:TCR0,Y0
-	MOVE	Y0,Y:(R5)+
-	MOVE	R5,X:TIMER_INDEX
-	RTS
-	
-
-;;;
-;;;  UNUSED CODE below here
-;;; 
-	
-	
-;;;
-;;; Simple buffer for MCE data...
-;;; 
-READ_MCE_EASY
-	JSET	#EF,X:PDRD,READ_MCE_EXIT
-
-	
-;;;
-;;; Large circular buffer for data from MCE
-;;;
-
-READ_MCE
-	;; If empty (EF set), bail immediately
-	JSET	#EF,X:PDRD,READ_MCE_EXIT
-
-	;; Read up to 512 words, but don't cross tail-1 or the far
-	;; side of the buffer.
-	MOVE	X:CIRCBUF_HEAD,A
-	MOVE	X:CIRCBUF_TAIL,B
-	MOVE	A1,R0
-	DEC	B
-	SUB	A,B
-	DEC	B
-	NOP
-	MOVE	B1,X0		;X0 = tail-1-head
-	MOVE	#(CIRCBUF_SIZE+CIRCBUF_START),B
-	SUB	B,A		;B = head-edge
-	MOVE	#-512,A
-	MAX	A,B		;B = max(-512,head-edge)
-	MOVE	X0,A
-	NEG	A
-	MAX	A,B
-	NEG	B		;B = min(512, edge-head, tail-1-head)
-	
-	;; Check half-full; HF will be clear.
-	JSET	#HF,X:PDRD,READ_MCE_SINGLES
-	NOP
-	NOP
-	JSET	#HF,X:PDRD,READ_MCE_SINGLES
-
-	.loop	B1
-	MOVEP	Y:RDFIFO,Y:(R0)+
-	.endl
-	JMP	READ_MCE
-
-READ_MCE_SINGLES
-	ASR	#24,B,B
-READ_MCE_SINGLES_1
-	JSET	#EF,X:PDRD,READ_MCE_EXIT
-	MOVEP	Y:RDFIFO,Y:(R0)+
-	DEC	B
-	JEQ	READ_MCE_SINGLES_1
-
-	
-READ_MCE_EXIT
-	RTS
-
-
-;;; Buffer inspection:
-;;; GET_SIZE (return unwrapped head-tail)
-;;; GET_WORD_AT_OFFSET (handle wrapping)
-;;; COPY_PACKET to stage it for PCI.
-	
-	
-
-CIRC_GET_READ_SIZE
-	;; Compute number of words in the buffer, return in B1.  Trashes A.
-	MOVE	X:CIRCBUF_TAIL,A
-	MOVE	X:CIRCBUF_HEAD,B
-	SUB	A,B
-	.if	<lt>
-	ADD	#(CIRCBUF_SIZE),B
-	.endi
-	RTS
-	
-CIRC_READ_WORD_AT_OFFSET
-	;; Get the word at position CIRCBUF_TAIL+R0.
-	MOVE	R0,A
-	MOVE	X:CIRCBUF_HEAD,B
-	ADD	A,B
-	MOVE	#(CIRCBUF_SIZE),A
-	CMP	A,B
-	;; JLT	CIRC_READ_WORD_AT_OFFSET_OK
-	.if	<gt>
-	SUB	A,B
-	.endi
-	MOVE	#(CIRCBUF_START),A
-	ADD	A,B
-	NOP
-	MOVE	B,R4
-	NOP
-	NOP
-	NOP
-	MOVE	Y:(R4),B
-	RTS
-
