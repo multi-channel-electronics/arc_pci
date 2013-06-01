@@ -25,6 +25,7 @@ HACK_INIT
 	BCLR	#COMM_MCEDATA,X:STATUS
 	BCLR	#COMM_ERR,X:STATUS
 	BCLR	#COMM_REP_ENABLED,X:STATUS
+	BCLR	#COMM_BUF_UPDATE,X:STATUS
 	
 	;; Init the datagram structure
 	JSR	REPLY_BUFFER_INIT
@@ -89,14 +90,16 @@ HACK_LOOP
 	JSSET	#COMM_MCEDATA,X:STATUS,PROCESS_MCE_DATA
 
 	;; ;; Check for timer expiry
-	;; JSSET	#TCF,X:TCSR0,TIMER_ACTION_X
+	JSSET	#TCF,X:TCSR0,TIMER_ACTION_X
 	
 	;; ;; Issue information?
-	;; JSSET	#QT_FLUSH,X:STATUS,SEND_BUF_INFO
+	JSSET	#QT_FLUSH,X:STATUS,SEND_BUF_INFO
 	
 	;; LOOP UNTIL host gives up.
 	JSET	#DSR_HF2,X:DSR,HACK_LOOP
 	
+
+	;; Clean-up
 	BCLR	#QT_FLUSH,X:STATUS
 	
 HACK_EXIT
@@ -118,9 +121,10 @@ TIMER_ACTION_X
 	;; JNE	TIMER_ACTION_X_OK
 	;; ASL	#0,B,A		   	; MOVE A,B
 	
-	;; For real... suppressed
-	;; BSET	#QT_FLUSH,X:STATUS	;    schedule inform
-	
+	;; If new data, schedule a flush.
+	BCLR	#COMM_BUF_UPDATE,X:STATUS
+	JCC	TIMER_ACTION_X_OK
+	BSET	#QT_FLUSH,X:STATUS	;    schedule inform
 TIMER_ACTION_X_OK
 	;; MOVE	A,X:QT_INFORM_IDX
 	RTS
@@ -229,7 +233,15 @@ BLOCK_TRANSFERX_HANDLE_ERRORS
 ;;; PERMANENTER CODE.
 	ORG	P:$900,P:$902
 
+;----------------------------------------------
 PROCESS_REPLY
+;----------------------------------------------
+	;; If reply channel is not configured, mark reply as sent and return.
+	JSET	#COMM_REP_ENABLED,X:STATUS,PROCESS_REPLY1
+	BCLR	#COMM_REP,X:STATUS ; Mark as... handled.
+	RTS
+
+PROCESS_REPLY1
 	;; Mark the packet type and size
 	MOVE	#>RB_TYPE_DSP_REP,A1
 	MOVE	#>(RB_REP_SIZE/2),X1
@@ -237,23 +249,13 @@ PROCESS_REPLY
 	MOVE	X1,X:REP_SIZE
 
 	;; Set destination address... and check that it's non-zero
-	CLR	A
 	MOVE	#>REP_BUS_ADDR,R0
 	MOVE	#>BURST_DEST_LO,R1
 	.loop	#2
 	MOVE	X:(R0)+,X0
-	OR	X0,A
 	MOVE	X0,X:(R1)+
 	.endl
 
-	;; Is reply channel configured?
-	CMP 	#0,A
-	JNE	PROCESS_REPLY1
-	BCLR	#COMM_REP,X:STATUS ; Mark as... handled.
-	RTS
-
-PROCESS_REPLY1
-	
 	;; Set BLOCK_SIZE, in bytes
 	MOVE	X:REP_SIZE,A
 	ASL	#2,A,A
@@ -337,7 +339,10 @@ PROCESS_MCE_REPLY
 ;----------------------------------------------
 PROCESS_MCE_DATA
 ;----------------------------------------------
-	;; Update QT_BUF_HEAD -- but just drop the frame if the buffer is full
+	;; Mark as handled
+	BCLR	#COMM_MCEDATA,X:STATUS
+	
+	;; Check QT_BUF_HEAD, just drop the frame if the buffer is full
 	MOVE	X:QT_BUF_HEAD,A
 	ADD	#1,A
 	MOVE	X:QT_BUF_MAX,B
@@ -348,12 +353,8 @@ PROCESS_MCE_DATA__CHECK_TAIL
 	MOVE	X:QT_BUF_TAIL,B	; Buffer full?
 	CMP	A,B
 	JEQ	PROCESS_MCE_DATA__DROP_FRAME
-
-	;; Store updated head undex.
-	MOVE	A,X:QT_BUF_HEAD
-	
-	;; DEBUG -- no copy.
-	JMP	PROCESS_MCE_DATA__DONE
+	;; Don't store the update QT_BUF_HEAD, we'll do that later
+	;; when we increment QT_DEST
 
 	;; Send out the data directly
 	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),A
@@ -362,24 +363,27 @@ PROCESS_MCE_DATA__CHECK_TAIL
 	MOVE	A1,X:BLOCK_SIZE
 	
 	;; Set destination address
-	MOVE	#>QT_BASE_LO,R0
+	MOVE	#>QT_DEST_LO,R0
 	MOVE	#>BURST_DEST_LO,R1
 	.loop	#2
 	MOVE	X:(R0)+,X0
 	MOVE	X0,X:(R1)+
 	.endl
 
-	MOVE	#(MCEREP_BUF+MCEREP_PAYLOAD),X0
+	MOVE	#>(MCEREP_BUF+MCEREP_PAYLOAD),X0
 	MOVE	X0,X:YMEM_SRC
 
 	;; Trigger writes as master.
 	JSR 	BLOCK_TRANSFER
 	
+	;; Update buffer pointers
+	JSR	BUFFER_INCR
+
 PROCESS_MCE_DATA__DONE
-	;; Mark as handled
-	BCLR	#COMM_MCEDATA,X:STATUS
-	;; Regardless of whether we sent that frame, we should count it
-	;; towards the goal
+	;; Regardless of whether we sent that frame, we should count
+	;; it towards the goal.  Also invalidate the buffer, to
+	;; trigger timer-based informs.
+	BSET	#COMM_BUF_UPDATE,X:STATUS
 	MOVE	X:QT_INFORM_IDX,A
 	ADD	#1,A
 	MOVE	X:QT_INFORM,B
@@ -395,7 +399,7 @@ PROCESS_MCE_DATA__DROP_FRAME
 	ADD	#1,A
 	NOP
 	MOVE	A,X:QT_DROPS
-	JMP	PROCESS_MCE_DATA__DONE
+	RTS
 
 
 ;--------------------
@@ -773,6 +777,13 @@ PROCESS_SET_DATA_BUFFER
 	MOVE	X:(R0)+,X0	; 8
 	MOVE	X0,X:QT_DROPS
 	MOVE	X:(R0)+,X0
+	
+	;; Reset QT_DEST from QT_BASE.
+	JSR	BUFFER_RESET
+	
+	;; Reset frame counter alert
+	MOVE	#>0,X0
+	MOVE	X0,X:QT_INFORM_IDX
 
 	;; Yes reply.
 	BCLR	#COMM_CMD,X:STATUS

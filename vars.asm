@@ -183,12 +183,13 @@ COMM_MCEREP		EQU	6 ; MCE reply has been buffered for send to host
 COMM_MCEDATA		EQU	7 ; MCE data " "
 COMM_ERR		EQU	8 ; Command not recognized or whatever
 COMM_REP_ENABLED	EQU	12 ;
-
+COMM_BUF_UPDATE		EQU	13 ; Data has been written to buffer
 	
 XMEM_SRC		DC	0
 	
 INT_DEBUG_BUF_IDX	DC	0
 DEBUG_BUF_IDX		DC	0
+	
 	
 CMD_BUFFER 		EQU	$100
 
