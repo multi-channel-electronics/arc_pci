@@ -89,10 +89,10 @@ HACK_LOOP
 	JSSET	#COMM_MCEDATA,X:STATUS,PROCESS_MCE_DATA
 
 	;; ;; Check for timer expiry
-	JSSET	#TCF,X:TCSR0,TIMER_ACTION_X
+	;; JSSET	#TCF,X:TCSR0,TIMER_ACTION_X
 	
 	;; ;; Issue information?
-	JSSET	#QT_FLUSH,X:STATUS,SEND_BUF_INFO
+	;; JSSET	#QT_FLUSH,X:STATUS,SEND_BUF_INFO
 	
 	;; LOOP UNTIL host gives up.
 	JSET	#DSR_HF2,X:DSR,HACK_LOOP
@@ -110,15 +110,19 @@ HACK_EXIT
 	
 TIMER_ACTION_X
 	MOVEP	#$300201,X:TCSR0	; Clear TOF, TCF, leave timer enabled.
-	MOVE	X:QT_INFORM_IDX,A
-	ADD	#1,A
-	MOVE	X:QT_INFORM,B
-	SUB	A,B
-	JNE	TIMER_ACTION_X_OK
-	ASL	#0,B,A		   	; MOVE A,B
-	BSET	#QT_FLUSH,X:STATUS	;    schedule inform
+;;; Testing...
+	;; MOVE	X:QT_INFORM_IDX,A
+	;; ADD	#1,A
+	;; MOVE	X:QT_INFORM,B
+	;; SUB	A,B
+	;; JNE	TIMER_ACTION_X_OK
+	;; ASL	#0,B,A		   	; MOVE A,B
+	
+	;; For real... suppressed
+	;; BSET	#QT_FLUSH,X:STATUS	;    schedule inform
+	
 TIMER_ACTION_X_OK
-	MOVE	A,X:QT_INFORM_IDX
+	;; MOVE	A,X:QT_INFORM_IDX
 	RTS
 
 	
@@ -232,14 +236,24 @@ PROCESS_REPLY
 	MOVE	A1,X:REP_TYPE
 	MOVE	X1,X:REP_SIZE
 
-	;; Set destination address
+	;; Set destination address... and check that it's non-zero
+	CLR	A
 	MOVE	#>REP_BUS_ADDR,R0
 	MOVE	#>BURST_DEST_LO,R1
 	.loop	#2
 	MOVE	X:(R0)+,X0
+	OR	X0,A
 	MOVE	X0,X:(R1)+
 	.endl
 
+	;; Is reply channel configured?
+	CMP 	#0,A
+	JNE	PROCESS_REPLY1
+	BCLR	#COMM_REP,X:STATUS ; Mark as... handled.
+	RTS
+
+PROCESS_REPLY1
+	
 	;; Set BLOCK_SIZE, in bytes
 	MOVE	X:REP_SIZE,A
 	ASL	#2,A,A
@@ -257,10 +271,11 @@ PROCESS_REPLY
 	
 	;; Raise interrupt and wait for handshake.
 	BSET	#INTA,X:DCTR
-	
 	JCLR	#DSR_HF0,X:DSR,*
-	BCLR	#INTA,X:DCTR
 	
+	BCLR	#COMM_REP,X:STATUS ; Mark as sent.
+	
+	BCLR	#INTA,X:DCTR
 	JSET	#DSR_HF0,X:DSR,*
 	
 	RTS
@@ -313,16 +328,33 @@ PROCESS_MCE_REPLY
 	
 	;; Raise interrupt and wait for handshake.
 	BSET	#INTA,X:DCTR
-	
 	JCLR	#DSR_HF0,X:DSR,*
 	BCLR	#INTA,X:DCTR
-	
 	JSET	#DSR_HF0,X:DSR,*
 	
 	RTS
 
-
+;----------------------------------------------
 PROCESS_MCE_DATA
+;----------------------------------------------
+	;; Update QT_BUF_HEAD -- but just drop the frame if the buffer is full
+	MOVE	X:QT_BUF_HEAD,A
+	ADD	#1,A
+	MOVE	X:QT_BUF_MAX,B
+	CMP	A,B		; End of buffer? [B ? A]
+	JGT	PROCESS_MCE_DATA__CHECK_TAIL
+	MOVE	#0,A		; Start over
+PROCESS_MCE_DATA__CHECK_TAIL
+	MOVE	X:QT_BUF_TAIL,B	; Buffer full?
+	CMP	A,B
+	JEQ	PROCESS_MCE_DATA__DROP_FRAME
+
+	;; Store updated head undex.
+	MOVE	A,X:QT_BUF_HEAD
+	
+	;; DEBUG -- no copy.
+	JMP	PROCESS_MCE_DATA__DONE
+
 	;; Send out the data directly
 	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),A
 	ASL	#2,A,A
@@ -343,11 +375,27 @@ PROCESS_MCE_DATA
 	;; Trigger writes as master.
 	JSR 	BLOCK_TRANSFER
 	
-	;; Mark as sent
+PROCESS_MCE_DATA__DONE
+	;; Mark as handled
 	BCLR	#COMM_MCEDATA,X:STATUS
-	
+	;; Regardless of whether we sent that frame, we should count it
+	;; towards the goal
+	MOVE	X:QT_INFORM_IDX,A
+	ADD	#1,A
+	MOVE	X:QT_INFORM,B
+	MOVE	A,X:QT_INFORM_IDX
+	CMP	A,B
+	JNE	PROCESS_MCE_DATA__DONE2
+	BSET	#QT_FLUSH,X:STATUS
+PROCESS_MCE_DATA__DONE2
 	RTS
-
+	
+PROCESS_MCE_DATA__DROP_FRAME
+	MOVE	X:QT_DROPS,A
+	ADD	#1,A
+	NOP
+	MOVE	A,X:QT_DROPS
+	JMP	PROCESS_MCE_DATA__DONE
 
 
 ;--------------------
@@ -355,14 +403,14 @@ SEND_BUF_INFO
 ;--------------------
 	BCLR	#QT_FLUSH,X:STATUS
 	;; Debug, click the buf head up and send inform.
-	MOVE	X:QT_BUF_HEAD,A1
-	ADD	#1,A
-	NOP
-	MOVE	A1,X:QT_BUF_HEAD
+	;; MOVE	X:QT_BUF_HEAD,A1
+	;; ADD	#1,A
+	;; NOP
+	;; MOVE	A1,X:QT_BUF_HEAD
 	;; RTS
 	JCLR	#COMM_REP_ENABLED,X:STATUS,SEND_BUF_INFO_EXIT
 	
-	
+	;; Load head index into first data field, pad to 32 bits
 	MOVE	X:QT_BUF_HEAD,X0
 	MOVE	X0,X:REP_DATA
 	MOVE	#0,X0
@@ -401,8 +449,6 @@ SEND_BUF_INFO
 	JSET	#DSR_HF0,X:DSR,*
 	
 SEND_BUF_INFO_EXIT
-	;; Mark as sent
-	BCLR	#QT_FLUSH,X:STATUS
 	RTS
 	
 
@@ -451,7 +497,9 @@ CMD_SEND_MCE		EQU	$21
 ;; 	MOVE	X0,Y:(R0-1)
 ;; 	RTS
 	
+;------------------------
 PROCESS_PC_CMD_INT
+;------------------------
 	;; Push all and disable further SRRQ ints
 	JSR	SAVE_REGISTERS	; This does not save all the registers...
 	BCLR	#DCTR_SRIE,X:DCTR
@@ -564,7 +612,7 @@ PROCESS_PC_CMD_1
 ;;; this gets called from the main loop.
 	
 PROCESS_PC_CMD_2
-	;; Init the reply packet, even if there might not be a reply.
+	;; Init the reply packet for success.
 	MOVE	#>RB_TYPE_DSP_REP,A1
 	MOVE	X:CMD_WORD,B	; this will be used in the switch below.
 	MOVE	A1,X:REP_TYPE	; type is "dsp reply"
@@ -582,11 +630,6 @@ PROCESS_PC_CMD_2
 	JSR	PROCESS_JOIN_XR0_A
 	MOVE	A0,X1		; "data"
 
-;;; 	this is wrong, each value is 24 bits and thus spread across two rams.
-	;; Pre-load the first packet word into R0 and the second into X0.
-	;; MOVE	X:CMD_BUFFER,R1
-	;; MOVE	X:(CMD_BUFFER+2),X1
-	
 	CMP	#>CMD_READ_P,B
 	JEQ	PROCESS_READ_P
 	
@@ -673,8 +716,9 @@ PROCESS_SET_REP_BUFFER
 	OR	X0,A		; If there is a 1 in that address, we will find it.
 	.endl
 	
-	;; No reply!
+	;; Yes, reply.
 	BCLR	#COMM_CMD,X:STATUS
+	BSET	#COMM_REP,X:STATUS
 	
 	;; Enable / disable replies based on whether that address was 0 or not.
 	CMP	#0,A
@@ -686,6 +730,7 @@ PROCESS_SET_REP_BUFFER
 PROCESS_SET_REP_BUFFER_DISABLE
 	BCLR	#COMM_REP_ENABLED,X:STATUS
 	RTS
+	
 
 PROCESS_SET_DATA_BUFFER
 	;; Lots of good stuff in here.
@@ -730,10 +775,8 @@ PROCESS_SET_DATA_BUFFER
 	MOVE	X:(R0)+,X0
 
 	;; Yes reply.
-	MOVE	#>0,X0
-	MOVE	X0,X:REP_RSTAT
-	MOVE	X0,X:REP_RSIZE
-	BSET	#COMM_CMD,X:STATUS
+	BCLR	#COMM_CMD,X:STATUS
+	BSET	#COMM_REP,X:STATUS
 	RTS
 
 	
