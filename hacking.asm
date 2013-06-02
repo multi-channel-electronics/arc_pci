@@ -55,7 +55,7 @@ HACK_LOOP
 	;; Should we send a reply?
 	JSSET	#COMM_REP,X:STATUS,PROCESS_REPLY
 	
-	;; FIFO action?
+	;; FIFO action? -- this might also get called from PCI handler...
 	JSR 	CHECK_FOR_DATA
 
 	;; Transmit to host?
@@ -119,11 +119,12 @@ BLOCK_TRANSFERX
 ;   In:
 ;   - BURST_DEST_HI:BURST_DEST_LO is PC RAM address (16:16)
 ;   - BLOCK_SIZE is packet size, in bytes
-;   - XMEM_SRC is start of data in X memory
+;   - MEM_SRC is start of data in X or Y memory
+;   - STATUS[COMM_TFR_YMEM] is used to determine X or Y 
 ;  Out:
 ;   - BLOCK_SIZE will be decremented to zero.
 ;   - BURST_DEST_HI:LO will be incremented by BLOCK_SIZE
-;   - XMEM_SRC will be incremented by BLOCK_SIZE/2
+;   - MEM_SRC will be incremented by BLOCK_SIZE/2
 ;  Trashes:
 ;   - A and B at least
 
@@ -148,19 +149,28 @@ BLOCK_TRANSFERX1
 	MOVE	A,X:BLOCK_SIZE		; Updated BLOCK_SIZE
 	MOVE	B,X:BURST_SIZE		; BURST_SIZE ;= round32(min(BLOCK_SIZE,$100))
 	ASR	#25,B,B			; B0 = # of 16 bit words
-
+	
 	;; Setup DMA from BURST_SRC to PCI tx
 	MOVEP	#DTXM,X:DDR0		; DMA dest'n
-	MOVE	X:XMEM_SRC,A0
+	MOVE	X:MEM_SRC,A0
 	MOVEP	A0,X:DSR0		; DMA source
 	ADD	B,A
 	DEC	B
-	MOVE	A0,X:XMEM_SRC		; BURST_SRC += BURST_SIZE/2
+	MOVE	A0,X:MEM_SRC		; BURST_SRC += BURST_SIZE/2
 	
 	MOVEP	B0,X:DCO0		; DMA length = BURST_SIZE/2 - 1
 
-	;; DMA go
+	;; Transfer from X or Y mem?
+	JSET	#COMM_TFR_YMEM,X:STATUS,BLOCK_TRANSFERX1_YMEM
+	
+BLOCK_TRANSFERX1_XMEM
 	MOVEP	#$8EFA50,X:DCR0		; X to X
+	JMP	BLOCK_TRANSFERX_PCI
+	
+BLOCK_TRANSFERX1_YMEM
+	MOVEP	#$8EFA51,X:DCR0		; X to Y
+	JMP	BLOCK_TRANSFERX_PCI
+	
 
 BLOCK_TRANSFERX_PCI
 	MOVE	#>$7,X0			; Memory write
@@ -227,9 +237,10 @@ PROCESS_REPLY1
 	MOVE	A1,X0
 	MOVE	X0,X:BLOCK_SIZE
 	MOVE	#>REP_BUFFER1,X0
-	MOVE	X0,X:XMEM_SRC
+	MOVE	X0,X:MEM_SRC
 
 	;; Trigger writes as master.
+	BCLR	#COMM_TFR_YMEM,X:STATUS
 	JSR 	BLOCK_TRANSFERX
 	
 	;; Mark as sent
@@ -284,7 +295,8 @@ PROCESS_MCE_REPLY
 	MOVE	A1,X0
 	MOVE	X0,X:BLOCK_SIZE
 	MOVE	#>REP_BUFFER1,X0
-	MOVE	X0,X:XMEM_SRC
+	MOVE	X0,X:MEM_SRC
+	BCLR	#COMM_TFR_YMEM,X:STATUS
 
 	;; Trigger writes as master.
 	JSR 	BLOCK_TRANSFERX
@@ -303,9 +315,6 @@ PROCESS_MCE_REPLY
 ;----------------------------------------------
 PROCESS_MCE_DATA
 ;----------------------------------------------
-	;; Mark as handled
-	BCLR	#COMM_MCEDATA,X:STATUS
-	
 	;; Check QT_BUF_HEAD, just drop the frame if the buffer is full
 	MOVE	X:QT_BUF_HEAD,A
 	ADD	#1,A
@@ -335,15 +344,19 @@ PROCESS_MCE_DATA__CHECK_TAIL
 	.endl
 
 	MOVE	#>(MCEREP_BUF+MCEREP_PAYLOAD),X0
-	MOVE	X0,X:YMEM_SRC
+	MOVE	X0,X:MEM_SRC
+	BSET	#COMM_TFR_YMEM,X:STATUS
 
 	;; Trigger writes as master.
-	JSR 	BLOCK_TRANSFER
+	JSR 	BLOCK_TRANSFERX
 	
 	;; Update buffer pointers
 	JSR	BUFFER_INCR
 
 PROCESS_MCE_DATA__DONE
+	;; Mark as handled
+	BCLR	#COMM_MCEDATA,X:STATUS
+	
 	;; Regardless of whether we sent that frame, we should count
 	;; it towards the goal.  Also invalidate the buffer, to
 	;; trigger timer-based informs.
@@ -405,7 +418,8 @@ SEND_BUF_INFO
 	MOVE	A1,X0
 	MOVE	X0,X:BLOCK_SIZE
 	MOVE	#>REP_BUFFER1,X0
-	MOVE	X0,X:XMEM_SRC
+	MOVE	X0,X:MEM_SRC
+	BCLR	#COMM_TFR_YMEM,X:STATUS
 
 	;; Trigger writes as master.
 	JSR 	BLOCK_TRANSFERX
@@ -471,7 +485,10 @@ PROCESS_PC_CMD_INT
 	;; Push all and disable further SRRQ ints
 	JSR	SAVE_REGISTERS	; This does not save all the registers...
 	BCLR	#DCTR_SRIE,X:DCTR
-
+	
+	;; Debug flag
+	BSET	#DCTR_HF3,X:DCTR
+	
 	;; Is there data?
 	JCLR	#SRRQ,X:DSR,PROCESS_PC_CMD_INT_EXIT
 	
@@ -531,6 +548,7 @@ PROCESS_PC_CMD_INT_OK
 PROCESS_PC_CMD_INT_EXIT	
 	;; Re-enable int and pop all
 	BSET	#DCTR_SRIE,X:DCTR
+	BCLR	#DCTR_HF3,X:DCTR
 	JSR	RESTORE_REGISTERS
 	RTI
 
@@ -894,25 +912,53 @@ FIFO_RESYNC
 	
 	
 CHECK_FOR_DATA__BUFFER_REPLY
+	;; Cue up data dump buffer...
+	MOVE	#$8000,R4
+
+	;; Test for buffer in use / set reply present
+	JSET	#COMM_MCEDATA,X:STATUS,CHECK_FOR_DATA__BUFFER_REPLY1
+	JSET	#COMM_MCEDATA,X:STATUS,CHECK_FOR_DATA__BUFFER_REPLY1
+	
+	;; Ok, you can keep it.
 	BSET	#COMM_MCEREP,X:STATUS
-	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),X0
 	MOVE	#(MCEREP_BUF+MCEREP_PAYLOAD),R4
+CHECK_FOR_DATA__BUFFER_REPLY1
+	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),X0
 	JSR	CHECK_FOR_DATA__BUFFER_LARGE
 	
 	JMP	CHECK_FOR_DATA_EXIT
 	
 CHECK_FOR_DATA__BUFFER_DATA
+	;; Cue up data dump buffer...
+	MOVE	#$8000,R4
+
+	;; Test for buffer in use / set reply present
+	JSET	#COMM_MCEDATA,X:STATUS,CHECK_FOR_DATA__BUFFER_DATA1
+	JSET	#COMM_MCEDATA,X:STATUS,CHECK_FOR_DATA__BUFFER_DATA1
+	
+	;; Ok, you can keep it.
+	BSET	#COMM_MCEDATA,X:STATUS
+	MOVE	#MCEDATA_BUF,R4
+CHECK_FOR_DATA__BUFFER_DATA1
+	
 	;; 	Increment data frame counter
 	MOVE	X:DA_COUNT,A0
 	INC	A
 	NOP
 	MOVE	A0,X:DA_COUNT
 	
+	;; Buffer for MCE data frames
+	;; MOVE	#MCEDATA_BUF,R4
+	
+	;; Test if we already have a data frame.  If so, dump this one.
 	BSET	#COMM_MCEDATA,X:STATUS
+	;; JCC	CHECK_FOR_DATA__BUFFER_DATA2
+	;; ;; Dump
+	;; MOVE	#$4000,R4
+	
+CHECK_FOR_DATA__BUFFER_DATA2
 	;; Packet size in dwords -> X0
 	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),X0
-	;; Dump it to temp buf...
-	MOVE	#MCEDATA_BUF,R4
 	
 	JSR	CHECK_FOR_DATA__BUFFER_LARGE
 	;; End marker for debugging; not a protocol signifier.

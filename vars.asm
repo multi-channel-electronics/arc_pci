@@ -184,8 +184,10 @@ COMM_MCEDATA		EQU	7 ; MCE data " "
 COMM_ERR		EQU	8 ; Command not recognized or whatever
 COMM_REP_ENABLED	EQU	12 ;
 COMM_BUF_UPDATE		EQU	13 ; Data has been written to buffer
+COMM_TFR_YMEM		EQU	14 ; PCI burst is coming from Y mem, not X mem.
+
 	
-XMEM_SRC		DC	0
+MEM_SRC			DC	0
 	
 INT_DEBUG_BUF_IDX	DC	0
 DEBUG_BUF_IDX		DC	0
