@@ -475,8 +475,10 @@ CMD_WRITE_Y		EQU	7
 			
 CMD_SET_REP_BUF		EQU	9
 CMD_SET_DATA_BUF	EQU	$A
+CMD_SET_DATA_BUF_MULTI	EQU	$B
 	
-CMD_SET_TAIL		EQU	$11		
+CMD_SET_TAIL		EQU	$11
+CMD_SET_TAIL_INF	EQU	$12
 			
 CMD_SEND_MCE		EQU	$21
 			
@@ -629,11 +631,17 @@ PROCESS_PC_CMD_2
 	CMP	#>CMD_SET_DATA_BUF,B
 	JEQ	PROCESS_SET_DATA_BUFFER
 	
+	CMP	#>CMD_SET_DATA_BUF_MULTI,B
+	JEQ	PROCESS_SET_DATA_BUFFER_MULTI
+	
 	CMP	#>CMD_SEND_MCE,B
 	JEQ	PROCESS_SEND_MCE
 	
 	CMP	#>CMD_SET_TAIL,B
 	JEQ	PROCESS_SET_TAIL
+	
+	CMP	#>CMD_SET_TAIL_INF,B
+	JEQ	PROCESS_SET_TAIL_INF
 	
 	;; No match... error?
 	BCLR	#COMM_CMD,X:STATUS
@@ -767,6 +775,62 @@ PROCESS_SET_DATA_BUFFER
 	JSR	TIMERX_STORE
 	RTS
 
+;-------------------------------
+PROCESS_SET_DATA_BUFFER_MULTI
+;-------------------------------
+	;; Lots of good stuff in here.
+	MOVE	#CMD_BUFFER,R0
+	NOP
+	NOP
+	
+	MOVE	X:(R0)+,X0	; 0
+	MOVE	X:(R0)+,X0
+
+	MOVE	X:(R0)+,X0	; 1
+	MOVE	X0,X:QT_BUF_SIZE
+	MOVE	X:(R0)+,X0
+
+	MOVE	X:(R0)+,X0	; 2
+	MOVE	X0,X:QT_FRAME_SIZE
+	MOVE	X:(R0)+,X0
+
+	;; Number of RAM blocks (1)
+	MOVE	X:(R0)+,X0	; 3
+	MOVE	X:(R0)+,X0
+	
+	;; Now loop over num_buffers... which is one.
+	NOP
+	MOVE	X:(R0)+,X0	; BUF+0
+	MOVE	X0,X:QT_BASE_LO	
+	MOVE	X:(R0)+,X0
+	MOVE	X0,X:QT_BASE_HI
+
+	MOVE	X:(R0)+,X0	; BUF+1
+	;; MOVE	X0,X:QT_BUF_MAX
+	MOVE	X:(R0)+,X0	; 
+	
+	MOVE	X:(R0)+,X0	; BUF+2
+	MOVE	X0,X:QT_BUF_MAX
+	MOVE	X:(R0)+,X0	; 
+	
+	;; Clear stuff.
+	MOVE	#>0,X0
+	MOVE	#>1,X1
+	MOVE	X0,X:QT_BUF_HEAD
+	MOVE	X0,X:QT_BUF_TAIL
+	MOVE	X0,X:QT_DROPS
+	MOVE	X0,X:QT_INFORM_IDX
+	MOVE	X1,X:QT_INFORM
+	
+	;; Reset QT_DEST from QT_BASE.
+	JSR	BUFFER_RESET
+	
+	;; Yes reply.
+	BCLR	#COMM_CMD,X:STATUS
+	BSET	#COMM_REP,X:STATUS
+	JSR	TIMERX_STORE
+	RTS
+
 	
 PROCESS_SEND_MCE
 	;; The packet data is a command for the MCE.  Send it.
@@ -792,6 +856,31 @@ PROCESS_SET_TAIL
 	MOVE	X:CMD_BUFFER,X0
 	MOVE	X0,X:QT_BUF_TAIL
 
+	;; Yes, reply.  Everything replies.
+	BCLR	#COMM_CMD,X:STATUS
+	BSET	#COMM_REP,X:STATUS
+	JSR	TIMERX_STORE
+	RTS
+
+PROCESS_SET_TAIL_INF
+	;; Update tail index from the first datum
+	MOVE	#>CMD_BUFFER,R0
+	NOP
+	NOP
+	MOVE	X:(R0)+,X0
+	MOVE	X0,X:QT_BUF_TAIL
+	MOVE	X:(R0)+,X0
+	
+	;; Update inform trigger?  Only if non-zero
+	CLR	A
+	MOVE	X:(R0)+,X0
+	CMP	X0,A
+	JEQ	PROCESS_SET_TAIL_INF_1
+	MOVE	X0,X:QT_INFORM
+	MOVE	A1,X:QT_INFORM_IDX
+PROCESS_SET_TAIL_INF_1
+	MOVE	X:(R0)+,X0
+	
 	;; Yes, reply.  Everything replies.
 	BCLR	#COMM_CMD,X:STATUS
 	BSET	#COMM_REP,X:STATUS
