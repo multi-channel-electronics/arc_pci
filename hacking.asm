@@ -36,9 +36,8 @@ HACK_INIT
 	MOVE	#>DEBUG_BUF,X0
 	MOVE	X0,X:DEBUG_BUF_IDX
 	
-	MOVE	#>TIMER_BUFFER,X0
-	MOVE	X0,X:TIMER_INDEX
-
+	JSR	TIMERX_STORE_INIT
+	
 	;; Enable PCI slave receive interrupt to handle commands from host
 	BSET	#DCTR_SRIE,X:DCTR
 	
@@ -180,7 +179,7 @@ BLOCK_TRANSFERX_PCI
 	;; Wait for completion, watch for FIFO data.
 	
 BLOCK_TRANSFERX_PCI_WAIT
-	;; JSR	CHECK_FOR_DATA
+	JSR	CHECK_FOR_DATA
 	JCLR	#MARQ,X:DPSR,BLOCK_TRANSFERX_PCI_WAIT
 
 	;; Check for errors:
@@ -225,7 +224,7 @@ PROCESS_REPLY1
 	MOVE	A1,X:REP_TYPE
 	MOVE	X1,X:REP_SIZE
 
-	;; Set destination address... and check that it's non-zero
+	;; Set destination address...
 	MOVE	#>REP_BUS_ADDR,R0
 	MOVE	#>BURST_DEST_LO,R1
 	.loop	#2
@@ -242,6 +241,9 @@ PROCESS_REPLY1
 	MOVE	#>REP_BUFFER1,X0
 	MOVE	X0,X:MEM_SRC
 
+	;; Last chance, check the FO input
+	JSR	CHECK_FOR_DATA
+	
 	;; Trigger writes as master.
 	BCLR	#COMM_TFR_YMEM,X:STATUS
 	JSR 	BLOCK_TRANSFERX
@@ -261,6 +263,10 @@ PROCESS_REPLY1
 	RTS
 
 PROCESS_MCE_REPLY
+	MOVE	#>$b10000,A
+	JSR	TIMERX_STORE_A1
+	JSR	TIMERX_STORE
+
 	;; Copy data into the reply buffer, starting at the "type" field
 	MOVE	#(MCEREP_BUF+MCEREP_TYPE),R3
 	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),Y1
@@ -313,11 +319,16 @@ PROCESS_MCE_REPLY
 	BCLR	#INTA,X:DCTR
 	JSET	#DSR_HF0,X:DSR,*
 	
+	JSR	TIMERX_STORE
 	RTS
 
 ;----------------------------------------------
 PROCESS_MCE_DATA
 ;----------------------------------------------
+	MOVE	#>$b20000,A
+	JSR	TIMERX_STORE_A1
+	JSR	TIMERX_STORE
+	
 	;; Check QT_BUF_HEAD, just drop the frame if the buffer is full
 	MOVE	X:QT_BUF_HEAD,A
 	ADD	#1,A
@@ -358,6 +369,7 @@ PROCESS_MCE_DATA__CHECK_TAIL
 
 PROCESS_MCE_DATA__DONE
 	;; Mark as handled
+	JSR	TIMERX_STORE
 	BCLR	#COMM_MCEDATA,X:STATUS
 	
 	;; Regardless of whether we sent that frame, we should count
@@ -371,6 +383,7 @@ PROCESS_MCE_DATA__DONE
 	CMP	A,B
 	JNE	PROCESS_MCE_DATA__DONE2
 	BSET	#QT_FLUSH,X:STATUS
+	BCLR	#COMM_BUF_UPDATE,X:STATUS ; So we don't trigger a timer int too
 PROCESS_MCE_DATA__DONE2
 	RTS
 	
@@ -385,6 +398,10 @@ PROCESS_MCE_DATA__DROP_FRAME
 ;--------------------
 SEND_BUF_INFO
 ;--------------------
+	MOVE	#>$b80000,A
+	JSR	TIMERX_STORE_A1
+	JSR	TIMERX_STORE
+	
 	BCLR	#QT_FLUSH,X:STATUS
 	;; Debug, click the buf head up and send inform.
 	;; MOVE	X:QT_BUF_HEAD,A1
@@ -434,6 +451,7 @@ SEND_BUF_INFO
 	JSET	#DSR_HF0,X:DSR,*
 	
 SEND_BUF_INFO_EXIT
+	JSR	TIMERX_STORE
 	RTS
 	
 
@@ -463,31 +481,17 @@ CMD_SET_TAIL		EQU	$11
 CMD_SEND_MCE		EQU	$21
 			
 
-;; PROCESS_PC_CMD_POLL
-;; 	MOVE	#DEBUG_BUF,R0
-;; 	NOP
-;; 	MOVE	Y:(R0),X0
-;; 	MOVE	X0,R0
-;; AGAIN_	
-;; 	JCLR	#SRRQ,X:DSR,PROCESS_PC_CMD_POLL_EXIT
-;; 	;; Dump PC words into debug buffer.
-;; 	MOVEP	X:DRXR,X0
-;; 	MOVE	X0,Y:(R0)+
-;; 	JMP	AGAIN_
-
-;; PROCESS_PC_CMD_POLL_EXIT
-;; 	MOVE	R0,X0
-;; 	MOVE	#(DEBUG_BUF+1),R0
-;; 	NOP
-;; 	MOVE	X0,Y:(R0-1)
-;; 	RTS
-	
 ;------------------------
 PROCESS_PC_CMD_INT
 ;------------------------
 	;; Push all and disable further SRRQ ints
 	JSR	SAVE_REGISTERS	; This does not save all the registers...
 	BCLR	#DCTR_SRIE,X:DCTR
+	
+	;; Mark entry
+	MOVE	#>$CC0000,A1
+	JSR	TIMERX_STORE_A1_RAW
+	JSR	TIMERX_STORE_RAW
 	
 	;; Debug flag
 	BSET	#DCTR_HF3,X:DCTR
@@ -531,24 +535,13 @@ PROCESS_PC_CMD_INT
 	.endl
 	
 PROCESS_PC_CMD_INT_OK
-	MOVE	X:INT_DEBUG_BUF_IDX,R0
-	MOVE	X:CMD_WORD,X0
-	MOVE	X0,Y:(R0)+
-	MOVE	X:CMD_SIZE,X0
-	MOVE	X0,Y:(R0)+
-	MOVE	X:CMD_BUFFER,X0
-	MOVE	X0,Y:(R0)+
-	MOVE	X:(CMD_BUFFER+1),X0
-	MOVE	X0,Y:(R0)+
-	MOVE	#>$aabbcc,X0	; end-of-data
-	MOVE	X0,Y:(R0)+
-	
-	MOVE	R0,X:INT_DEBUG_BUF_IDX
-	
 	;; Mark cmd-to-process
 	BSET	#COMM_CMD,X:STATUS
 
 PROCESS_PC_CMD_INT_EXIT	
+	;; Mark exit
+	JSR	TIMERX_STORE_RAW
+	
 	;; Re-enable int and pop all
 	BSET	#DCTR_SRIE,X:DCTR
 	BCLR	#DCTR_HF3,X:DCTR
@@ -587,6 +580,9 @@ PROCESS_PC_CMD_1
 ;;; this gets called from the main loop.
 	
 PROCESS_PC_CMD_2
+	MOVE	#>$cd0000,A1
+	JSR	TIMERX_STORE_A1
+
 	;; Init the reply packet for success.
 	MOVE	#>RB_TYPE_DSP_REP,A1
 	MOVE	X:CMD_WORD,B	; this will be used in the switch below.
@@ -594,6 +590,10 @@ PROCESS_PC_CMD_2
 	MOVE	B1,X:REP_RCMD	; copy of command word
 	MOVE	B0,X:REP_RSTAT	; status = 0
 	MOVE	B0,X:REP_RSIZE	; data size = 0
+	
+	MOVE	B,A
+	JSR	TIMERX_STORE_A1
+	JSR	TIMERX_STORE
 	
 	;; Now distribute the command to a handler
 	;; For memory reads, args are [address].
@@ -638,6 +638,8 @@ PROCESS_PC_CMD_2
 	;; No match... error?
 	BCLR	#COMM_CMD,X:STATUS
 	BSET	#COMM_ERR,X:STATUS
+	
+	JSR	TIMERX_STORE
 	RTS
 
 PROCESS_READ_P
@@ -660,6 +662,7 @@ PROCESS_READ_EXIT
 	;; Mark reply-to-send
 	BCLR	#COMM_CMD,X:STATUS
 	BSET	#COMM_REP,X:STATUS
+	JSR	TIMERX_STORE
 	RTS
 
 PROCESS_WRITE_P
@@ -676,6 +679,7 @@ PROCESS_WRITE_EXIT
 	;; Mark reply-to-send
 	BCLR	#COMM_CMD,X:STATUS
 	BSET	#COMM_REP,X:STATUS
+	JSR	TIMERX_STORE
 	RTS
 	
 	
@@ -694,6 +698,7 @@ PROCESS_SET_REP_BUFFER
 	;; Yes, reply.
 	BCLR	#COMM_CMD,X:STATUS
 	BSET	#COMM_REP,X:STATUS
+	JSR	TIMERX_STORE
 	
 	;; Enable / disable replies based on whether that address was 0 or not.
 	CMP	#0,A
@@ -734,7 +739,7 @@ PROCESS_SET_DATA_BUFFER
 	MOVE	X:(R0)+,X0
 
 	MOVE	X:(R0)+,X0	; 5
-	MOVE	X0,X:TCPR0	;  ->Right into the time-out counter
+	;; MOVE	X0,X:TCPR0	;  ->Right into the time-out counter
 	MOVE	X:(R0)+,X0
 	
 	MOVE	X:(R0)+,X0	; 6
@@ -759,6 +764,7 @@ PROCESS_SET_DATA_BUFFER
 	;; Yes reply.
 	BCLR	#COMM_CMD,X:STATUS
 	BSET	#COMM_REP,X:STATUS
+	JSR	TIMERX_STORE
 	RTS
 
 	
@@ -777,6 +783,7 @@ PROCESS_SEND_MCE
 	NOP
 	BCLR	#COMM_CMD,X:STATUS
 	BSET	#COMM_REP,X:STATUS
+	JSR	TIMERX_STORE
 	RTS
 
 	
@@ -788,6 +795,7 @@ PROCESS_SET_TAIL
 	;; Yes, reply.  Everything replies.
 	BCLR	#COMM_CMD,X:STATUS
 	BSET	#COMM_REP,X:STATUS
+	JSR	TIMERX_STORE
 	RTS
 
 
@@ -825,18 +833,28 @@ PROCESS_JOIN_XR0_A
 ;------------------------
 CHECK_FOR_DATA
 ;------------------------
+	BSET	#DCTR_HF5,X:DCTR
 	JCLR	#EF,X:PDRD,CHECK_FOR_DATA_EXIT
 	NOP
 	NOP
 	JCLR	#EF,X:PDRD,CHECK_FOR_DATA_EXIT
 	;; The FIFO is non-empty.
+	MOVE	#>$cf0000,A1
+	JSR	TIMERX_STORE_A1
+	JSR	TIMERX_STORE
 	
 	;; Read FIFO words into A1.  Reading into A causes weird sign
 	;; extension effects.  If we encounter any unexpected data,
 	;; reset the FIFO.
 
+	MOVE	#>$a80000,Y0	; See where we get stuck.
+	
 	CLR	A		; A0=0
 	MOVE	#>MCEREP_BUF,R4
+	
+	NOP
+	NOP
+	MOVE	Y0,Y:(R4)
 	
 	MOVEP	Y:RDFIFO,A1
 	AND	#>$00FFFF,A
@@ -844,6 +862,7 @@ CHECK_FOR_DATA
 	CMP	#>$00A5A5,A
 	JNE	RESET_FIFO	; Empty the FIFO, and return to main loop.
 	
+	MOVE	Y0,Y:(R4)
 	JCLR	#EF,X:PDRD,*
 	NOP
 	NOP
@@ -855,6 +874,7 @@ CHECK_FOR_DATA
 	CMP	#>$00A5A5,A
 	JNE	FIFO_RESYNC	; Sure, give simple resync a chance
 
+	MOVE	Y0,Y:(R4)
 	JCLR	#EF,X:PDRD,*
 	NOP
 	NOP
@@ -867,6 +887,7 @@ FIFO_RESYNC
 	CMP	#>$005A5A,A
 	JNE	RESET_FIFO
 
+	MOVE	Y0,Y:(R4)
 	JCLR	#EF,X:PDRD,*
 	NOP
 	NOP
@@ -880,6 +901,7 @@ FIFO_RESYNC
 
 	;; We made it; read 4 more 16-bit words, which are the packet type and size.
 	.loop	#4
+	MOVE	Y0,Y:(R4)
 	JCLR	#EF,X:PDRD,*
 	NOP
 	NOP
@@ -890,15 +912,20 @@ FIFO_RESYNC
 	MOVE	A1,Y:(R4)+
 	.endl
 	
+	JSR	TIMERX_STORE
+	
 	;; Compute packet divisions
 	;; -- sets TOTAL_BUFFS (half-fifos) and LEFT_TO_READ (single fifo reads)
 	CLR	A
 	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),A0
 	JSR	PACKET_PARTITIONS
 	
-	;; Is this a data or reply packet?
+	JSR	TIMERX_STORE
+	
 	CLR	A
-	MOVE	Y:(MCEREP_BUF+MCEREP_TYPE),A1
+	MOVE    Y:(MCEREP_BUF+MCEREP_TYPE),A1
+	
+	;; Is this a data or reply packet?
 	CMP	#'RP',A
 	JEQ	CHECK_FOR_DATA__BUFFER_REPLY
 	
@@ -911,15 +938,18 @@ FIFO_RESYNC
 	NOP
 	MOVE	A0,X:PTYPE_FAILS
 	JSR	RESET_FIFO
-	JMP	CHECK_FOR_DATA_EXIT
+	
+CHECK_FOR_DATA_EXIT
+	BCLR	#DCTR_HF5,X:DCTR
+	RTS
 	
 	
 CHECK_FOR_DATA__BUFFER_REPLY
 	;; Cue up data dump buffer...
-	MOVE	#$8000,R4
+	MOVE	#>$8000,R4
 
 	;; Test for buffer in use / set reply present
-	JSET	#COMM_MCEDATA,X:STATUS,CHECK_FOR_DATA__BUFFER_REPLY1
+	JSET	#COMM_MCEREP,X:STATUS,CHECK_FOR_DATA__BUFFER_REPLY1
 	JSET	#COMM_MCEDATA,X:STATUS,CHECK_FOR_DATA__BUFFER_REPLY1
 	
 	;; Ok, you can keep it.
@@ -930,13 +960,14 @@ CHECK_FOR_DATA__BUFFER_REPLY1
 	JSR	CHECK_FOR_DATA__BUFFER_LARGE
 	
 	JMP	CHECK_FOR_DATA_EXIT
+
 	
 CHECK_FOR_DATA__BUFFER_DATA
 	;; Cue up data dump buffer...
-	MOVE	#$8000,R4
+	MOVE	#>$8000,R4
 
-	;; Test for buffer in use / set reply present
-	JSET	#COMM_MCEDATA,X:STATUS,CHECK_FOR_DATA__BUFFER_DATA1
+	;; Test for buffer in use
+	JSET	#COMM_MCEREP,X:STATUS,CHECK_FOR_DATA__BUFFER_DATA1
 	JSET	#COMM_MCEDATA,X:STATUS,CHECK_FOR_DATA__BUFFER_DATA1
 	
 	;; Ok, you can keep it.
@@ -965,7 +996,7 @@ CHECK_FOR_DATA__BUFFER_DATA2
 	
 	JSR	CHECK_FOR_DATA__BUFFER_LARGE
 	;; End marker for debugging; not a protocol signifier.
-	MOVE	#$ff1112,X0
+	MOVE	#$af000,X0
 	MOVE	X0,Y:(R4)
 	
 	JMP	CHECK_FOR_DATA_EXIT
@@ -995,9 +1026,8 @@ CHECK_FOR_DATA__BUFFER
 	MOVE	X0,Y:(R4)
 
 	RTS
-	
-CHECK_FOR_DATA_EXIT
-	RTS
+
+
 	
 ;----------------------------------------------
 RESET_FIFO
@@ -1006,18 +1036,13 @@ RESET_FIFO
 	MOVE	X:DEBUG_BUF_IDX,R3
 	NOP
 	NOP
-	MOVE	A0,Y:(R3)+
-	MOVE	A1,Y:(R3)+
-	CMP	#>$00A5A5,A
-	JEQ	RESET_FIFO1
-	MOVE	R3,Y:(R3)+
 RESET_FIFO1
-	NOP
-	NOP
-	MOVE	Y:RDFIFO,A
 	MOVE	A1,Y:(R3)+
-	JSET	#EF,X:PDRD,RESET_FIFO1
-
+	JCLR	#EF,X:PDRD,RESET_FIFO2
+	MOVE	Y:RDFIFO,A
+	JMP	RESET_FIFO1
+	
+RESET_FIFO2
 	MOVE	#>$aa1122,A
 	NOP
 	MOVE	A1,Y:(R3)+
@@ -1034,6 +1059,8 @@ RESET_FIFO1
 	NOP
 	.endl
 	MOVEP	#%011100,X:PDRD
+	
+	BCLR	#DCTR_HF5,X:DCTR
 	RTS
 
 ;;;
@@ -1048,18 +1075,33 @@ CHECK_FOR_DATA__BUFFER_LARGE
 	CMP	#0,A
 	JEQ	FINISHED_BUFFS
 
-	DO	A1,FINISHED_BUFFS
-	;; .loop	X:TOTAL_BUFFS
-;; CHECK_WAIT_X
-	JSET 	#HF,X:PDRD,*
-	;; JSET	#HF,X:PDRD,CHECK_WAIT_X	; Wait for half full+1
-	;; NOP
-	;; NOP
-	;; JSET	#HF,X:PDRD,CHECK_WAIT_X	; Protect against metastability
+	MOVE	#>$aa0000,Y0
+
+	;; Timing trap.  Bytes arrive at 25 MHz.  A half-fifo should fill
+	;; within 512*4 = 2**11 ticks of the 50 MHz clock.  Don't wait
+	;; longer than 2**13 ticks before giving up.
+	
+	MOVE	#>$1,B
+	ASR	#12,B,B		;B = 2**(24-12) = 2**12
+	
+	DO	X:TOTAL_BUFFS,FINISHED_BUFFS
+	CLR	A
+	MOVE	Y0,Y:(R4)
+BLOCK_FOR_HALF
+	INC	A
+	CMP	A,B
+	JLE	GO_FOR_HALF	; I give up.
+	JSET 	#HF,X:PDRD,BLOCK_FOR_HALF
+	NOP
+	NOP
+	JSET 	#HF,X:PDRD,BLOCK_FOR_HALF
+GO_FOR_HALF
 	.loop	#512
 	MOVEP	Y:RDFIFO,Y:(R4)+
 	.endl
+	
 	NOP
+	JSR	TIMERX_STORE
 	
 FINISHED_BUFFS	
 	;; .endl
@@ -1072,6 +1114,11 @@ FINISHED_BUFFS
 	.loop	X:LEFT_TO_READ
 	MOVEP	Y:RDFIFO,Y:(R4)+
 	.endl
+	
+	JSR	TIMERX_STORE
+	
+	MOVE	#>$ab0000,Y0
+ 	MOVE	Y0,Y:(R4)	        ; Where was we?
 	RTS
 
 BUFFER_PACKET_SINGLES_TIMED	
@@ -1079,6 +1126,7 @@ BUFFER_PACKET_SINGLES_TIMED
 	CLR	A
 	CLR	B
 	MOVE	X:TCR0,B0		; Store timer value (50 MHz)
+	MOVE	#>$ac0000,Y0
 	ASR	#2,B,B			; / 4
 	.loop	X:LEFT_TO_READ
 BUFFER_PACKET_SINGLES_WAIT_X
@@ -1087,10 +1135,12 @@ BUFFER_PACKET_SINGLES_WAIT_X
 	CMP	A,B
 	JEQ	BUFFER_PACKET_SINGLES_WAIT_X
  	MOVEP	Y:RDFIFO,Y:(R4)+
+ 	MOVE	Y0,Y:(R4)	        ; Where was we?
 	ASL	#0,A,B			; MOVE A,B
 	.endl
 	NOP
 	NOP
+	JSR	TIMERX_STORE
 	RTS
 	
 BUFFER_PACKET_SINGLES_POLLED
@@ -1100,5 +1150,43 @@ BUFFER_PACKET_SINGLES_POLLED
 	.endl
 	NOP
 	NOP
+	RTS
+	
+
+TIMERX_STORE_INIT
+	MOVE	#>TIMER_BUFFER,A0
+	NOP
+	MOVE	A0,X:TIMER_INDEX
+	RTS
+
+TIMERX_STORE_RAW
+	;; Write the timer value to the timer buffer.
+	;; Trashes A, R5.  Sorry.
+	MOVE	X:TIMER_SOURCE,A
+	; Fall-through
+
+TIMERX_STORE_A1_RAW
+	;; Write A1 to to the timer buffer. Trashes A, R5.
+	MOVE	X:TIMER_INDEX,R5
+	NOP
+	NOP
+	MOVE	A1,Y:(R5)+
+	MOVE	R5,A
+	NOP
+	CMP	#>(TIMER_BUFFER_END-1),A
+	JGE	TIMERX_STORE_INIT
+	MOVE	A1,X:TIMER_INDEX
+	RTS
+
+TIMERX_STORE
+	BCLR	#DCTR_SRIE,X:DCTR
+	JSR	TIMERX_STORE_RAW
+	BSET	#DCTR_SRIE,X:DCTR
+	RTS
+	
+TIMERX_STORE_A1
+	BCLR	#DCTR_SRIE,X:DCTR
+	JSR	TIMERX_STORE_A1_RAW
+	BSET	#DCTR_SRIE,X:DCTR
 	RTS
 	

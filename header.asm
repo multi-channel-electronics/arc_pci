@@ -31,7 +31,7 @@ IMAGE_BUFFER	EQU	0	; Data frame buffer offset.
 REPLY_BUFFER	EQU     $100000	; Buffer MCE replies at 1M
 COMMAND_BUFFER	EQU	$200000	; Buffer MCE commands at 2M
 TIMER_BUFFER    EQU     $201000
-TIMER_BUFFER_END EQU    $202000
+TIMER_BUFFER_END EQU    $300000
 
 	
 ; HST timeout recovery....
