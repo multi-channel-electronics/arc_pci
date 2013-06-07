@@ -191,11 +191,20 @@ MEM_SRC			DC	0
 	
 INT_DEBUG_BUF_IDX	DC	0
 DEBUG_BUF_IDX		DC	0
-	
-	
-CMD_BUFFER 		EQU	$100
 
-	
+QT_MAX_BLOCKS		EQU	20
+; struct QT_DATA:
+QT_BLOCK__ADDR		EQU	0
+QT_BLOCK__END_IDX	EQU	2
+QT_BLOCK___SIZE		EQU	3	
+QT_N_BLOCK		DC	0
+QT_BLOCK_PTR		DC	0
+QT_BLOCKS		DS	(QT_MAX_BLOCKS*QT_BLOCK___SIZE)
+
+;; Put this well out of the way...
+CMD_BUFFER		EQU	$400
+
+
 ;;; 
 ;;; Reply/status buffer - this is a structure that is copied into PC RAM
 ;;;  whenever the DSP needs to provide a command reply or other information

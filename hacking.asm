@@ -365,7 +365,7 @@ PROCESS_MCE_DATA__CHECK_TAIL
 	JSR 	BLOCK_TRANSFERX
 	
 	;; Update buffer pointers
-	JSR	BUFFER_INCR
+	JSR	BUFFER_INCR_MULTI
 
 PROCESS_MCE_DATA__DONE
 	;; Mark as handled
@@ -392,6 +392,69 @@ PROCESS_MCE_DATA__DROP_FRAME
 	ADD	#1,A
 	NOP
 	MOVE	A,X:QT_DROPS
+	RTS
+
+	
+;----------------------------------------
+BUFFER_RESET_MULTI
+;----------------------------------------
+; Reset pointers to the very start of the buffer.
+	MOVE	#>0,X0
+	MOVE	#>QT_BLOCKS,X1
+	MOVE	X0,X:QT_BUF_HEAD
+	MOVE	X1,X:QT_BLOCK_PTR
+	JMP	BUFFER_SET_MULTI_BLOCK
+	
+;----------------------------------------
+BUFFER_SET_NEXT_MULTI_BLOCK
+;----------------------------------------
+	MOVE	X:QT_BLOCK_PTR,A
+	ADD	#>QT_BLOCK___SIZE,A
+	NOP
+	MOVE	A,X:QT_BLOCK_PTR
+	;; Fall-through...
+
+;----------------------------------------
+BUFFER_SET_MULTI_BLOCK
+;----------------------------------------
+; Set QT_DEST to the address of the block described at QT_BLOCK_PTR
+	MOVE	X:QT_BLOCK_PTR,R0
+	MOVE	#QT_DEST_LO,R1
+	NOP
+	MOVE	X:(R0+QT_BLOCK__ADDR+0),X0
+	MOVE	X0,X:(R1)
+	MOVE	X:(R0+QT_BLOCK__ADDR+1),X0
+	MOVE	X0,X:(R1+1)
+	RTS
+	
+;----------------------------------------
+BUFFER_INCR_MULTI
+;----------------------------------------
+; Increment the buf_head index (possibly wrapping it back to 0).
+; Set up QT_DEST_LO to point to the next RAM location, which may
+; be in a different RAM block.
+	MOVE	X:QT_BUF_HEAD,A		; If head + 1 == max
+	ADD	#1,A			; 
+	MOVE	X:QT_BUF_MAX,B		;	
+	CMP	A,B			; 
+	JLE	BUFFER_RESET_MULTI	;	head = 0
+					; else
+	MOVE	A,X:QT_BUF_HEAD		;	head = head + 1
+
+	;; Compare head to the indices supported by the current block
+	MOVE	X:QT_BLOCK_PTR,R0
+	NOP
+	NOP
+	MOVE	X:(R0+QT_BLOCK__END_IDX),B
+	NOP
+	CMP	A,B		; (block_end [?] head)
+	JLE	BUFFER_SET_NEXT_MULTI_BLOCK
+	
+	CLR	B
+	MOVE	X:QT_BUF_SIZE,B0
+	MOVE	#QT_DEST_LO,R0
+	JSR	ADD_HILO_ADDRESS	; QT_DEST += QT_BUF_SIZE	
+		
 	RTS
 
 
@@ -784,6 +847,7 @@ PROCESS_SET_DATA_BUFFER_MULTI
 	NOP
 	
 	MOVE	X:(R0)+,X0	; 0
+	MOVE	X0,X:QT_BUF_MAX
 	MOVE	X:(R0)+,X0
 
 	MOVE	X:(R0)+,X0	; 1
@@ -796,22 +860,31 @@ PROCESS_SET_DATA_BUFFER_MULTI
 
 	;; Number of RAM blocks (1)
 	MOVE	X:(R0)+,X0	; 3
+	MOVE	X0,X:QT_N_BLOCK
 	MOVE	X:(R0)+,X0
 	
-	;; Now loop over num_buffers... which is one.
+	;; Now loop over num_buffers and store the block addresses and
+	;; final indices.
+	
+	MOVE	#>QT_BLOCKS,R1
+	MOVE	X:QT_N_BLOCK,X1
 	NOP
+
+	.loop	X1
+	
 	MOVE	X:(R0)+,X0	; BUF+0
-	MOVE	X0,X:QT_BASE_LO	
+	MOVE	X0,X:(R1)+	;  addr_lo
 	MOVE	X:(R0)+,X0
-	MOVE	X0,X:QT_BASE_HI
+	MOVE	X0,X:(R1)+	;  addr_hi
 
 	MOVE	X:(R0)+,X0	; BUF+1
-	;; MOVE	X0,X:QT_BUF_MAX
 	MOVE	X:(R0)+,X0	; 
 	
 	MOVE	X:(R0)+,X0	; BUF+2
-	MOVE	X0,X:QT_BUF_MAX
+	MOVE	X0,X:(R1)+	;  end_idx
 	MOVE	X:(R0)+,X0	; 
+	
+	.endl
 	
 	;; Clear stuff.
 	MOVE	#>0,X0
@@ -822,8 +895,8 @@ PROCESS_SET_DATA_BUFFER_MULTI
 	MOVE	X0,X:QT_INFORM_IDX
 	MOVE	X1,X:QT_INFORM
 	
-	;; Reset QT_DEST from QT_BASE.
-	JSR	BUFFER_RESET
+	;; Reset QT_DEST.
+	JSR	BUFFER_RESET_MULTI
 	
 	;; Yes reply.
 	BCLR	#COMM_CMD,X:STATUS
