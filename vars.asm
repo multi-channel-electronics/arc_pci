@@ -155,27 +155,19 @@ TIMER_INDEX		DC	0
 BDEBUG0			DC	0
 BDEBUG1			DC	0
 BDEBUG2			DC	0
-;; BDEBUG3			DC	0
-;; BDEBUG4			DC	0
-;; BDEBUG5			DC	0
-;; BDEBUG6			DC	0
-;; BDEBUG7			DC	0
-;; BDEBUG8			DC	0
-;; BDEBUG9			DC	0
+BDEBUG3			DC	0
+BDEBUG4			DC	0
+BDEBUG5			DC	0
+BDEBUG6			DC	0
+BDEBUG7			DC	0
+BDEBUG8			DC	0
+BDEBUG9			DC	0
 	
-TRIGGER_FAKE		DC	0
 
-FIFO_FAILS		DC	0
-PTYPE_FAILS		DC	0
-DA_COUNT		DC	0
-	
-;;; WORD and SIZE must be adjacent like this.
-CMD_SIZE		DC	0
-CMD_WORD		DC	0
+;;; 
+;;; New definitions for U0107 alternative protocols
+;;; 
 
-REP_BUS_ADDR		DC	0,0
-DATA_BUS_ADDR		DC	0,0
-	
 ;;; Bits in STATUS... watch for conflicts. (4-8, 12-15 are free)
 COMM_REP		EQU	4 ; Reply needs to be sent
 COMM_CMD		EQU	5 ; Command needs to be processed
@@ -186,6 +178,16 @@ COMM_REP_ENABLED	EQU	12 ;
 COMM_BUF_UPDATE		EQU	13 ; Data has been written to buffer
 COMM_TFR_YMEM		EQU	14 ; PCI burst is coming from Y mem, not X mem.
 
+	
+FIFO_FAILS		DC	0
+PTYPE_FAILS		DC	0
+DA_COUNT		DC	0
+	
+;;; WORD and SIZE must be adjacent like this.
+CMD_SIZE		DC	0
+CMD_WORD		DC	0
+
+REP_BUS_ADDR		DC	0,0
 	
 MEM_SRC			DC	0
 	
@@ -200,17 +202,32 @@ QT_BLOCK___SIZE		EQU	3
 QT_N_BLOCK		DC	0
 QT_BLOCK_PTR		DC	0
 QT_BLOCKS		DS	(QT_MAX_BLOCKS*QT_BLOCK___SIZE)
+	
 
-;; Put this well out of the way...
-CMD_BUFFER		EQU	$400
+;;; MCE packet header; 8 words; keep them together.
+MCEHDR_PREAMBLE		DS	(4)
+MCEHDR_TYPE		DS	(2)
+MCEHDR_SIZE		DS	(2)
+MCEHDR			EQU	MCEHDR_PREAMBLE
+
+;;; Secured MCE reply; contains TYPE and SIZE as well as up to 64 dwords of payload
+MCEREP__TYPE		EQU	0
+MCEREP__SIZE		EQU	2
+MCEREP__PAYLOAD		EQU	4
+MCEREP___SIZE		EQU	MCEREP__PAYLOAD+128
+	
+	
+;;; 
+;;; Buffer for commands from PC
+;;;
+CMD_BUFFER		DS	(256)
 
 
 ;;; 
 ;;; Reply/status buffer - this is a structure that is copied into PC RAM
-;;;  whenever the DSP needs to provide a command reply or other information
-;;;  (e.g. not notify of some event...).
-;;; 
-;;; Also, make it large enough for MCE replies...
+;;;  whenever the DSP needs to provide a command reply or other information.
+;;;  This needs to be large enough to hold an MCE reply.
+;;;
 
 RB_SIZE			EQU	128+32 ; This MUST be even, so that effective number
 				       ; of 32-bit words is integral
@@ -238,38 +255,35 @@ REP_RPAYLOAD		EQU	REP_DATA+4
 REP_REND		EQU	REP_RPAYLOAD+16 ; Whatever.
 	
 
-MCEREP_BUF		EQU	0 ; Y-mem location for mce reply buffer?
 ;;; Indices int MCEREP_BUF
-MCEREP_PRE0		EQU	0
-MCEREP_PRE1		EQU	2
-MCEREP_TYPE		EQU	4
-MCEREP_SIZE		EQU	6
-MCEREP_PAYLOAD		EQU	8
-MCEREP_END		EQU	MCEREP_PAYLOAD+128 ; MCE replies are max 256 bytes
-	
-;; MCEDATA_BUF		EQU	$1000
-MCEDATA_BUF		EQU	$8 ;Debugging.
+;; MCEREP_PRE0		EQU	0
+;; MCEREP_PRE1		EQU	2
+;; MCEREP_TYPE		EQU	4
+;; MCEREP_SIZE		EQU	6
+;; MCEREP_PAYLOAD		EQU	8
+;; MCEREP_END		EQU	MCEREP_PAYLOAD+128 ; MCE replies are max 256 bytes
 	
 ;;; Datagram sizes for reply and MCE packets.
 ;;; Must be even; divide by two to get 32-bit words; mul by two to get bytes.
 RB_REP_SIZE		EQU	(REP_REND-REP_DATA+REP_HEADER_SIZE)
-RB_MCE_SIZE		EQU	(MCEREP_END+REP_HEADER_SIZE)
+RB_MCE_SIZE		EQU	(8+128)
 RB_INF_SIZE		EQU	(REP_REND-REP_DATA+2)
 
-	
-DEBUG_BUF		EQU 	$2000
-DEBUG_DUMP		EQU	$2100
-INT_DEBUG_BUF		EQU 	$8000
 
+; 
+; Buffer locations, Y memory.
+;
+MCECMD_BUF		EQU	$0
 
-;;; 
-;;; Large circular buffer for frame and reply data from MCE.
-;;; 
-CIRCBUF_HEAD		DC	0 ; Write index
-CIRCBUF_TAIL		DC	0 ; Read  index
-CIRCBUF_START		EQU	0 ; Buffer start in Y mem.
-CIRCBUF_SIZE		EQU	$100000	; 1 million locations = 2 MB
+MCEREP_BUF		EQU	$100 ; Y-mem location for mce reply buffer?
+
+MCEDATA_BUF		EQU	$200
 	
+MCE_PACKET_DUMP		EQU	$2000
+	
+DEBUG_BUF		EQU 	$8000
+	
+
 	
 ;----------------------------------------------------------
 

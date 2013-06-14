@@ -30,12 +30,6 @@ HACK_INIT
 	;; Init the datagram structure
 	JSR	REPLY_BUFFER_INIT
 	
-	;; Init debug buffer indices
-	MOVE	#>INT_DEBUG_BUF,X0
-	MOVE	X0,X:INT_DEBUG_BUF_IDX
-	MOVE	#>DEBUG_BUF,X0
-	MOVE	X0,X:DEBUG_BUF_IDX
-	
 	JSR	TIMERX_STORE_INIT
 	
 	;; Enable PCI slave receive interrupt to handle commands from host
@@ -49,7 +43,7 @@ HACK_INIT
 	;; 
 HACK_LOOP
 	;; Interrupt driven: process command in buffer
-	JSSET 	#COMM_CMD,X:STATUS,PROCESS_PC_CMD_2
+	JSSET 	#COMM_CMD,X:STATUS,PROCESS_PC_CMD
 
 	;; Should we send a reply?
 	JSSET	#COMM_REP,X:STATUS,PROCESS_REPLY
@@ -176,11 +170,12 @@ BLOCK_TRANSFERX_PCI
 	MOVE	#BURST_DEST_LO,R0	; RAM address
 	JSR	PCI_GO			; Initiate PCI burst
 
-	;; Wait for completion, watch for FIFO data.
-	
 BLOCK_TRANSFERX_PCI_WAIT
 	JSR	CHECK_FOR_DATA
 	JCLR	#MARQ,X:DPSR,BLOCK_TRANSFERX_PCI_WAIT
+	
+	;; Restore R0, since CHECK_FOR_DATA probably trashed it.
+	MOVE	#BURST_DEST_LO,R0	; RAM address
 
 	;; Check for errors:
 	JCLR	#MDT,X:DPSR,BLOCK_TRANSFERX_HANDLE_ERRORS
@@ -206,8 +201,96 @@ BLOCK_TRANSFERX_HANDLE_ERRORS
 	JMP	BLOCK_TRANSFERX_PCI
 
 
-;;; PERMANENTER CODE.
-	ORG	P:$900,P:$902
+
+;----------------------------------------------
+CON_TRANSFERX
+;----------------------------------------------
+;   In:
+;   - BURST_SRC_HI:BURST_SRC_LO is PC RAM address
+;   - BLOCK_SIZE is packet size, in bytes
+;   - YMEM_DEST is start of data in Y memory
+;  Out:
+;   - BLOCK_SIZE will be decremented to zero.
+;   - BURST_SRC_HI:LO will be incremented by BLOCK_SIZE
+;   - YMEM_DEST will be incremented by BLOCK_SIZE/2
+;  Trashes:
+;   - A and B, R0, X0
+
+	CLR	A
+	MOVE	X:BLOCK_SIZE,A1	        ; A1 = BLOCK_SIZE
+	CMP	#0,A			; Still bytes to transfer?
+	JNE	CON_TRANSFERX0
+	RTS
+
+CON_TRANSFERX0
+	;; Maximum size of a DMA/PCI burst is 256 bytes,
+	;; but latency clock determines the ideal value.
+	MOVE	X:PCI_BURST_SIZE,B	; B1 = burst size (256)
+
+	CMP	B,A			; A ? B
+	JGE	<CON_TRANSFERX1		; jump if A >= B
+	MOVE	A,B			; This only moves A1,B1.
+CON_TRANSFERX1
+	;; Now burst size B <= block size A.
+	SUB	B,A			; A -= B
+	ADD	#0,B			; Clear carry bit
+	MOVE	A,X:BLOCK_SIZE		; Updated BLOCK_SIZE
+	MOVE	B,X:BURST_SIZE		; BURST_SIZE ;= round32(min(BLOCK_SIZE,$100))
+	ASR	#25,B,B			; B0 = # of 16 bit words
+
+	;; Setup DMA from BURST_SRC to PCI tx
+	MOVE	X:YMEM_DEST,A0
+	NOP
+	MOVE	A0,X:DDR0		; DMA dest'n
+	MOVEP	#>DRXR,X:DSR0		; DMA source
+	ADD	B,A
+	DEC	B
+	MOVE	A0,X:YMEM_DEST		; YMEM_DEST += BURST_SIZE/2
+	
+	MOVEP	B0,X:DCO0		; DMA length = BURST_SIZE/2 - 1
+
+ 	;; DMA go
+ 	MOVEP	#$8EEAC4,X:DCR0
+
+CON_TRANSFERX_PCI
+	MOVE	#>$6,X0			; Memory write
+	MOVE	#BURST_SRC_LO,R0	; RAM address
+	JSR	PCI_GO			; Initiate PCI burst
+	
+	;; Watch for FIFO action
+CON_TRANSFERX_PCI_WAIT
+	JSR	CHECK_FOR_DATA
+
+	;; Wait for completion
+	JCLR	#MARQ,X:DPSR,CON_TRANSFERX_PCI_WAIT
+	
+	;; Restore R0, since CHECK_FOR_DATA probably trashed it.
+	MOVE	#BURST_SRC_LO,R0	; RAM address
+
+	;; Check for errors:
+	JCLR	#MDT,X:DPSR,CON_TRANSFERX_HANDLE_ERRORS
+	
+	CLR	B
+	MOVE	X:BURST_SIZE,B0		; All bytes were transferred
+	JSR	ADD_HILO_ADDRESS	; Update source address
+	JMP	CON_TRANSFERX		; Next burst in block
+
+CON_TRANSFERX_HANDLE_ERRORS
+	;; Set PCIDMA_* flags; trashes A only	
+	JSR	PCI_ERROR_CLEAR
+	
+	BCLR	#PCIDMA_RESTART,X:STATUS ; Test and clear
+	JCS	CON_TRANSFERX_PCI	; Restart PCI burst
+
+	BCLR	#PCIDMA_RESUME,X:STATUS	; Test and clear
+	JCC	CON_TRANSFERX		; Error but no error? Redo this burst.
+
+	;; Update the PCI burst size and burst again.
+	JSR	PCI_RECOVER_COUNT	; Get transferred byte count in A.
+	JSR	PCI_UPDATE_R0
+	JMP	CON_TRANSFERX_PCI
+	
+
 
 ;----------------------------------------------
 PROCESS_REPLY
@@ -266,21 +349,20 @@ PROCESS_MCE_REPLY
 	MOVE	#>$b10000,A
 	JSR	TIMERX_STORE_A1
 	JSR	TIMERX_STORE
-
-	;; Copy data into the reply buffer, starting at the "type" field
-	MOVE	#(MCEREP_BUF+MCEREP_TYPE),R3
-	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),Y1
+	
+	;; Copy data into the X-mem reply buffer, including type and size dwords.
 	MOVE	#(REP_DATA),R0
+	MOVE	#(MCEREP_BUF+MCEREP__TYPE),R3
+	MOVE	Y:(MCEREP_BUF+MCEREP__SIZE),Y1
 	.loop	#4
 	MOVE	Y:(R3)+,Y0
 	MOVE	Y0,X:(R0)+
 	.endl
-	.loop	#2
 	.loop 	Y1
 	MOVE	Y:(R3)+,Y0
 	MOVE	Y0,X:(R0)+
-	.endl
-	nop
+	MOVE	Y:(R3)+,Y0
+	MOVE	Y0,X:(R0)+
 	.endl
 
 	;; Mark the packet type and size
@@ -344,8 +426,7 @@ PROCESS_MCE_DATA__CHECK_TAIL
 	;; when we increment QT_DEST
 
 	;; Send out the data directly
-	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),A
-	ASL	#2,A,A
+	MOVE	X:QT_FRAME_SIZE,A
 	NOP
 	MOVE	A1,X:BLOCK_SIZE
 	
@@ -357,9 +438,10 @@ PROCESS_MCE_DATA__CHECK_TAIL
 	MOVE	X0,X:(R1)+
 	.endl
 
-	MOVE	#>(MCEREP_BUF+MCEREP_PAYLOAD),X0
+	;; 
+	MOVE	#>MCEDATA_BUF,X0
 	MOVE	X0,X:MEM_SRC
-	BSET	#COMM_TFR_YMEM,X:STATUS
+	BSET	#COMM_TFR_YMEM,X:STATUS ; DMA from Y-mem
 
 	;; Trigger writes as master.
 	JSR 	BLOCK_TRANSFERX
@@ -544,7 +626,7 @@ CMD_SET_TAIL		EQU	$11
 CMD_SET_TAIL_INF	EQU	$12
 			
 CMD_SEND_MCE		EQU	$21
-			
+CMD_POST_MCE		EQU	$22
 
 ;------------------------
 PROCESS_PC_CMD_INT
@@ -564,12 +646,6 @@ PROCESS_PC_CMD_INT
 	;; Is there data?
 	JCLR	#SRRQ,X:DSR,PROCESS_PC_CMD_INT_EXIT
 	
-	;; Ok, you asked for it.
-	;; Read the command word (cmd|length)
-	;; MOVEP	X:DRXR,X0
-	;; MOVE	#CMD_SIZE,R0
-	;; JSR	PROCESS_SPLIT_X0_XR0
-
 	MOVEP	X:DRXR,X0	; 16-bit word #0 = the command
 	MOVE	X0,X:CMD_WORD
 	NOP
@@ -613,38 +689,8 @@ PROCESS_PC_CMD_INT_EXIT
 	JSR	RESTORE_REGISTERS
 	RTI
 
-;;; Polling PC CMD reader.
 	
 PROCESS_PC_CMD
-	;; Is there data?
-	JSET	#SRRQ,X:DSR,PROCESS_PC_CMD_1
-	RTS
-	
-PROCESS_PC_CMD_1
-	;; Read the command word (cmd|length)
-	MOVEP	X:DRXR,X0
-	MOVE	#CMD_SIZE,R0
-;;; 	warn    'BROKEN: do not split the words.  They are split.'
-	JSR	PROCESS_SPLIT_X0_XR0
-	
-	;; Read the packet data into a buffer.
-	CLR	A
-	MOVE	#CMD_BUFFER,R0
-	MOVE	X:CMD_SIZE,A1
-	;; Don't call .loop with 0 argument!
-	CMP	#0,A
-	JEQ	PROCESS_PC_CMD_2
-	.loop	A1
-	JCLR	#SRRQ,X:DSR,*
-	MOVEP	X:DRXR,X:(R0)+
-	NOP
-	NOP
-	.endl
-
-;;; If polling, handle the command immediately; if interrupt driven,
-;;; this gets called from the main loop.
-	
-PROCESS_PC_CMD_2
 	MOVE	#>$cd0000,A1
 	JSR	TIMERX_STORE_A1
 
@@ -699,6 +745,9 @@ PROCESS_PC_CMD_2
 	
 	CMP	#>CMD_SEND_MCE,B
 	JEQ	PROCESS_SEND_MCE
+	
+	CMP	#>CMD_POST_MCE,B
+	JEQ	PROCESS_POST_MCE
 	
 	CMP	#>CMD_SET_TAIL,B
 	JEQ	PROCESS_SET_TAIL
@@ -785,7 +834,7 @@ PROCESS_SET_REP_BUFFER_DISABLE
 
 PROCESS_SET_DATA_BUFFER
 	;; Lots of good stuff in here.
-	MOVE	#CMD_BUFFER,R0
+	MOVE	#>CMD_BUFFER,R0
 	NOP
 	NOP
 	MOVE	X:(R0)+,X0	; 0
@@ -842,10 +891,9 @@ PROCESS_SET_DATA_BUFFER
 PROCESS_SET_DATA_BUFFER_MULTI
 ;-------------------------------
 	;; Lots of good stuff in here.
-	MOVE	#CMD_BUFFER,R0
+	MOVE	#>CMD_BUFFER,R0
 	NOP
 	NOP
-	
 	MOVE	X:(R0)+,X0	; 0
 	MOVE	X0,X:QT_BUF_MAX
 	MOVE	X:(R0)+,X0
@@ -923,6 +971,45 @@ PROCESS_SEND_MCE
 	JSR	TIMERX_STORE
 	RTS
 
+	
+PROCESS_POST_MCE
+	;; There is an MCE command in RAM and we need to fetch it and
+	;; transmit it.  For now assume the bus address is the only info.
+	
+	MOVE	#>CMD_BUFFER,R0
+	MOVE	#>BURST_SRC_LO,R1
+	NOP
+	.loop   #2
+	MOVE	X:(R0)+,X0
+	MOVE	X0,X:(R1)+
+	.endl
+	
+	MOVE	#>MCECMD_BUF,X0
+	MOVE	X0,X:YMEM_DEST
+	MOVE	#>256,X0
+	MOVE	X0,X:BLOCK_SIZE
+	
+	JSR	CON_TRANSFERX
+
+	JSR	TIMERX_STORE
+	
+	;; The packet data is a command for the MCE.  Send it.
+	;; The data should be stored as 128 x 16bit units.
+	MOVE	#MCECMD_BUF,R3
+	.loop	#128
+	MOVE	Y:(R3)+,A1		; get hi 16
+	ASR	#8,A,B		        ; Shift b2 into B1
+	AND	#>$FF,A
+	MOVE	A1,X:FO_SEND
+	MOVE	B1,X:FO_SEND
+	.endl
+
+	NOP
+	BCLR	#COMM_CMD,X:STATUS
+	BSET	#COMM_REP,X:STATUS
+	JSR	TIMERX_STORE
+	RTS
+	
 	
 PROCESS_SET_TAIL
 	;; Update tail index from the first datum
@@ -1009,61 +1096,41 @@ CHECK_FOR_DATA
 	;; extension effects.  If we encounter any unexpected data,
 	;; reset the FIFO.
 
-	MOVE	#>$a80000,Y0	; See where we get stuck.
-	
 	CLR	A		; A0=0
-	MOVE	#>MCEREP_BUF,R4
-	
-	NOP
-	NOP
-	MOVE	Y0,Y:(R4)
+	MOVE	#>MCEHDR,R0
 	
 	MOVEP	Y:RDFIFO,A1
 	AND	#>$00FFFF,A
-	MOVE	A1,Y:(R4)+
+	MOVE	A1,X:(R0)+
 	CMP	#>$00A5A5,A
 	JNE	RESET_FIFO	; Empty the FIFO, and return to main loop.
 	
-	MOVE	Y0,Y:(R4)
-	JCLR	#EF,X:PDRD,*
-	NOP
-	NOP
 	JCLR	#EF,X:PDRD,*
 	
 	MOVEP	Y:RDFIFO,A1
 	AND	#>$00FFFF,A
-	MOVE	A1,Y:(R4)+
+	MOVE	A1,X:(R0)+
 	CMP	#>$00A5A5,A
-	JNE	FIFO_RESYNC	; Sure, give simple resync a chance
-
-	MOVE	Y0,Y:(R4)
-	JCLR	#EF,X:PDRD,*
-	NOP
-	NOP
+	JNE	RESET_FIFO
+	
 	JCLR	#EF,X:PDRD,*
 	
 	MOVEP	Y:RDFIFO,A1
 	AND	#>$00FFFF,A
-	MOVE	A1,Y:(R4)+
-FIFO_RESYNC
+	MOVE	A1,X:(R0)+
 	CMP	#>$005A5A,A
 	JNE	RESET_FIFO
 
-	MOVE	Y0,Y:(R4)
-	JCLR	#EF,X:PDRD,*
-	NOP
-	NOP
 	JCLR	#EF,X:PDRD,*
 	
 	MOVEP	Y:RDFIFO,A1
 	AND	#>$00FFFF,A
-	MOVE	A1,Y:(R4)+
+	MOVE	A1,X:(R0)+
 	CMP	#>$005A5A,A
 	JNE	RESET_FIFO
 
 	;; We made it; read 4 more 16-bit words, which are the packet type and size.
 	.loop	#4
-	MOVE	Y0,Y:(R4)
 	JCLR	#EF,X:PDRD,*
 	NOP
 	NOP
@@ -1071,7 +1138,7 @@ FIFO_RESYNC
 	MOVEP	Y:RDFIFO,A1
 	AND	#>$00ffff,A
 	NOP
-	MOVE	A1,Y:(R4)+
+	MOVE	A1,X:(R0)+
 	.endl
 	
 	JSR	TIMERX_STORE
@@ -1079,13 +1146,13 @@ FIFO_RESYNC
 	;; Compute packet divisions
 	;; -- sets TOTAL_BUFFS (half-fifos) and LEFT_TO_READ (single fifo reads)
 	CLR	A
-	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),A0
+	MOVE 	X:MCEHDR_SIZE,A0
 	JSR	PACKET_PARTITIONS
 	
 	JSR	TIMERX_STORE
 	
 	CLR	A
-	MOVE    Y:(MCEREP_BUF+MCEREP_TYPE),A1
+	MOVE    X:MCEHDR_TYPE,A1
 	
 	;; Is this a data or reply packet?
 	CMP	#'RP',A
@@ -1108,17 +1175,27 @@ CHECK_FOR_DATA_EXIT
 	
 CHECK_FOR_DATA__BUFFER_REPLY
 	;; Cue up data dump buffer...
-	MOVE	#>$8000,R4
+	MOVE	#>MCE_PACKET_DUMP,R4
 
 	;; Test for buffer in use / set reply present
 	JSET	#COMM_MCEREP,X:STATUS,CHECK_FOR_DATA__BUFFER_REPLY1
-	JSET	#COMM_MCEDATA,X:STATUS,CHECK_FOR_DATA__BUFFER_REPLY1
 	
 	;; Ok, you can keep it.
 	BSET	#COMM_MCEREP,X:STATUS
-	MOVE	#(MCEREP_BUF+MCEREP_PAYLOAD),R4
+	
+	;; Copy type and size from header into reply structure
+	MOVE	#>MCEHDR_TYPE,R0
+	MOVE	#>MCEREP_BUF,R4
+	.loop	#4
+	MOVE	X:(R0)+,X0
+	NOP
+	MOVE	X0,Y:(R4)+
+	.endl
+	
+	;; Now buffer rest of packet to R4 -> MCEREP_BUF+MCEREP__PAYLOAD
+	
 CHECK_FOR_DATA__BUFFER_REPLY1
-	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),X0
+	MOVE	X:MCEHDR_SIZE,X0
 	JSR	CHECK_FOR_DATA__BUFFER_LARGE
 	
 	JMP	CHECK_FOR_DATA_EXIT
@@ -1126,37 +1203,27 @@ CHECK_FOR_DATA__BUFFER_REPLY1
 	
 CHECK_FOR_DATA__BUFFER_DATA
 	;; Cue up data dump buffer...
-	MOVE	#>$8000,R4
+	MOVE	#>MCE_PACKET_DUMP,R4
 
 	;; Test for buffer in use
-	JSET	#COMM_MCEREP,X:STATUS,CHECK_FOR_DATA__BUFFER_DATA1
 	JSET	#COMM_MCEDATA,X:STATUS,CHECK_FOR_DATA__BUFFER_DATA1
 	
 	;; Ok, you can keep it.
 	BSET	#COMM_MCEDATA,X:STATUS
 	MOVE	#MCEDATA_BUF,R4
-CHECK_FOR_DATA__BUFFER_DATA1
 	
+CHECK_FOR_DATA__BUFFER_DATA1
 	;; 	Increment data frame counter
 	MOVE	X:DA_COUNT,A0
 	INC	A
 	NOP
 	MOVE	A0,X:DA_COUNT
 	
-	;; Buffer for MCE data frames
-	;; MOVE	#MCEDATA_BUF,R4
-	
-	;; Test if we already have a data frame.  If so, dump this one.
-	BSET	#COMM_MCEDATA,X:STATUS
-	;; JCC	CHECK_FOR_DATA__BUFFER_DATA2
-	;; ;; Dump
-	;; MOVE	#$4000,R4
-	
-CHECK_FOR_DATA__BUFFER_DATA2
 	;; Packet size in dwords -> X0
-	MOVE	Y:(MCEREP_BUF+MCEREP_SIZE),X0
+	MOVE	X:MCEHDR_SIZE,X0
 	
 	JSR	CHECK_FOR_DATA__BUFFER_LARGE
+	
 	;; End marker for debugging; not a protocol signifier.
 	MOVE	#$af000,X0
 	MOVE	X0,Y:(R4)
