@@ -1292,6 +1292,22 @@ RESET_FIFO2
 	BCLR	#DCTR_HF5,X:DCTR
 	RTS
 
+;----------------------------------------
+RESET_MCE_COMMS
+;----------------------------------------
+; Vector interrupt to send special reset signal to MCE rx.
+	BSET	#SCLK,X:PDRE		; Enable special command mode
+	NOP
+	NOP
+	MOVE	#$FFF000,R0		; Memory mapped address of transmitter
+	MOVE	#$10000B,X0		; Special command to reset controller
+	MOVE	X0,X:(R0)
+	REP	#6			; Wait for transmission to complete
+	NOP
+	BCLR	#SCLK,X:PDRE		; Disable special command mode
+	RTI
+
+	
 ;;;
 ;;; Large packet buffering.
 ;;;
