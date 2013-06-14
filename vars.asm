@@ -255,14 +255,6 @@ REP_RPAYLOAD		EQU	REP_DATA+4
 REP_REND		EQU	REP_RPAYLOAD+16 ; Whatever.
 	
 
-;;; Indices int MCEREP_BUF
-;; MCEREP_PRE0		EQU	0
-;; MCEREP_PRE1		EQU	2
-;; MCEREP_TYPE		EQU	4
-;; MCEREP_SIZE		EQU	6
-;; MCEREP_PAYLOAD		EQU	8
-;; MCEREP_END		EQU	MCEREP_PAYLOAD+128 ; MCE replies are max 256 bytes
-	
 ;;; Datagram sizes for reply and MCE packets.
 ;;; Must be even; divide by two to get 32-bit words; mul by two to get bytes.
 RB_REP_SIZE		EQU	(REP_REND-REP_DATA+REP_HEADER_SIZE)
@@ -283,6 +275,28 @@ MCE_PACKET_DUMP		EQU	$2000
 	
 DEBUG_BUF		EQU 	$8000
 	
+	
+;
+; Commands for U0107 comms protocol
+;
+
+CMD_READ_P		EQU	1
+CMD_READ_X		EQU	2
+CMD_READ_Y		EQU	3
+			
+CMD_WRITE_P		EQU	5
+CMD_WRITE_X		EQU	6
+CMD_WRITE_Y		EQU	7
+			
+CMD_SET_REP_BUF		EQU	9
+CMD_SET_DATA_BUF_MULTI	EQU	$B
+	
+CMD_SET_TAIL_INF	EQU	$12
+			
+CMD_SEND_MCE		EQU	$21
+CMD_POST_MCE		EQU	$22
+
+
 
 	
 ;----------------------------------------------------------
