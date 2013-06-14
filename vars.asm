@@ -241,9 +241,10 @@ RB_TYPE_BUF_INF		EQU     3  ;
 REP_BUFFER1		DS	RB_SIZE
 
 ;;; Aliases into the structure.
-REP_VERSION		EQU	REP_BUFFER1+0  ;
-REP_SIZE		EQU	REP_BUFFER1+1  ;
-REP_TYPE		EQU	REP_BUFFER1+2  ;
+REP_VERSION		EQU	REP_BUFFER1+0  ; Datagram protocol version
+REP_SIZE		EQU	REP_BUFFER1+1  ; Datagram payload size in 32-bit words
+REP_TYPE		EQU	REP_BUFFER1+2  ; Datagram type
+REP_FWREV		EQU	REP_BUFFER1+4  ; FW rev.
 REP_DATA		EQU	REP_BUFFER1+16 ; Start of DSP or MCE reply data
 REP_HEADER_SIZE		EQU	(REP_DATA-REP_VERSION) ; Whatever
 	

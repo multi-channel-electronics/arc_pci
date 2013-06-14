@@ -103,6 +103,9 @@ REPLY_BUFFER_INIT
 	MOVE	#>(RB_REP_SIZE/2),X1
 	MOVE	X0,X:REP_VERSION
 	MOVE	X1,X:REP_SIZE
+	MOVE	#>REP_FWREV,R0
+	MOVE	X:REV_NUMBER,X0
+	JSR	PROCESS_SPLIT_X0_XR0
 	RTS
 
 
@@ -293,20 +296,19 @@ CON_TRANSFERX_HANDLE_ERRORS
 
 
 ;----------------------------------------------
-PROCESS_REPLY
+COPY_DATAGRAM_TO_HOST
 ;----------------------------------------------
-	;; If reply channel is not configured, mark reply as sent and return.
-	JSET	#COMM_REP_ENABLED,X:STATUS,PROCESS_REPLY1
-	BCLR	#COMM_REP,X:STATUS ; Mark as... handled.
+; Caller should have already loaded the packet buffer, especially:
+;   REP_TYPE
+;   REP_SIZE
+; This routine DMAs the data into RAM and hand-shakes and interrupt
+; with the driver.
+	
+	;; If reply channel is not configured, bail.
+	JSET	#COMM_REP_ENABLED,X:STATUS,COPY_DATAGRAM_TO_HOST1
 	RTS
-
-PROCESS_REPLY1
-	;; Mark the packet type and size
-	MOVE	#>RB_TYPE_DSP_REP,A1
-	MOVE	#>(RB_REP_SIZE/2),X1
-	MOVE	A1,X:REP_TYPE
-	MOVE	X1,X:REP_SIZE
-
+	
+COPY_DATAGRAM_TO_HOST1
 	;; Set destination address...
 	MOVE	#>REP_BUS_ADDR,R0
 	MOVE	#>BURST_DEST_LO,R1
@@ -321,31 +323,47 @@ PROCESS_REPLY1
 	NOP
 	MOVE	A1,X0
 	MOVE	X0,X:BLOCK_SIZE
+	;; Source is X:REP_BUFFER1
 	MOVE	#>REP_BUFFER1,X0
 	MOVE	X0,X:MEM_SRC
+	BCLR	#COMM_TFR_YMEM,X:STATUS
 
 	;; Last chance, check the FO input
 	JSR	CHECK_FOR_DATA
 	
 	;; Trigger writes as master.
-	BCLR	#COMM_TFR_YMEM,X:STATUS
 	JSR 	BLOCK_TRANSFERX
-	
-	;; Mark as sent
-	BCLR	#COMM_REP,X:STATUS
 	
 	;; Raise interrupt and wait for handshake.
 	BSET	#INTA,X:DCTR
 	JCLR	#DSR_HF0,X:DSR,*
 	
-	BCLR	#COMM_REP,X:STATUS ; Mark as sent.
-	
 	BCLR	#INTA,X:DCTR
 	JSET	#DSR_HF0,X:DSR,*
-	
 	RTS
 
+
+
+;----------------------------------------------
+PROCESS_REPLY
+;----------------------------------------------
+	;; Mark the packet type and size
+	MOVE	#>RB_TYPE_DSP_REP,A1
+	MOVE	#>(RB_REP_SIZE/2),X1
+	MOVE	A1,X:REP_TYPE
+	MOVE	X1,X:REP_SIZE
+	
+	;; Copy
+	JSR	COPY_DATAGRAM_TO_HOST
+	
+	;; Mark as sent
+	BCLR	#COMM_REP,X:STATUS
+	JSR	TIMERX_STORE
+	RTS
+
+;----------------------------------------------
 PROCESS_MCE_REPLY
+;----------------------------------------------
 	MOVE	#>$b10000,A
 	JSR	TIMERX_STORE_A1
 	JSR	TIMERX_STORE
@@ -365,44 +383,22 @@ PROCESS_MCE_REPLY
 	MOVE	Y0,X:(R0)+
 	.endl
 
+	JSR	TIMERX_STORE
+	
 	;; Mark the packet type and size
 	MOVE	#>RB_TYPE_MCE_REP,A1
 	MOVE	#>(RB_MCE_SIZE/2),X1 ; size in 32-bit words.
 	MOVE	A1,X:REP_TYPE
 	MOVE	X1,X:REP_SIZE
 	
-	;; Set destination address
-	MOVE	#>REP_BUS_ADDR,R0
-	MOVE	#>BURST_DEST_LO,R1
-	.loop	#2
-	MOVE	X:(R0)+,X0
-	MOVE	X0,X:(R1)+
-	.endl
-
-	;; Set BLOCK_SIZE, in bytes
-	MOVE	X:REP_SIZE,A
-	ASL	#2,A,A
-	NOP
-	MOVE	A1,X0
-	MOVE	X0,X:BLOCK_SIZE
-	MOVE	#>REP_BUFFER1,X0
-	MOVE	X0,X:MEM_SRC
-	BCLR	#COMM_TFR_YMEM,X:STATUS
-
-	;; Trigger writes as master.
-	JSR 	BLOCK_TRANSFERX
+	;; Copy
+	JSR	COPY_DATAGRAM_TO_HOST
 	
 	;; Mark as sent
 	BCLR	#COMM_MCEREP,X:STATUS
-	
-	;; Raise interrupt and wait for handshake.
-	BSET	#INTA,X:DCTR
-	JCLR	#DSR_HF0,X:DSR,*
-	BCLR	#INTA,X:DCTR
-	JSET	#DSR_HF0,X:DSR,*
-	
 	JSR	TIMERX_STORE
 	RTS
+	
 
 ;----------------------------------------------
 PROCESS_MCE_DATA
@@ -547,15 +543,6 @@ SEND_BUF_INFO
 	JSR	TIMERX_STORE_A1
 	JSR	TIMERX_STORE
 	
-	BCLR	#QT_FLUSH,X:STATUS
-	;; Debug, click the buf head up and send inform.
-	;; MOVE	X:QT_BUF_HEAD,A1
-	;; ADD	#1,A
-	;; NOP
-	;; MOVE	A1,X:QT_BUF_HEAD
-	;; RTS
-	JCLR	#COMM_REP_ENABLED,X:STATUS,SEND_BUF_INFO_EXIT
-	
 	;; Load head index into first data field, pad to 32 bits
 	MOVE	X:QT_BUF_HEAD,X0
 	MOVE	X0,X:REP_DATA
@@ -568,34 +555,9 @@ SEND_BUF_INFO
 	MOVE	A1,X:REP_TYPE
 	MOVE	X1,X:REP_SIZE
 	
-	;; Set destination address
-	MOVE	#>REP_BUS_ADDR,R0
-	MOVE	#>BURST_DEST_LO,R1
-	.loop	#2
-	MOVE	X:(R0)+,X0
-	MOVE	X0,X:(R1)+
-	.endl
+	JSR	COPY_DATAGRAM_TO_HOST
 	
-	;; Set BLOCK_SIZE, in bytes
-	MOVE	X:REP_SIZE,A
-	ASL	#2,A,A
-	NOP
-	MOVE	A1,X0
-	MOVE	X0,X:BLOCK_SIZE
-	MOVE	#>REP_BUFFER1,X0
-	MOVE	X0,X:MEM_SRC
-	BCLR	#COMM_TFR_YMEM,X:STATUS
-
-	;; Trigger writes as master.
-	JSR 	BLOCK_TRANSFERX
-	
-	;; Raise interrupt and wait for handshake.
-	BSET	#INTA,X:DCTR
-	JCLR	#DSR_HF0,X:DSR,*
-	BCLR	#INTA,X:DCTR
-	JSET	#DSR_HF0,X:DSR,*
-	
-SEND_BUF_INFO_EXIT
+	BCLR	#QT_FLUSH,X:STATUS
 	JSR	TIMERX_STORE
 	RTS
 	
