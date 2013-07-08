@@ -43,9 +43,9 @@ PACKET_IN
 	JSSET   #CON_MCE,X:STATUS,CON_TRANSMIT
 	JSSET	#CON_DEMAND,X:STATUS,CON_BUFFER
 
-	;; Hackers, welcome.
-	JSR	HACK_ENTRY
-	
+	;; Enter new comms mode if host signals with HF2
+	JSET	#DSR_HF2,X:DSR,NEW_COMMS_INIT
+
 	;; Loop
 	JMP	PACKET_IN
 

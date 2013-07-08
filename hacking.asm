@@ -7,14 +7,11 @@
 	PAGE    132     ; Printronix page width - 132 columns
 	OPT	CEX	; print DC evaluations
 
-;;; 
-HACK_ENTRY
-;;;
+;----------------------------------------------
+; NEW_COMMS_ENTRY
+;----------------------------------------------
 	
-	;; Only enter if HF2 is high.
-	JCLR	#DSR_HF2,X:DSR,HACK_EXIT
-	
-HACK_INIT	
+NEW_COMMS_INIT
 	;; Reset the FO receiver
 	JSR	RESET_FIFO
 
@@ -28,7 +25,7 @@ HACK_INIT
 	BCLR	#COMM_BUF_UPDATE,X:STATUS
 	
 	;; Init the datagram structure
-	JSR	REPLY_BUFFER_INIT
+	JSR	INIT_DATAGRAM_BUFFER
 	
 	JSR	TIMERX_STORE_INIT
 	
@@ -38,10 +35,10 @@ HACK_INIT
 	;; Set bit to indicate to host that we're in this loop.
 	BSET	#DCTR_HF4,X:DCTR
 	
-	;;
-	;; Main loop
-	;; 
-HACK_LOOP
+;
+; Main loop
+; 
+NEW_COMMS_MAIN_LOOP
 	;; Interrupt driven: process command in buffer
 	JSSET 	#COMM_CMD,X:STATUS,PROCESS_PC_CMD
 
@@ -55,60 +52,121 @@ HACK_LOOP
 	JSSET	#COMM_MCEREP,X:STATUS,PROCESS_MCE_REPLY
 	JSSET	#COMM_MCEDATA,X:STATUS,PROCESS_MCE_DATA
 
-	;; ;; Check for timer expiry
-	JSSET	#TCF,X:TCSR0,TIMER_ACTION_X
+	;; Check for timer expiry
+	JSSET	#TCF,X:TCSR0,TIMERX_ACTION
 	
-	;; ;; Issue information?
+	;; Issue information?
 	JSSET	#QT_FLUSH,X:STATUS,SEND_BUF_INFO
 	
 	;; LOOP UNTIL host gives up.
-	JSET	#DSR_HF2,X:DSR,HACK_LOOP
-	
+	JSET	#DSR_HF2,X:DSR,NEW_COMMS_MAIN_LOOP
 
-	;; Clean-up
+
+;
+; Cleanup and exit to standard loop.
+;
+	;; Don't trigger buffer flush
 	BCLR	#QT_FLUSH,X:STATUS
 	
-HACK_EXIT
 	;; Disable PCI slave receive interrupt
 	BCLR	#DCTR_SRIE,X:DCTR
 	
-	;; Lower flag
+	;; Lower handshake flag
 	BCLR	#DCTR_HF4,X:DCTR
 	RTS
+
+
+
+;----------------------------------------------
+; Timer tick handler and buffer management
+;----------------------------------------------
 	
-	
-TIMER_ACTION_X
+TIMERX_ACTION
 	MOVEP	#$300201,X:TCSR0	; Clear TOF, TCF, leave timer enabled.
 	;; If new data, schedule a flush.
 	BCLR	#COMM_BUF_UPDATE,X:STATUS
-	JCC	TIMER_ACTION_X_OK
+	JCC	TIMERX_ACTION_OK
 	BSET	#QT_FLUSH,X:STATUS	;    schedule inform
-TIMER_ACTION_X_OK
-	RTS
-
-	
-;;;
-;;; New comms implementation
-;;; 
-
-	
-REPLY_BUFFER_INIT
-	;; initialize header of reply packet.
-	MOVE	#0,X0
-	MOVE	#>REP_BUFFER1,R0
-	.loop	#RB_SIZE
-	MOVE	X0,X:(R0)+
-	.endl
-	MOVE	#>RB_VERSION,X0
-	MOVE	#>(RB_REP_SIZE/2),X1
-	MOVE	X0,X:REP_VERSION
-	MOVE	X1,X:REP_SIZE
-	MOVE	#>REP_FWREV,R0
-	MOVE	X:REV_NUMBER,X0
-	JSR	PROCESS_SPLIT_X0_XR0
+TIMERX_ACTION_OK
 	RTS
 
 
+;----------------------------------------------
+TIMERX_STORE_INIT
+; Set buffer pointer to start of TIMER_BUFFER.
+	MOVE	#>TIMER_BUFFER,A0
+	NOP
+	MOVE	A0,X:TIMER_INDEX
+	RTS
+
+;----------------------------------------------
+TIMERX_STORE_RAW
+; Write current timer value to timer buffer.  Trashes A, R5.
+; No interrupt protection.
+	MOVE	X:TIMER_SOURCE,A
+; Fall-through!
+;----------------------------------------------
+TIMERX_STORE_A1_RAW
+; Write A1 to to timer buffer. Trashes A, R5.
+	MOVE	X:TIMER_INDEX,R5
+	NOP
+	NOP
+	MOVE	A1,Y:(R5)+
+	MOVE	R5,A
+	NOP
+	CMP	#>(TIMER_BUFFER_END-1),A
+	JGE	TIMERX_STORE_INIT
+	MOVE	A1,X:TIMER_INDEX
+	RTS
+
+;----------------------------------------------
+TIMERX_STORE
+; Interrupt-protected version of TIMERX_STORE_RAW.
+	BCLR	#DCTR_SRIE,X:DCTR
+	JSR	TIMERX_STORE_RAW
+	BSET	#DCTR_SRIE,X:DCTR
+	RTS
+	
+;----------------------------------------------
+TIMERX_STORE_A1
+; Interrupt-protected version of TIMERX_STORE_A1_RAW.
+	BCLR	#DCTR_SRIE,X:DCTR
+	JSR	TIMERX_STORE_A1_RAW
+	BSET	#DCTR_SRIE,X:DCTR
+	RTS
+	
+
+;
+; Utility functions for 32/24-bit <-> 16+16 conversion.
+;
+
+PROCESS_SPLIT_X0_XR0
+	;; Split the 24-bit contents in X0 into 8: and :16 bits, placed into
+	;; X:R0 and R0+1 resp.  Advances R0 accordingly.  Trashes A,B.
+	MOVE	X0,A0
+	EXTRACTU #$010000,A,B
+	EXTRACTU #$008010,A,A	; Put
+	MOVE	B0,X:(R0)+
+	MOVE	A0,X:(R0)+
+	RTS
+
+PROCESS_JOIN_XR0_A
+	;; Join two 16-bit words at R0,R0+1 into a 32-bit word and
+	;; return in A.  Trashes X0.  Advances R0 by 2.
+	CLR	A
+	MOVE	X:(R0)+,A0
+	MOVE	X:(R0)+,X0
+	INSERT	#$010010,X0,A
+	RTS
+
+	
+;
+; PCI burst code
+; 
+; BLOCK_TRANSFERX and CON_TRANSFERX are replacements for
+; BLOCK_TRANSFER and CON_TRANSFER.  They can read/write to X or Y
+; memory, depending on X:STATUS[COMM_TFR_YMEM].
+	
 ;----------------------------------------------
 BLOCK_TRANSFERX
 ;----------------------------------------------
@@ -295,12 +353,36 @@ CON_TRANSFERX_HANDLE_ERRORS
 	
 
 
+;;;
+;;; New comms protocol implementation
+;;; 
+
+	
+;----------------------------------------------
+INIT_DATAGRAM_BUFFER
+;----------------------------------------------
+; Initialize header of reply packet.
+	MOVE	#0,X0
+	MOVE	#>DGRAM_BUFFER,R0
+	.loop	#DG__SIZE
+	MOVE	X0,X:(R0)+
+	.endl
+	MOVE	#>DG_VERS_CODE,X0
+	MOVE	#>(RB_REP_SIZE/2),X1
+	MOVE	X0,X:DGRAM_VERSION
+	MOVE	X1,X:DGRAM_SIZE
+	MOVE	#>DGRAM_FWREV,R0
+	MOVE	X:REV_NUMBER,X0
+	JSR	PROCESS_SPLIT_X0_XR0
+	RTS
+	
+
 ;----------------------------------------------
 COPY_DATAGRAM_TO_HOST
 ;----------------------------------------------
 ; Caller should have already loaded the packet buffer, especially:
-;   REP_TYPE
-;   REP_SIZE
+;   DGRAM_TYPE
+;   DGRAM_SIZE
 ; This routine DMAs the data into RAM and hand-shakes and interrupt
 ; with the driver.
 	
@@ -318,13 +400,13 @@ COPY_DATAGRAM_TO_HOST1
 	.endl
 
 	;; Set BLOCK_SIZE, in bytes
-	MOVE	X:REP_SIZE,A
+	MOVE	X:DGRAM_SIZE,A
 	ASL	#2,A,A
 	NOP
 	MOVE	A1,X0
 	MOVE	X0,X:BLOCK_SIZE
-	;; Source is X:REP_BUFFER1
-	MOVE	#>REP_BUFFER1,X0
+	;; Source is X:DGRAM_BUFFER
+	MOVE	#>DGRAM_BUFFER,X0
 	MOVE	X0,X:MEM_SRC
 	BCLR	#COMM_TFR_YMEM,X:STATUS
 
@@ -347,11 +429,13 @@ COPY_DATAGRAM_TO_HOST1
 ;----------------------------------------------
 PROCESS_REPLY
 ;----------------------------------------------
+; Create a Datagram for a DSP reply and send it.  User has, previously,
+; put some data in the payload.
 	;; Mark the packet type and size
-	MOVE	#>RB_TYPE_DSP_REP,A1
+	MOVE	#>DG_TYPE_DSP_REP,A1
 	MOVE	#>(RB_REP_SIZE/2),X1
-	MOVE	A1,X:REP_TYPE
-	MOVE	X1,X:REP_SIZE
+	MOVE	A1,X:DGRAM_TYPE
+	MOVE	X1,X:DGRAM_SIZE
 	
 	;; Copy
 	JSR	COPY_DATAGRAM_TO_HOST
@@ -364,12 +448,13 @@ PROCESS_REPLY
 ;----------------------------------------------
 PROCESS_MCE_REPLY
 ;----------------------------------------------
+; Copy MCE reply into X mem and send to PC.
 	MOVE	#>$b10000,A
 	JSR	TIMERX_STORE_A1
 	JSR	TIMERX_STORE
 	
 	;; Copy data into the X-mem reply buffer, including type and size dwords.
-	MOVE	#(REP_DATA),R0
+	MOVE	#(DGRAM_DATA),R0
 	MOVE	#(MCEREP_BUF+MCEREP__TYPE),R3
 	MOVE	Y:(MCEREP_BUF+MCEREP__SIZE),Y1
 	.loop	#4
@@ -386,10 +471,10 @@ PROCESS_MCE_REPLY
 	JSR	TIMERX_STORE
 	
 	;; Mark the packet type and size
-	MOVE	#>RB_TYPE_MCE_REP,A1
+	MOVE	#>DG_TYPE_MCE_REP,A1
 	MOVE	#>(RB_MCE_SIZE/2),X1 ; size in 32-bit words.
-	MOVE	A1,X:REP_TYPE
-	MOVE	X1,X:REP_SIZE
+	MOVE	A1,X:DGRAM_TYPE
+	MOVE	X1,X:DGRAM_SIZE
 	
 	;; Copy
 	JSR	COPY_DATAGRAM_TO_HOST
@@ -403,6 +488,8 @@ PROCESS_MCE_REPLY
 ;----------------------------------------------
 PROCESS_MCE_DATA
 ;----------------------------------------------
+; Copy data frame to next PC buffer location.  Increment buffer
+; pointers and possibly schedule an information (QT_FLUSH).
 	MOVE	#>$b20000,A
 	JSR	TIMERX_STORE_A1
 	JSR	TIMERX_STORE
@@ -536,24 +623,30 @@ BUFFER_INCR_MULTI
 	RTS
 
 
-;--------------------
+;
+; Other activities
+;
+	
+;----------------------------------------
 SEND_BUF_INFO
-;--------------------
+;----------------------------------------
+; Inform the the PC of the current data buffer state.
+;
 	MOVE	#>$b80000,A
 	JSR	TIMERX_STORE_A1
 	JSR	TIMERX_STORE
 	
 	;; Load head index into first data field, pad to 32 bits
 	MOVE	X:QT_BUF_HEAD,X0
-	MOVE	X0,X:REP_DATA
+	MOVE	X0,X:DGRAM_DATA
 	MOVE	#0,X0
-	MOVE	X0,X:(REP_DATA+1)
+	MOVE	X0,X:(DGRAM_DATA+1)
 	
 	;; Mark the packet type and size
-	MOVE	#>RB_TYPE_BUF_INF,A1
+	MOVE	#>DG_TYPE_BUF_INF,A1
 	MOVE	#>(RB_INF_SIZE/2),X1 ; size in 32-bit words.
-	MOVE	A1,X:REP_TYPE
-	MOVE	X1,X:REP_SIZE
+	MOVE	A1,X:DGRAM_TYPE
+	MOVE	X1,X:DGRAM_SIZE
 	
 	JSR	COPY_DATAGRAM_TO_HOST
 	
@@ -568,8 +661,10 @@ SEND_BUF_INFO
 ;;;
 
 ;------------------------
-PROCESS_PC_CMD_INT
+BUFFER_PC_CMD_INT_HANDLER
 ;------------------------
+; Interrupt handler for DRXR.  Reads command from PC, by polling.
+	
 	;; Push all and disable further SRRQ ints
 	JSR	SAVE_REGISTERS	; This does not save all the registers...
 	BCLR	#DCTR_SRIE,X:DCTR
@@ -583,7 +678,7 @@ PROCESS_PC_CMD_INT
 	BSET	#DCTR_HF3,X:DCTR
 	
 	;; Is there data?
-	JCLR	#SRRQ,X:DSR,PROCESS_PC_CMD_INT_EXIT
+	JCLR	#SRRQ,X:DSR,BUFFER_PC_CMD_INT_HANDLER_EXIT
 	
 	MOVEP	X:DRXR,X0	; 16-bit word #0 = the command
 	MOVE	X0,X:CMD_WORD
@@ -601,7 +696,7 @@ PROCESS_PC_CMD_INT
 	
 	;; Don't call .loop with 0 argument!
 	CMP	#0,A
-	JEQ	PROCESS_PC_CMD_INT_OK
+	JEQ	BUFFER_PC_CMD_INT_HANDLER_OK
 	
 	.loop	A1
 	JCLR	#SRRQ,X:DSR,*
@@ -614,11 +709,11 @@ PROCESS_PC_CMD_INT
 	NOP
 	.endl
 	
-PROCESS_PC_CMD_INT_OK
+BUFFER_PC_CMD_INT_HANDLER_OK
 	;; Mark cmd-to-process
 	BSET	#COMM_CMD,X:STATUS
 
-PROCESS_PC_CMD_INT_EXIT	
+BUFFER_PC_CMD_INT_HANDLER_EXIT
 	;; Mark exit
 	JSR	TIMERX_STORE_RAW
 	
@@ -629,14 +724,18 @@ PROCESS_PC_CMD_INT_EXIT
 	RTI
 
 	
+;------------------------
 PROCESS_PC_CMD
+;------------------------
+; Parse the command from host and pass to a specialized processor.
+;
 	MOVE	#>$cd0000,A1
 	JSR	TIMERX_STORE_A1
 
 	;; Init the reply packet for success.
-	MOVE	#>RB_TYPE_DSP_REP,A1
+	MOVE	#>DG_TYPE_DSP_REP,A1
 	MOVE	X:CMD_WORD,B	; this will be used in the switch below.
-	MOVE	A1,X:REP_TYPE	; type is "dsp reply"
+	MOVE	A1,X:DGRAM_TYPE	; type is "dsp reply"
 	MOVE	B1,X:REP_RCMD	; copy of command word
 	MOVE	B0,X:REP_RSTAT	; status = 0
 	MOVE	B0,X:REP_RSIZE	; data size = 0
@@ -695,6 +794,14 @@ PROCESS_PC_CMD
 	JSR	TIMERX_STORE
 	RTS
 
+
+;----------------------------------------------
+; READ and WRITE MEMORY command handling
+;----------------------------------------------
+; PROCESS_[READ|WRITE]_[P|X|Y] are called by PROCESS_PC_CMD.
+; They assume that R1 is the pointer for read/write, and for writes
+; that X1 contains the data.
+	
 PROCESS_READ_P
 	MOVE	P:(R1),X0
 	JMP	PROCESS_READ_EXIT
@@ -735,10 +842,16 @@ PROCESS_WRITE_EXIT
 	JSR	TIMERX_STORE
 	RTS
 	
-	
+;----------------------------------------------
 PROCESS_SET_REP_BUFFER
-	;; Two data words, representing the upper and lower halfs of the
-	;; 32-bit bus address
+;----------------------------------------------
+; Store the PC reply buffer bus address, and enable replies.
+;
+; Format of the command payload:
+;	CMD_BUFFER+0   lo 16 bits | Buffer bus address
+;	CMD_BUFFER+1   hi 16 bits |
+;
+; Triggers a reply to host.
 	CLR	A
 	MOVE	#CMD_BUFFER,R0
 	MOVE	#REP_BUS_ADDR,R1
@@ -768,7 +881,22 @@ PROCESS_SET_REP_BUFFER_DISABLE
 ;-------------------------------
 PROCESS_SET_DATA_BUFFER_MULTI
 ;-------------------------------
-	;; Lots of good stuff in here.
+; Store the PC data frame buffer information.  Resets all frame data
+; counters and pointers.
+;
+;
+; Format of the command payload:
+;	CMD_BUFFER+0   Total frame container count (max 65535)
+;	CMD_BUFFER+2   Frame container size (max 65535)
+;	CMD_BUFFER+4   Frame size (max 65535)
+;	CMD_BUFFER+6   Number of contiguous RAM blocks
+;	CMD_BUFFER+8   Block data; 6 words per block.
+;
+;	BLOCK_START+0  lo 16  | Buffer bus address
+;	BLOCK_START+1  hi 16  |
+;	BLOCK_START+2  First index of buffer
+;	BLOCK_START+4  Last index of buffer + 1
+;
 	MOVE	#>CMD_BUFFER,R0
 	NOP
 	NOP
@@ -831,9 +959,11 @@ PROCESS_SET_DATA_BUFFER_MULTI
 	RTS
 
 	
+;-------------------------------
 PROCESS_SEND_MCE
-	;; The packet data is a command for the MCE.  Send it.
-	;; The data should be stored as 128 x 16bit units.
+;-------------------------------
+; The command includes an MCE command packet; send it to the MCE
+; Data are stored as 128 x 16bit units, starting at X:CMD_BUFFER.
 	MOVE	#CMD_BUFFER,R0
 	.loop	#128
 	MOVE	X:(R0)+,A1		; get hi 16
@@ -850,10 +980,12 @@ PROCESS_SEND_MCE
 	RTS
 
 	
+;-------------------------------
 PROCESS_POST_MCE
-	;; There is an MCE command in RAM and we need to fetch it and
-	;; transmit it.  For now assume the bus address is the only info.
-	
+;-------------------------------
+; The command indicates that an MCE command has been placed in memory
+; and should be copied to the MCE.  The bus address is at X:CMD_BUFFER.
+;
 	MOVE	#>CMD_BUFFER,R0
 	MOVE	#>BURST_SRC_LO,R1
 	NOP
@@ -888,9 +1020,15 @@ PROCESS_POST_MCE
 	JSR	TIMERX_STORE
 	RTS
 	
-	
+
+;-------------------------------
 PROCESS_SET_TAIL_INF
-	;; Update tail index from the first datum
+;-------------------------------
+; Host has sent a buffer information packet; update buffer state.
+;
+;	CMD_BUFFER+0	New circular buffer tail index.
+;	CMD_BUFFER+2	New value for QT_INFORM.
+;
 	MOVE	#>CMD_BUFFER,R0
 	NOP
 	NOP
@@ -915,35 +1053,20 @@ PROCESS_SET_TAIL_INF_1
 	RTS
 
 
-PROCESS_SPLIT_X0_XR0
-	;; Split the 24-bit contents in X0 into 8: and :16 bits, placed into
-	;; X:R0 and R0+1 resp.  Advances R0 accordingly.  Trashes A,B.
-	MOVE	X0,A0
-	EXTRACTU #$010000,A,B
-	EXTRACTU #$008010,A,A	; Put
-	MOVE	B0,X:(R0)+
-	MOVE	A0,X:(R0)+
-	RTS
-
-PROCESS_SPLIT_X0_YR0
-	;; Split the 24-bit contents in X0 into 8: and :16 bits, placed into
-	;; X:R0 and R0+1 resp.  Advances R0 by 2.  Trashes A,B.
-	MOVE	X0,A0
-	EXTRACTU #$010000,A,B
-	EXTRACTU #$008010,A,A	; Put
-	MOVE	B0,Y:(R0)+
-	MOVE	A0,Y:(R0)+
-	RTS
-
-PROCESS_JOIN_XR0_A
-	;; Join two 16-bit words at R0,R0+1 into a 32-bit word and
-	;; return in A.  Trashes X0.  Advances R0 by 2.
-	CLR	A
-	MOVE	X:(R0)+,A0
-	MOVE	X:(R0)+,X0
-	INSERT	#$010010,X0,A
-	RTS
-
+;----------------------------------------
+RESET_MCE_COMMS
+;----------------------------------------
+; Vector interrupt to send special reset signal to MCE rx.
+	BSET	#SCLK,X:PDRE		; Enable special command mode
+	NOP
+	NOP
+	MOVE	#$FFF000,R0		; Memory mapped address of transmitter
+	MOVE	#$10000B,X0		; Special command to reset controller
+	MOVE	X0,X:(R0)
+	REP	#6			; Wait for transmission to complete
+	NOP
+	BCLR	#SCLK,X:PDRE		; Disable special command mode
+	RTI
 
 
 ;------------------------
@@ -1159,22 +1282,7 @@ RESET_FIFO2
 	BCLR	#DCTR_HF5,X:DCTR
 	RTS
 
-;----------------------------------------
-RESET_MCE_COMMS
-;----------------------------------------
-; Vector interrupt to send special reset signal to MCE rx.
-	BSET	#SCLK,X:PDRE		; Enable special command mode
-	NOP
-	NOP
-	MOVE	#$FFF000,R0		; Memory mapped address of transmitter
-	MOVE	#$10000B,X0		; Special command to reset controller
-	MOVE	X0,X:(R0)
-	REP	#6			; Wait for transmission to complete
-	NOP
-	BCLR	#SCLK,X:PDRE		; Disable special command mode
-	RTI
 
-	
 ;;;
 ;;; Large packet buffering.
 ;;;
@@ -1214,6 +1322,7 @@ GO_FOR_HALF
 	
 	NOP
 	JSR	TIMERX_STORE
+	NOP
 	
 FINISHED_BUFFS	
 	;; .endl
@@ -1263,42 +1372,3 @@ BUFFER_PACKET_SINGLES_POLLED
 	NOP
 	NOP
 	RTS
-	
-
-TIMERX_STORE_INIT
-	MOVE	#>TIMER_BUFFER,A0
-	NOP
-	MOVE	A0,X:TIMER_INDEX
-	RTS
-
-TIMERX_STORE_RAW
-	;; Write the timer value to the timer buffer.
-	;; Trashes A, R5.  Sorry.
-	MOVE	X:TIMER_SOURCE,A
-	; Fall-through
-
-TIMERX_STORE_A1_RAW
-	;; Write A1 to to the timer buffer. Trashes A, R5.
-	MOVE	X:TIMER_INDEX,R5
-	NOP
-	NOP
-	MOVE	A1,Y:(R5)+
-	MOVE	R5,A
-	NOP
-	CMP	#>(TIMER_BUFFER_END-1),A
-	JGE	TIMERX_STORE_INIT
-	MOVE	A1,X:TIMER_INDEX
-	RTS
-
-TIMERX_STORE
-	BCLR	#DCTR_SRIE,X:DCTR
-	JSR	TIMERX_STORE_RAW
-	BSET	#DCTR_SRIE,X:DCTR
-	RTS
-	
-TIMERX_STORE_A1
-	BCLR	#DCTR_SRIE,X:DCTR
-	JSR	TIMERX_STORE_A1_RAW
-	BSET	#DCTR_SRIE,X:DCTR
-	RTS
-	

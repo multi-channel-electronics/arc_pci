@@ -229,38 +229,38 @@ CMD_BUFFER		DS	(256)
 ;;;  This needs to be large enough to hold an MCE reply.
 ;;;
 
-RB_SIZE			EQU	128+32 ; This MUST be even, so that effective number
+DG__SIZE		EQU	128+32 ; This MUST be even, so that effective number
 				       ; of 32-bit words is integral
 	
-RB_VERSION		EQU	1  ; Version of this datagram
-RB_TYPE_DSP_REP		EQU     1  ;
-RB_TYPE_MCE_REP		EQU     2  ;
-RB_TYPE_BUF_INF		EQU     3  ;
+DG_VERS_CODE		EQU	1  ; Datagram protocol version
+DG_TYPE_DSP_REP		EQU     1  ; DSP reply     | Packet type codes
+DG_TYPE_MCE_REP		EQU     2  ; MCE reply     |
+DG_TYPE_BUF_INF		EQU     3  ; Buffer status |
 
 ;;; The actualy buffer storage.
-REP_BUFFER1		DS	RB_SIZE
+DGRAM_BUFFER		DS	DG__SIZE
 
 ;;; Aliases into the structure.
-REP_VERSION		EQU	REP_BUFFER1+0  ; Datagram protocol version
-REP_SIZE		EQU	REP_BUFFER1+1  ; Datagram payload size in 32-bit words
-REP_TYPE		EQU	REP_BUFFER1+2  ; Datagram type
-REP_FWREV		EQU	REP_BUFFER1+4  ; FW rev.
-REP_DATA		EQU	REP_BUFFER1+16 ; Start of DSP or MCE reply data
-REP_HEADER_SIZE		EQU	(REP_DATA-REP_VERSION) ; Whatever
+DGRAM_VERSION		EQU	DGRAM_BUFFER+0  ; Datagram protocol version
+DGRAM_SIZE		EQU	DGRAM_BUFFER+1  ; Datagram payload size in 32-bit words
+DGRAM_TYPE		EQU	DGRAM_BUFFER+2  ; Datagram type
+DGRAM_FWREV		EQU	DGRAM_BUFFER+4  ; FW rev.
+DGRAM_DATA		EQU	DGRAM_BUFFER+16 ; Start of DSP or MCE reply data
+DGRAM__HEADER_SIZE	EQU	(DGRAM_DATA-DGRAM_VERSION) ; Whatever
 	
 ;;; For DSP reply packets:
-REP_RSTAT		EQU	REP_DATA+0
-REP_RSIZE		EQU	REP_DATA+1
-REP_RCMD		EQU	REP_DATA+2
-REP_RPAYLOAD		EQU	REP_DATA+4
+REP_RSTAT		EQU	DGRAM_DATA+0
+REP_RSIZE		EQU	DGRAM_DATA+1
+REP_RCMD		EQU	DGRAM_DATA+2
+REP_RPAYLOAD		EQU	DGRAM_DATA+4
 REP_REND		EQU	REP_RPAYLOAD+16 ; Whatever.
 	
 
 ;;; Datagram sizes for reply and MCE packets.
 ;;; Must be even; divide by two to get 32-bit words; mul by two to get bytes.
-RB_REP_SIZE		EQU	(REP_REND-REP_DATA+REP_HEADER_SIZE)
+RB_REP_SIZE		EQU	(REP_REND-DGRAM_DATA+DGRAM__HEADER_SIZE)
 RB_MCE_SIZE		EQU	(8+128)
-RB_INF_SIZE		EQU	(REP_REND-REP_DATA+2)
+RB_INF_SIZE		EQU	(REP_REND-DGRAM_DATA+2)
 
 
 ; 

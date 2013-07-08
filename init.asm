@@ -99,7 +99,8 @@ INIT_PCI
 	IF	@SCP("DOWNLOAD","ONCE")		; Download via ONCE debugger
 	ORG	P:$6A,P:$6A
 	ENDIF
-	JSR	PROCESS_PC_CMD_INT
+	JSR	BUFFER_PC_CMD_INT_HANDLER
+
 
 	
 ;**************************************************************************
