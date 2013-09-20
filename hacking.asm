@@ -557,7 +557,7 @@ PROCESS_MCE_DATA__DROP_FRAME
 	ADD	#1,A
 	NOP
 	MOVE	A,X:QT_DROPS
-	RTS
+	JMP 	PROCESS_MCE_DATA__DONE
 
 	
 ;----------------------------------------
