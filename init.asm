@@ -91,8 +91,17 @@ INIT_PCI
 
 	DC	0,0,0,0,0,0,0,0,0,0,0,0		; Filler
 	DC	0,0,0,0,0,0,0,0,0,0,0,0		; Filler
-	DC	0,0,0,0,0,0,0,0,0,0,0,0		; $60-$71 Reserved PCI
+	DC	0,0,0,0,0,0,0,0,0,0,0
 
+	;; PCI slave request interrupt vector
+	ORG	P:$6A,P:$6C
+	IF	@SCP("DOWNLOAD","ONCE")		; Download via ONCE debugger
+	ORG	P:$6A,P:$6A
+	ENDIF
+	JSR	BUFFER_PC_CMD_INT_HANDLER
+
+
+	
 ;**************************************************************************
 ; Check for program space overwriting of ISR starting at P:$72
        IF      @CVS(N,*)>$71
@@ -143,6 +152,9 @@ INIT_PCI
 ; Quiet RP mode, clear buffer full flag
 	BCLR	#RP_BUFFER_FULL,X:<STATUS	; $8C
 	NOP
+	
+; Reset MCE (new-style command, no reply)
+	JSR	RESET_MCE_COMMS			; $8E
 
 ; ***********************************************************************
 ; For now have boot code starting from P:$100

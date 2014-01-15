@@ -43,10 +43,9 @@ PACKET_IN
 	JSSET   #CON_MCE,X:STATUS,CON_TRANSMIT
 	JSSET	#CON_DEMAND,X:STATUS,CON_BUFFER
 
-	;; Hackers, welcome.
-	NOP
-	NOP
-	
+	;; Enter new comms mode if host signals with HF2
+	JSET	#DSR_HF2,X:DSR,NEW_COMMS_INIT
+
 	;; Loop
 	JMP	PACKET_IN
 
@@ -1057,9 +1056,12 @@ PCI_MESSAGE_TO_HOST_10
 	MOVE	X:SV_X0,X0		; restore X0
 	MOVE	X:SV_R0,R0		; restore R0
 	BSET	#DCTR_HF3,X:DCTR	; Raise HF3 (handshake)
-	
-	; Only interrupt in irq mode
-	JSET	#DSR_HF2,X:DSR,PCI_MESSAGE_TO_HOST_20
+
+	; No more NO_IRQ mode... we need DSR_HF2 for master-only mode
+	;; Only interrupt in irq mode
+	;; JSET	#DSR_HF2,X:DSR,PCI_MESSAGE_TO_HOST_20
+	NOP
+	NOP
 	BSET	#INTA,X:DCTR		; Assert the interrupt
 	
 PCI_MESSAGE_TO_HOST_20

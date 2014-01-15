@@ -162,7 +162,144 @@ BDEBUG6			DC	0
 BDEBUG7			DC	0
 BDEBUG8			DC	0
 BDEBUG9			DC	0
+	
 
+;;; 
+;;; New definitions for U0107 alternative protocols
+;;; 
+
+;;; Bits in STATUS... watch for conflicts. (4-8, 12-15 are free)
+COMM_REP		EQU	4 ; Reply needs to be sent
+COMM_CMD		EQU	5 ; Command needs to be processed
+COMM_MCEREP		EQU	6 ; MCE reply has been buffered for send to host
+COMM_MCEDATA		EQU	7 ; MCE data " "
+COMM_ERR		EQU	8 ; Command not recognized or whatever
+COMM_REP_ENABLED	EQU	12 ;
+COMM_BUF_UPDATE		EQU	13 ; Data has been written to buffer
+COMM_TFR_YMEM		EQU	14 ; PCI burst is coming from Y mem, not X mem.
+
+	
+FIFO_FAILS		DC	0
+PTYPE_FAILS		DC	0
+DA_COUNT		DC	0
+	
+;;; WORD and SIZE must be adjacent like this.
+CMD_SIZE		DC	0
+CMD_WORD		DC	0
+
+REP_BUS_ADDR		DC	0,0
+	
+MEM_SRC			DC	0
+	
+INT_DEBUG_BUF_IDX	DC	0
+DEBUG_BUF_IDX		DC	0
+
+QT_MAX_BLOCKS		EQU	20
+; struct QT_DATA:
+QT_BLOCK__ADDR		EQU	0
+QT_BLOCK__END_IDX	EQU	2
+QT_BLOCK___SIZE		EQU	3	
+QT_N_BLOCK		DC	0
+QT_BLOCK_PTR		DC	0
+QT_BLOCKS		DS	(QT_MAX_BLOCKS*QT_BLOCK___SIZE)
+	
+
+;;; MCE packet header; 8 words; keep them together.
+MCEHDR_PREAMBLE		DS	(4)
+MCEHDR_TYPE		DS	(2)
+MCEHDR_SIZE		DS	(2)
+MCEHDR			EQU	MCEHDR_PREAMBLE
+
+;;; Secured MCE reply; contains TYPE and SIZE as well as up to 64 dwords of payload
+MCEREP__TYPE		EQU	0
+MCEREP__SIZE		EQU	2
+MCEREP__PAYLOAD		EQU	4
+MCEREP___SIZE		EQU	MCEREP__PAYLOAD+128
+	
+	
+;;; 
+;;; Buffer for commands from PC
+;;;
+CMD_BUFFER		DS	(256)
+
+
+;;; 
+;;; Reply/status buffer - this is a structure that is copied into PC RAM
+;;;  whenever the DSP needs to provide a command reply or other information.
+;;;  This needs to be large enough to hold an MCE reply.
+;;;
+
+DG__SIZE		EQU	128+32 ; This MUST be even, so that effective number
+				       ; of 32-bit words is integral
+	
+DG_VERS_CODE		EQU	1  ; Datagram protocol version
+DG_TYPE_DSP_REP		EQU     1  ; DSP reply     | Packet type codes
+DG_TYPE_MCE_REP		EQU     2  ; MCE reply     |
+DG_TYPE_BUF_INF		EQU     3  ; Buffer status |
+
+;;; The actualy buffer storage.
+DGRAM_BUFFER		DS	DG__SIZE
+
+;;; Aliases into the structure.
+DGRAM_VERSION		EQU	DGRAM_BUFFER+0  ; Datagram protocol version
+DGRAM_SIZE		EQU	DGRAM_BUFFER+1  ; Datagram payload size in 32-bit words
+DGRAM_TYPE		EQU	DGRAM_BUFFER+2  ; Datagram type
+DGRAM_FWREV		EQU	DGRAM_BUFFER+4  ; FW rev.
+DGRAM_DATA		EQU	DGRAM_BUFFER+16 ; Start of DSP or MCE reply data
+DGRAM__HEADER_SIZE	EQU	(DGRAM_DATA-DGRAM_VERSION) ; Whatever
+	
+;;; For DSP reply packets:
+REP_RSTAT		EQU	DGRAM_DATA+0
+REP_RSIZE		EQU	DGRAM_DATA+1
+REP_RCMD		EQU	DGRAM_DATA+2
+REP_RPAYLOAD		EQU	DGRAM_DATA+4
+REP_REND		EQU	REP_RPAYLOAD+16 ; Whatever.
+	
+
+;;; Datagram sizes for reply and MCE packets.
+;;; Must be even; divide by two to get 32-bit words; mul by two to get bytes.
+RB_REP_SIZE		EQU	(REP_REND-DGRAM_DATA+DGRAM__HEADER_SIZE)
+RB_MCE_SIZE		EQU	(8+128)
+RB_INF_SIZE		EQU	(REP_REND-DGRAM_DATA+2)
+
+
+; 
+; Buffer locations, Y memory.
+;
+MCECMD_BUF		EQU	$0
+
+MCEREP_BUF		EQU	$100 ; Y-mem location for mce reply buffer?
+
+MCEDATA_BUF		EQU	$200
+	
+MCE_PACKET_DUMP		EQU	$2000
+	
+DEBUG_BUF		EQU 	$8000
+	
+	
+;
+; Commands for U0107 comms protocol
+;
+
+CMD_READ_P		EQU	1
+CMD_READ_X		EQU	2
+CMD_READ_Y		EQU	3
+			
+CMD_WRITE_P		EQU	5
+CMD_WRITE_X		EQU	6
+CMD_WRITE_Y		EQU	7
+			
+CMD_SET_REP_BUF		EQU	9
+CMD_SET_DATA_BUF_MULTI	EQU	$B
+	
+CMD_SET_TAIL_INF	EQU	$12
+			
+CMD_SEND_MCE		EQU	$21
+CMD_POST_MCE		EQU	$22
+
+
+
+	
 ;----------------------------------------------------------
 
 ;;; Bit defines for STATUS word
