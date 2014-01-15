@@ -29,7 +29,7 @@ MODE			DC	0	; Operating mode control
 FRAME_COUNT		DC	0	; Count of data frames from MCE
 
 ;-----------------------------------------------
-REV_NUMBER		DC	$550106	; byte 0 = minor revision #
+REV_NUMBER		DC	$550107	; byte 0 = minor revision #
 					; byte 1 = major revision #
 					; byte 2 = release Version (ascii letter)
 REV_DATA		DC	$000000 ; Not used by UBC
