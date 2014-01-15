@@ -42,7 +42,8 @@ build.clb: header.asm init.asm main.asm build.asm vars.asm app.asm info.asm \
 	$(ASM) $(ASM_FLAGS) -l$*ls -b$@ $< |sed $(SED_PROG) | awk $(AWK_PROG)
 
 clean:	tidy
-	-rm *.lod
+	-rm $(TARGET).lod
+	-rm $(TARGET).s
 
 tidy:
 	-rm *.cld *.clb *.ls *~
