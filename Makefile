@@ -16,11 +16,15 @@ AWK_PROG='($$5=="ERROR" || $$5=="WARNING") {file=substr($$3,2); match($$4, "[0-9
 
 ASM_FLAGS=-dDOWNLOAD ROM
 
-#default: $(TARGET).s
-default: patch
+# Target for dsp_cmd patch generation:
+PATCH_SOURCE="../releases/U0106/build.lod"
+
+default: $(TARGET).s
+#default: patch
 
 patch: $(TARGET).lod
-	python ../../tools/live_patch.py | tee patch || ( rm patch && false )
+	python ../tools/live_patch.py $(PATCH_SOURCE) $(TARGET).lod | \
+	    tee patch || ( rm patch && false )
 
 build.clb: header.asm init.asm main.asm build.asm vars.asm app.asm info.asm \
 	 hacking.asm
