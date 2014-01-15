@@ -88,13 +88,12 @@ INIT_PCI
 	MOVE	P:(*+3),X0		; Trick to write "JMP <START" to P:0
 	MOVE	X0,P:(0)
 	JMP	<START
-	
+
 	DC	0,0,0,0,0,0,0,0,0,0,0,0		; Filler
 	DC	0,0,0,0,0,0,0,0,0,0,0,0		; Filler
-	;; DC	0,0,0,0,0,0,0,0,0,0,0,0		; $60-$71 Reserved PCI
 	DC	0,0,0,0,0,0,0,0,0,0,0
 
-	;; PCI slave request interrupte vector
+	;; PCI slave request interrupt vector
 	ORG	P:$6A,P:$6C
 	IF	@SCP("DOWNLOAD","ONCE")		; Download via ONCE debugger
 	ORG	P:$6A,P:$6A

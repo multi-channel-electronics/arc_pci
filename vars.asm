@@ -11,7 +11,7 @@ See info.asm for versioning and authors.
 ; eeprom / P memory after the main code (but before the application
 ; area).
 
-        ORG X:VAR_TBL,P:
+        ORG     X:VAR_TBL,P:
 
 
 	IF	@SCP("DOWNLOAD","ROM")	; Boot ROM code

@@ -25,7 +25,7 @@ PACKET_IN
 	
 	;; Reinitialize if a serious error has been detected
  	JSET	#FATAL_ERROR,X:<STATUS,START 
-	
+
 	;; Jump to special application area if signalled to do so
 	JSET	#MODE_APPLICATION,X:<MODE,APPLICATION
 
@@ -1056,8 +1056,9 @@ PCI_MESSAGE_TO_HOST_10
 	MOVE	X:SV_X0,X0		; restore X0
 	MOVE	X:SV_R0,R0		; restore R0
 	BSET	#DCTR_HF3,X:DCTR	; Raise HF3 (handshake)
-	
-	; Only interrupt in irq mode
+
+	; No more NO_IRQ mode... we need DSR_HF2 for master-only mode
+	;; Only interrupt in irq mode
 	;; JSET	#DSR_HF2,X:DSR,PCI_MESSAGE_TO_HOST_20
 	NOP
 	NOP
