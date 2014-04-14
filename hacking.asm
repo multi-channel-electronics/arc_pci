@@ -75,7 +75,8 @@ NEW_COMMS_MAIN_LOOP
 	;; Lower handshake flag
 	BCLR	#DCTR_HF4,X:DCTR
 
-	JMP	PACKET_IN	
+	;; Return to main loop.
+	RTS
 
 
 ;----------------------------------------------
