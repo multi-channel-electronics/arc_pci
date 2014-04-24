@@ -46,6 +46,10 @@ PACKET_IN
 	;; Enter new comms mode if host signals with HF2
 	JSSET	#DSR_HF2,X:DSR,NEW_COMMS_INIT
 
+	;; Hackers, welcome
+	NOP
+	NOP
+	
 	;; Loop
 	JMP	PACKET_IN
 
@@ -870,7 +874,11 @@ QUIET_TRANSFER_SET_R0_PERSISTENT
 	MOVE	#>VAR_TBL_START,B
 	MOVE	R0,A
 	ADD	A,B
+	NOP
 	MOVE    B,R0
+	NOP
+	NOP
+	NOP
 	MOVE	X0,P:(R0)
 	JMP	VCOM_EXIT
 

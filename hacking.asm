@@ -1,4 +1,5 @@
-       COMMENT *
+
+		COMMENT *
 
 	This implementation does communication with the host using PCI
 	master writes only.
@@ -25,15 +26,23 @@ NEW_COMMS_INIT
 	BCLR	#COMM_BUF_UPDATE,X:STATUS
 	
 	;; Init the datagram structure
-	;; JSR	INIT_DATAGRAM_BUFFER
-	JSR	CLEAR_DATABUF
+	JSR	INIT_DATAGRAM_BUFFER
 	
+	;; Set host frame buffer as unconfigured.
+	CLR	A
+	NOP
+	MOVE	A,X:QT_N_BLOCK
+	
+	;; Setup timing storage
 	JSR	TIMERX_STORE_INIT
 	
 	;; Enable PCI slave receive interrupt to handle commands from host
 	BSET	#DCTR_SRIE,X:DCTR
 	
-	;; Set bit to indicate to host that we're in this loop.
+	;; Set status bit that identifies new comms mode
+	BSET	#COMM_ACTIVE,X:STATUS
+
+	;; Set host flag so host can easily tell we're in new comms mode
 	BSET	#DCTR_HF4,X:DCTR
 	
 ;
@@ -59,6 +68,10 @@ NEW_COMMS_MAIN_LOOP
 	;; Issue information?
 	JSSET	#QT_FLUSH,X:STATUS,SEND_BUF_INFO
 	
+	;; Hackers, welcome
+	NOP
+	NOP
+
 	;; LOOP UNTIL host gives up.
 	JSET	#DSR_HF2,X:DSR,NEW_COMMS_MAIN_LOOP
 
@@ -70,12 +83,14 @@ NEW_COMMS_MAIN_LOOP
 	BCLR	#QT_FLUSH,X:STATUS
 	
 	;; Disable PCI slave receive interrupt
-	;; BCLR	#DCTR_SRIE,X:DCTR
+	BCLR	#DCTR_SRIE,X:DCTR
 	
-	;; ;; Lower handshake flag
-	;; BCLR	#DCTR_HF4,X:DCTR
-	JMP	NEW_SHUTDOWN
+	;; Lower handshake flag
+	BCLR	#DCTR_HF4,X:DCTR
 
+	;; Update status flag
+	BCLR	#COMM_ACTIVE,X:STATUS
+	
 	;; Return to main loop.
 	RTS
 
@@ -493,12 +508,15 @@ PROCESS_MCE_DATA
 ;----------------------------------------------
 ; Copy data frame to next PC buffer location.  Increment buffer
 ; pointers and possibly schedule an information (QT_FLUSH).
-	;; MOVE	#>$b20000,A
-	;; JSR	TIMERX_STORE_A1
-	;; JSR	TIMERX_STORE
-	JMP PROCESS_MCE_DATA_CHECKBUF
-	NOP
-	NOP
+	MOVE	#>$b20000,A
+	JSR	TIMERX_STORE_A1
+	JSR	TIMERX_STORE
+	
+	;; Drop the frame unless host frame buffer has been configured.
+	CLR	A
+	MOVE	X:QT_N_BLOCK,X0
+	CMP	X0,A
+	JEQ	PROCESS_MCE_DATA__DROP_FRAME
 	
 PROCESS_MCE_DATA_CONTD	
 	;; Check QT_BUF_HEAD, just drop the frame if the buffer is full
@@ -1378,42 +1396,4 @@ BUFFER_PACKET_SINGLES_POLLED
 	.endl
 	NOP
 	NOP
-	RTS
-
-;;;
-;;; Hacking hacking.
-;;;
-
-PROCESS_MCE_DATA_CHECKBUF
-	;; Borrowed...
-	MOVE	#>$b20000,A
-	JSR	TIMERX_STORE_A1
-	JSR	TIMERX_STORE
-	;; .
-
-	;; Drop the frame unless the data frame buffer has been set up.
-	CLR	A
-	MOVE	X:QT_N_BLOCK,X0
-	CMP	X0,A
-	JEQ	PROCESS_MCE_DATA__DROP_FRAME
-	JMP PROCESS_MCE_DATA_CONTD
-
-CLEAR_DATABUF
-	;; Init the datagram structure
-	JSR	INIT_DATAGRAM_BUFFER
-	CLR	A
-	MOVE	A,X:QT_N_BLOCK
-
-	;; Set status bit for DSP_STATUS.
-	BSET	#COMM_ACTIVE,X:STATUS
-	RTS
-
-NEW_SHUTDOWN
-	BCLR	#COMM_ACTIVE,X:STATUS
-	
-	;; Disable PCI slave receive interrupt
-	BCLR	#DCTR_SRIE,X:DCTR
-	
-	;; Lower handshake flag
-	BCLR	#DCTR_HF4,X:DCTR
 	RTS
