@@ -1,5 +1,4 @@
-
-		COMMENT *
+       COMMENT *
 
 	This implementation does communication with the host using PCI
 	master writes only.
@@ -26,7 +25,8 @@ NEW_COMMS_INIT
 	BCLR	#COMM_BUF_UPDATE,X:STATUS
 	
 	;; Init the datagram structure
-	JSR	INIT_DATAGRAM_BUFFER
+	;; JSR	INIT_DATAGRAM_BUFFER
+	JSR	CLEAR_DATABUF
 	
 	JSR	TIMERX_STORE_INIT
 	
@@ -492,10 +492,14 @@ PROCESS_MCE_DATA
 ;----------------------------------------------
 ; Copy data frame to next PC buffer location.  Increment buffer
 ; pointers and possibly schedule an information (QT_FLUSH).
-	MOVE	#>$b20000,A
-	JSR	TIMERX_STORE_A1
-	JSR	TIMERX_STORE
+	;; MOVE	#>$b20000,A
+	;; JSR	TIMERX_STORE_A1
+	;; JSR	TIMERX_STORE
+	JMP PROCESS_MCE_DATA_CHECKBUF
+	NOP
+	NOP
 	
+PROCESS_MCE_DATA_CONTD	
 	;; Check QT_BUF_HEAD, just drop the frame if the buffer is full
 	MOVE	X:QT_BUF_HEAD,A
 	ADD	#1,A
@@ -1074,7 +1078,7 @@ RESET_MCE_COMMS
 ;------------------------
 CHECK_FOR_DATA
 ;------------------------
-	BSET	#DCTR_HF5,X:DCTR
+	BSET	#DCTR_HF5,X:DCTR        ; Signal for debugging
 	JCLR	#EF,X:PDRD,CHECK_FOR_DATA_EXIT
 	NOP
 	NOP
@@ -1374,3 +1378,29 @@ BUFFER_PACKET_SINGLES_POLLED
 	NOP
 	NOP
 	RTS
+
+;;;
+;;; Hacking hacking.
+;;;
+
+PROCESS_MCE_DATA_CHECKBUF
+	;; Borrowed...
+	MOVE	#>$b20000,A
+	JSR	TIMERX_STORE_A1
+	JSR	TIMERX_STORE
+	;; .
+
+	;; Drop the frame unless the data frame buffer has been set up.
+	CLR	A
+	MOVE	X:QT_N_BLOCK,X0
+	CMP	X0,A
+	JEQ	PROCESS_MCE_DATA__DROP_FRAME
+	JMP PROCESS_MCE_DATA_CONTD
+
+CLEAR_DATABUF
+	;; Init the datagram structure
+	JSR	INIT_DATAGRAM_BUFFER
+	CLR	A
+	MOVE	A,X:QT_N_BLOCK
+	RTS
+	
