@@ -25,6 +25,7 @@ Assembler directives:
 	INCLUDE 'main.asm'
 	INCLUDE 'vars.asm'
 	INCLUDE 'app.asm'
+	INCLUDE 'comms7.asm'
 	INCLUDE 'hacking.asm'
 	
 END_ADR	EQU	@LCV(L)		; End address of P: code written to ROM
