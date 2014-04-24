@@ -177,7 +177,6 @@ COMM_ERR		EQU	8 ; Command not recognized or whatever
 COMM_REP_ENABLED	EQU	12 ; Datagram buffer has been enabled by host
 COMM_BUF_UPDATE		EQU	13 ; Data has been written to buffer
 COMM_TFR_YMEM		EQU	14 ; PCI burst is coming from Y mem, not X mem.
-COMM_ACTIVE		EQU	15 ; Alternative (U0107+) protocol is active.
 
 FIFO_FAILS		DC	0
 PTYPE_FAILS		DC	0
@@ -330,6 +329,7 @@ MODE_APPLICATION	EQU	0   ; set if PCI application to run
 MODE_MCE		EQU	1   ; process packets from MCE (!choke)
 MODE_QT			EQU	2   ; Quiet transfer for data packets (QT mode)
 MODE_RP_BUFFER		EQU     3   ; Quiet transfer for reply packets (Quiet-RP)
+MODE_C7_ACTIVE		EQU	4   ; Alternative (U0107+) protocol is active.
 
 
 ;;; END OF VARIABLE TABLE

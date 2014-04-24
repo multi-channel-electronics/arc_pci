@@ -40,7 +40,7 @@ NEW_COMMS_INIT
 	BSET	#DCTR_SRIE,X:DCTR
 	
 	;; Set status bit that identifies new comms mode
-	BSET	#COMM_ACTIVE,X:STATUS
+	BSET	#MODE_C7_ACTIVE,X:MODE
 
 	;; Set host flag so host can easily tell we're in new comms mode
 	BSET	#DCTR_HF4,X:DCTR
@@ -89,7 +89,7 @@ NEW_COMMS_MAIN_LOOP
 	BCLR	#DCTR_HF4,X:DCTR
 
 	;; Update status flag
-	BCLR	#COMM_ACTIVE,X:STATUS
+	BCLR	#MODE_C7_ACTIVE,X:MODE
 	
 	;; Return to main loop.
 	RTS

@@ -31,7 +31,7 @@ inv_patch: $(TARGET).lod
 	python ../tools/live_patch.py $(TARGET).lod $(PATCH_SOURCE)
 
 build.clb: header.asm init.asm main.asm build.asm vars.asm app.asm info.asm \
-	 hacking.asm
+	 comms7.asm hacking.asm
 
 %s : %lod
 	$(LOD) $< $@ UBC_MCE_PCI 4
