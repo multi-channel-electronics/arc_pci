@@ -70,10 +70,11 @@ NEW_COMMS_MAIN_LOOP
 	BCLR	#QT_FLUSH,X:STATUS
 	
 	;; Disable PCI slave receive interrupt
-	BCLR	#DCTR_SRIE,X:DCTR
+	;; BCLR	#DCTR_SRIE,X:DCTR
 	
-	;; Lower handshake flag
-	BCLR	#DCTR_HF4,X:DCTR
+	;; ;; Lower handshake flag
+	;; BCLR	#DCTR_HF4,X:DCTR
+	JMP	NEW_SHUTDOWN
 
 	;; Return to main loop.
 	RTS
@@ -1402,5 +1403,17 @@ CLEAR_DATABUF
 	JSR	INIT_DATAGRAM_BUFFER
 	CLR	A
 	MOVE	A,X:QT_N_BLOCK
+
+	;; Set status bit for DSP_STATUS.
+	BSET	#COMM_ACTIVE,X:STATUS
 	RTS
+
+NEW_SHUTDOWN
+	BCLR	#COMM_ACTIVE,X:STATUS
 	
+	;; Disable PCI slave receive interrupt
+	BCLR	#DCTR_SRIE,X:DCTR
+	
+	;; Lower handshake flag
+	BCLR	#DCTR_HF4,X:DCTR
+	RTS

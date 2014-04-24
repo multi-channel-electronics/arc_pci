@@ -168,17 +168,17 @@ BDEBUG9			DC	0
 ;;; New definitions for U0107 alternative protocols
 ;;; 
 
-;;; Bits in STATUS... watch for conflicts. (4-8, 12-15 are free)
+;;; Bits in STATUS... watch for conflicts. (4-8, 12-15, 18-19 are free)
 COMM_REP		EQU	4 ; Reply needs to be sent
 COMM_CMD		EQU	5 ; Command needs to be processed
 COMM_MCEREP		EQU	6 ; MCE reply has been buffered for send to host
 COMM_MCEDATA		EQU	7 ; MCE data " "
 COMM_ERR		EQU	8 ; Command not recognized or whatever
-COMM_REP_ENABLED	EQU	12 ;
+COMM_REP_ENABLED	EQU	12 ; Datagram buffer has been enabled by host
 COMM_BUF_UPDATE		EQU	13 ; Data has been written to buffer
 COMM_TFR_YMEM		EQU	14 ; PCI burst is coming from Y mem, not X mem.
+COMM_ACTIVE		EQU	15 ; Alternative (U0107+) protocol is active.
 
-	
 FIFO_FAILS		DC	0
 PTYPE_FAILS		DC	0
 DA_COUNT		DC	0
@@ -302,7 +302,7 @@ CMD_POST_MCE		EQU	$22
 	
 ;----------------------------------------------------------
 
-;;; Bit defines for STATUS word
+;;; Bit defines for STATUS word -- see also COMM_* above.
 
 APPLICATION_RUNNING	EQU	0   ; Indicates application is in progress
 SEND_TO_HOST		EQU	1   ; set in HST ISR when host ready for packet (stays set until after HST reply)
