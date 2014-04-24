@@ -17,14 +17,15 @@ AWK_PROG='($$5=="ERROR" || $$5=="WARNING") {file=substr($$3,2); match($$4, "[0-9
 ASM_FLAGS=-dDOWNLOAD ROM
 
 # Target for dsp_cmd patch generation:
-PATCH_SOURCE="build.lod.u0107"
+PATCH_SOURCE=$(shell cat difflod_source)
 
 default: $(TARGET).s
-#default: patch
 
-patch: $(TARGET).lod
+patch: $(TARGET).lod difflod_source
+	echo "# `date`: `pwd` `svnversion`" | tee patch
+	echo "# Diff rel to $(PATCH_SOURCE)" | tee -a patch
 	python ../tools/live_patch.py $(PATCH_SOURCE) $(TARGET).lod | \
-	    tee patch || ( rm patch && false )
+	    tee -a patch || ( rm patch && false )
 
 inv_patch: $(TARGET).lod
 	echo "# Inverse patch."
