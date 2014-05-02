@@ -16,51 +16,32 @@ See info.asm for versioning and authors.
 ;;;
 	
 PACKET_IN
-	;; JSSET	#DSR_HF2,X:DSR,NEW_COMMS_INIT
 
 	;; Clear I'm-alive bit
-	;; BCLR    #MAIN_LOOP_POLL,X:<STATUS
-	;; ;; Are we in state freeze?
-	;; JSET	#FREEZER,X:<STATUS,PACKET_IN
-	BCLR	#INTA,X:DCTR		; Clear interrupt
-	NOP
-	NOP
-	NOP
-	NOP
-	NOP
-	NOP
-	NOP
-	NOP
-	NOP
-	NOP
-	NOP
-	NOP
-	NOP
-	NOP
-	NOP
-	NOP
-	NOP
+	BCLR    #MAIN_LOOP_POLL,X:<STATUS
 
+	;; Are we in state freeze?
+	JSET	#FREEZER,X:<STATUS,PACKET_IN
 	
-	;; ;; Reinitialize if a serious error has been detected
- 	;; JSET	#FATAL_ERROR,X:<STATUS,START 
+	;; Reinitialize if a serious error has been detected
+ 	JSET	#FATAL_ERROR,X:<STATUS,START 
 
-	;; ;; Jump to special application area if signalled to do so
-	;; JSET	#MODE_APPLICATION,X:<MODE,APPLICATION
+	;; Jump to special application area if signalled to do so
+	JSET	#MODE_APPLICATION,X:<MODE,APPLICATION
 
-	;; ;; Check for timer expiry and branch to the handler
-	;; JSSET	#TCF,X:TCSR0,TIMER_ACTION 
+	;; Check for timer expiry and branch to the handler
+	JSSET	#TCF,X:TCSR0,TIMER_ACTION 
 
-	;; ;; If it's time to signal the PC of buffer state, do so.
-	;; JSSET	#QT_FLUSH,X:STATUS,BUFFER_INFORM
+	;; If it's time to signal the PC of buffer state, do so.
+	JSSET	#QT_FLUSH,X:STATUS,BUFFER_INFORM
 	
-	;; ;; Check for data in fibre-optic FIFO
-	;; JSR	<CHECK_FO
- 	;; JSSET	#FO_WRD_RCV,X:STATUS,HANDLE_FIFO
+	;; Check for data in fibre-optic FIFO
+	JSR	<CHECK_FO
+ 	JSSET	#FO_WRD_RCV,X:STATUS,HANDLE_FIFO
 
-	;; ;; CON only progresses if FIFO isn't hot.
-	;; JSSET   #CON_MCE,X:STATUS,CON_TRANSMIT
-	;; JSSET	#CON_DEMAND,X:STATUS,CON_BUFFER
+	;; CON only progresses if FIFO isn't hot.
+	JSSET   #CON_MCE,X:STATUS,CON_TRANSMIT
+	JSSET	#CON_DEMAND,X:STATUS,CON_BUFFER
 
 	;; Enter new comms mode if host signals with HF2
 	JSSET	#DSR_HF2,X:DSR,NEW_COMMS_INIT
@@ -198,8 +179,15 @@ INCR_X_R0
 ;;; Handler for MCE reply (RP) packets.
 	
 HANDLE_RP
-	;; Process normally if QUIET_RP not enabled
-	JCLR	#MODE_RP_BUFFER,X:MODE,MCE_PACKET
+;;; 
+	JMP	HANDLE_RP_CHECK
+;;;
+HANDLE_RP_CHECK_RETURNS
+	;; ;; Ignore if certainly spurious
+	;; JCLR	#MODE_MCE,X:MODE,HANDLE_RP_DROP
+	
+	;; ;; Process normally if QUIET_RP not enabled
+	;; JCLR	#MODE_RP_BUFFER,X:MODE,MCE_PACKET
 
 	;; Drop this packet if we're backed up
 	JSET	#RP_BUFFER_FULL,X:STATUS,HANDLE_RP_DROP
@@ -269,10 +257,18 @@ HANDLE_RP_DROP
 
 
 HANDLE_DA
-	;; Increment frame count
-	MOVE	#FRAME_COUNT,R0
-	JSR	INCR_X_R0
+;;; 
+	JMP	HANDLE_DA_CHECK
+	NOP
+HANDLE_DA_CHECK_RETURNS	
+;;; 
+	;; ;; Increment frame count
+	;; MOVE	#FRAME_COUNT,R0
+	;; JSR	INCR_X_R0
 
+	;; ;; Ignore if certainly spurious
+	;; JCLR	#MODE_MCE,X:MODE,HANDLE_RP_DROP
+	
 	;; If not quiet mode, do normal processing
 	JCLR	#MODE_QT,X:MODE,MCE_PACKET
 
