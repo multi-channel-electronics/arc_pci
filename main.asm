@@ -16,32 +16,51 @@ See info.asm for versioning and authors.
 ;;;
 	
 PACKET_IN
+	;; JSSET	#DSR_HF2,X:DSR,NEW_COMMS_INIT
 
 	;; Clear I'm-alive bit
-	BCLR    #MAIN_LOOP_POLL,X:<STATUS
+	;; BCLR    #MAIN_LOOP_POLL,X:<STATUS
+	;; ;; Are we in state freeze?
+	;; JSET	#FREEZER,X:<STATUS,PACKET_IN
+	BCLR	#INTA,X:DCTR		; Clear interrupt
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
 
-	;; Are we in state freeze?
-	JSET	#FREEZER,X:<STATUS,PACKET_IN
 	
-	;; Reinitialize if a serious error has been detected
- 	JSET	#FATAL_ERROR,X:<STATUS,START 
+	;; ;; Reinitialize if a serious error has been detected
+ 	;; JSET	#FATAL_ERROR,X:<STATUS,START 
 
-	;; Jump to special application area if signalled to do so
-	JSET	#MODE_APPLICATION,X:<MODE,APPLICATION
+	;; ;; Jump to special application area if signalled to do so
+	;; JSET	#MODE_APPLICATION,X:<MODE,APPLICATION
 
-	;; Check for timer expiry and branch to the handler
-	JSSET	#TCF,X:TCSR0,TIMER_ACTION 
+	;; ;; Check for timer expiry and branch to the handler
+	;; JSSET	#TCF,X:TCSR0,TIMER_ACTION 
 
-	;; If it's time to signal the PC of buffer state, do so.
-	JSSET	#QT_FLUSH,X:STATUS,BUFFER_INFORM
+	;; ;; If it's time to signal the PC of buffer state, do so.
+	;; JSSET	#QT_FLUSH,X:STATUS,BUFFER_INFORM
 	
-	;; Check for data in fibre-optic FIFO
-	JSR	<CHECK_FO
- 	JSSET	#FO_WRD_RCV,X:STATUS,HANDLE_FIFO
+	;; ;; Check for data in fibre-optic FIFO
+	;; JSR	<CHECK_FO
+ 	;; JSSET	#FO_WRD_RCV,X:STATUS,HANDLE_FIFO
 
-	;; CON only progresses if FIFO isn't hot.
-	JSSET   #CON_MCE,X:STATUS,CON_TRANSMIT
-	JSSET	#CON_DEMAND,X:STATUS,CON_BUFFER
+	;; ;; CON only progresses if FIFO isn't hot.
+	;; JSSET   #CON_MCE,X:STATUS,CON_TRANSMIT
+	;; JSSET	#CON_DEMAND,X:STATUS,CON_BUFFER
 
 	;; Enter new comms mode if host signals with HF2
 	JSSET	#DSR_HF2,X:DSR,NEW_COMMS_INIT
