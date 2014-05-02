@@ -179,18 +179,14 @@ INCR_X_R0
 ;;; Handler for MCE reply (RP) packets.
 	
 HANDLE_RP
-;;; 
-	JMP	HANDLE_RP_CHECK
-;;;
-HANDLE_RP_CHECK_RETURNS
-	;; ;; Ignore if certainly spurious
-	;; JCLR	#MODE_MCE,X:MODE,HANDLE_RP_DROP
+	;; Ignore if certainly spurious
+	JCLR	#MODE_MCE,X:MODE,HANDLE_RP_DROP
 	
-	;; ;; Process normally if QUIET_RP not enabled
-	;; JCLR	#MODE_RP_BUFFER,X:MODE,MCE_PACKET
+	;; Process normally if QUIET_RP not enabled
+	JCLR	#MODE_RP_BUFFER,X:MODE,MCE_PACKET
 
 	;; Drop this packet if we're backed up
-	JSET	#RP_BUFFER_FULL,X:STATUS,HANDLE_RP_DROP
+	JSET    #RP_BUFFER_FULL,X:STATUS,HANDLE_RP_DROP
 
 	;; Copy packet to Y memory, designated area for replies
 	MOVE	#>REPLY_BUFFER,R1
@@ -257,17 +253,12 @@ HANDLE_RP_DROP
 
 
 HANDLE_DA
-;;; 
-	JMP	HANDLE_DA_CHECK
-	NOP
-HANDLE_DA_CHECK_RETURNS	
-;;; 
-	;; ;; Increment frame count
-	;; MOVE	#FRAME_COUNT,R0
-	;; JSR	INCR_X_R0
+	;; Increment frame count
+	MOVE	#FRAME_COUNT,R0
+	JSR	INCR_X_R0
 
-	;; ;; Ignore if certainly spurious
-	;; JCLR	#MODE_MCE,X:MODE,HANDLE_RP_DROP
+	;; Ignore if certainly spurious
+	JCLR	#MODE_MCE,X:MODE,HANDLE_DA_DROP
 	
 	;; If not quiet mode, do normal processing
 	JCLR	#MODE_QT,X:MODE,MCE_PACKET

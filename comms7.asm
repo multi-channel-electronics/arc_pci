@@ -404,13 +404,9 @@ COPY_DATAGRAM_TO_HOST
 ; This routine DMAs the data into RAM and hand-shakes and interrupt
 ; with the driver.
 	
-	;; ;; If reply channel is not configured, bail.
-	;; JSET	#COMM_REP_ENABLED,X:STATUS,COPY_DATAGRAM_TO_HOST1
-	;; RTS
-;;; Skip out to check HF2.
-	NOP
-	JMP	COPY_DATAGRAM_TO_HOST_PLUSPLUS
-
+	;; If reply channel is not configured, bail.
+	JSET	#COMM_REP_ENABLED,X:STATUS,COPY_DATAGRAM_TO_HOST1
+	RTS
 	
 COPY_DATAGRAM_TO_HOST1
 	;; Set destination address...
@@ -435,17 +431,36 @@ COPY_DATAGRAM_TO_HOST1
 	;; Last chance, check the FO input
 	JSR	CHECK_FOR_DATA
 	
+	;; Check for host flag one last time...
+	JCLR	#DSR_HF2,X:DSR,COPY_DATAGRAM_TO_HOST__BAIL
+	
 	;; Trigger writes as master.
 	JSR 	BLOCK_TRANSFERX
 	
-	;; Raise interrupt and wait for handshake.
+COPY_DATAGRAM_TO_HOST2
+	;; Assert interrupt
 	BSET	#INTA,X:DCTR
-	JCLR	#DSR_HF0,X:DSR,*
 	
+	;; Bail out if host disables us
+	JCLR	#DSR_HF2,X:DSR,COPY_DATAGRAM_TO_HOST__BAIL
+	
+	;; Loop until host handshake up
+	JCLR	#DSR_HF0,X:DSR,COPY_DATAGRAM_TO_HOST2
+	
+COPY_DATAGRAM_TO_HOST3
+	;; Clear interrupt
 	BCLR	#INTA,X:DCTR
-	JSET	#DSR_HF0,X:DSR,*
+	
+	;; Bail out if host disables us
+	JCLR	#DSR_HF2,X:DSR,COPY_DATAGRAM_TO_HOST__BAIL
+	
+	;; Loop until host handshake down
+	JSET	#DSR_HF0,X:DSR,COPY_DATAGRAM_TO_HOST3
 	RTS
 
+COPY_DATAGRAM_TO_HOST__BAIL
+	BCLR	#INTA,X:DCTR
+	RTS
 
 
 ;----------------------------------------------
@@ -520,7 +535,7 @@ PROCESS_MCE_DATA
 	CLR	A
 	MOVE	X:QT_N_BLOCK,X0
 	CMP	X0,A
-	JEQ	PROCESS_MCE_DATA__NOBUFFER
+	JEQ	PROCESS_MCE_DATA__DROP_FRAME_QUIETLY
 	
 PROCESS_MCE_DATA_CONTD	
 	;; Check QT_BUF_HEAD, just drop the frame if the buffer is full
@@ -555,14 +570,14 @@ PROCESS_MCE_DATA__CHECK_TAIL
 	MOVE	X0,X:MEM_SRC
 	BSET	#COMM_TFR_YMEM,X:STATUS ; DMA from Y-mem
 
-	;; ;; Trigger writes as master.
-	;; JSR 	BLOCK_TRANSFERX
+	;; RTS on no handshake
+	JCLR	#DSR_HF2,X:DSR,PROCESS_MCE_DATA__DONE2
 	
-	;; ;; Update buffer pointers
-	;; JSR	BUFFER_INCR_MULTI
+	;; Trigger writes as master.
+	JSR 	BLOCK_TRANSFERX
 	
-	JMP	PROCESS_MCE_DATA_JACK_IN
-	NOP
+	;; Update buffer pointers
+	JSR	BUFFER_INCR_MULTI
 
 PROCESS_MCE_DATA__DONE
 	;; Mark as handled
@@ -590,6 +605,12 @@ PROCESS_MCE_DATA__DROP_FRAME
 	NOP
 	MOVE	A,X:QT_DROPS
 	JMP 	PROCESS_MCE_DATA__DONE
+
+PROCESS_MCE_DATA__DROP_FRAME_QUIETLY
+	;; Mark, clear bit, return.  Don't inc buffers or trigger inform.
+	JSR	TIMERX_STORE
+	BCLR	#COMM_MCEDATA,X:STATUS
+	RTS
 
 	
 ;----------------------------------------
@@ -1405,117 +1426,3 @@ BUFFER_PACKET_SINGLES_POLLED
 	NOP
 	RTS
 
-
-;;;
-;;; 
-;;; SUPERHACK
-;;;
-;;;
-	
-STANDARD_COPY_PREAMBLE
-	JSET	#COMM_REP_ENABLED,X:STATUS,XXX_COPY_DATAGRAM_TO_HOST1
-	RTS
-XXX_COPY_DATAGRAM_TO_HOST1
-	JMP	COPY_DATAGRAM_TO_HOST1
-
-
-	
-	ORG	P:$c00,P:$c02
-	IF	@SCP("DOWNLOAD","ONCE")		; Download via ONCE debugger
-	ORG	P:$c00,P:$c00
-	ENDIF
-	
-COPY_DATAGRAM_TO_HOST_PLUSPLUS
-	JSET	#COMM_REP_ENABLED,X:STATUS,YYY_COPY_DATAGRAM_TO_HOST1
-	RTS
-YYY_COPY_DATAGRAM_TO_HOST1
-	;; Set destination address...
-	MOVE	#>REP_BUS_ADDR,R0
-	MOVE	#>BURST_DEST_LO,R1
-	.loop	#2
-	MOVE	X:(R0)+,X0
-	MOVE	X0,X:(R1)+
-	.endl
-
-	;; Set BLOCK_SIZE, in bytes
-	MOVE	X:DGRAM_SIZE,A
-	ASL	#2,A,A
-	NOP
-	MOVE	A1,X0
-	MOVE	X0,X:BLOCK_SIZE
-	;; Source is X:DGRAM_BUFFER
-	MOVE	#>DGRAM_BUFFER,X0
-	MOVE	X0,X:MEM_SRC
-	BCLR	#COMM_TFR_YMEM,X:STATUS
-
-	;; Last chance, check the FO input
-	JSR	CHECK_FOR_DATA
-	
-	;; Check for host flag one last time...
-	JCLR	#DSR_HF2,X:DSR,COPY_DATAGRAM_TO_HOST_BAIL
-	
-	;; Trigger writes as master.
-	JSR 	BLOCK_TRANSFERX
-	
-COPY_DATAGRAM_TO_HOST2
-	;; Assert interrupt
-	BSET	#INTA,X:DCTR
-	
-	JCLR	#DSR_HF2,X:DSR,COPY_DATAGRAM_TO_HOST_BAIL
-	
-	;; Watch for host handshake up
-	JCLR	#DSR_HF0,X:DSR,COPY_DATAGRAM_TO_HOST2
-	
-COPY_DATAGRAM_TO_HOST3
-	;; I guess we got it.
-	BCLR	#INTA,X:DCTR
-	
-	JCLR	#DSR_HF2,X:DSR,COPY_DATAGRAM_TO_HOST_BAIL
-	
-	;; Wait for host handshake down
-	JSET	#DSR_HF0,X:DSR,COPY_DATAGRAM_TO_HOST3
-	RTS
-
-COPY_DATAGRAM_TO_HOST_BAIL
-	BCLR	#INTA,X:DCTR
-	RTS
-
-
-PROCESS_MCE_DATA_JACK_IN
-	;; RTS on no handshake
-	JCLR	#DSR_HF2,X:DSR,PROCESS_MCE_DATA_JACK_IN_DONE
-
-	JSR	BLOCK_TRANSFERX
-	
-	;; Update buffer pointers
-	JSR	BUFFER_INCR_MULTI
-	
-PROCESS_MCE_DATA_JACK_IN_DONE
-	JMP	PROCESS_MCE_DATA__DONE
-
-PROCESS_MCE_DATA__NOBUFFER
-	;; Mark, clear bit, return.  Don't manipulate buffers.
-	JSR	TIMERX_STORE
-	BCLR	#COMM_MCEDATA,X:STATUS
-	RTS
-
-
-HANDLE_DA_CHECK
-	;; Increment frame count
-	MOVE	#FRAME_COUNT,R0
-	JSR	INCR_X_R0
-
-	;; Ignore if certainly spurious
-	JCLR	#MODE_MCE,X:MODE,HANDLE_DA_DROP
-	
-	JMP	HANDLE_DA_CHECK_RETURNS
-
-
-HANDLE_RP_CHECK
-	;; Ignore if certainly spurious
-	JCLR	#MODE_MCE,X:MODE,HANDLE_RP_DROP
-	
-	;; Process normally if QUIET_RP not enabled
-	JCLR	#MODE_RP_BUFFER,X:MODE,MCE_PACKET
-	
-	JMP	HANDLE_RP_CHECK_RETURNS
