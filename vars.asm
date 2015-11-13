@@ -241,7 +241,8 @@ DGRAM_BUFFER		DS	DG__SIZE
 
 ;;; Aliases into the structure.
 DGRAM_VERSION		EQU	DGRAM_BUFFER+0  ; Datagram protocol version
-DGRAM_SIZE		EQU	DGRAM_BUFFER+1  ; Datagram payload size in 32-bit words
+DGRAM_DSIZE		EQU	DGRAM_BUFFER+1  ; Total datagram size,
+        ;; in 32-bit words, including VERSION, SIZE, rest of header.
 DGRAM_TYPE		EQU	DGRAM_BUFFER+2  ; Datagram type
 DGRAM_FWREV		EQU	DGRAM_BUFFER+4  ; FW rev.
 DGRAM_DATA		EQU	DGRAM_BUFFER+16 ; Start of DSP or MCE reply data
@@ -255,11 +256,14 @@ REP_RPAYLOAD		EQU	DGRAM_DATA+4
 REP_REND		EQU	REP_RPAYLOAD+16 ; Whatever.
 	
 
-;;; Datagram sizes for reply and MCE packets.
-;;; Must be even; divide by two to get 32-bit words; mul by two to get bytes.
-RB_REP_SIZE		EQU	(REP_REND-DGRAM_DATA+DGRAM__HEADER_SIZE)
-RB_MCE_SIZE		EQU	(8+128)
-RB_INF_SIZE		EQU	(REP_REND-DGRAM_DATA+2)
+;;; Datagram sizes for reply and MCE packets, in 32-bit words.
+;;; This will get loaded directly into DGRAM_DSIZE.
+;;; - For DSP replies, get size from packet structure.
+;;; - For MCE replies, 64 dwords - preamble = 62 dwords.
+;;; - For INF packets, 1 dword.  Plus the header.
+RB_REP_DSIZE		EQU	(DGRAM__HEADER_SIZE/2+(REP_REND-DGRAM_DATA)/2)
+RB_MCE_DSIZE		EQU	(DGRAM__HEADER_SIZE/2+62)
+RB_INF_DSIZE		EQU	(DGRAM__HEADER_SIZE/2+1)
 
 
 ; 

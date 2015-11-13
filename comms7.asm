@@ -386,9 +386,9 @@ INIT_DATAGRAM_BUFFER
 	MOVE	X0,X:(R0)+
 	.endl
 	MOVE	#>DG_VERS_CODE,X0
-	MOVE	#>(RB_REP_SIZE/2),X1
+	MOVE	#>RB_REP_DSIZE,X1
 	MOVE	X0,X:DGRAM_VERSION
-	MOVE	X1,X:DGRAM_SIZE
+	MOVE	X1,X:DGRAM_DSIZE
 	MOVE	#>DGRAM_FWREV,R0
 	MOVE	X:REV_NUMBER,X0
 	JSR	PROCESS_SPLIT_X0_XR0
@@ -400,7 +400,7 @@ COPY_DATAGRAM_TO_HOST
 ;----------------------------------------------
 ; Caller should have already loaded the packet buffer, especially:
 ;   DGRAM_TYPE
-;   DGRAM_SIZE
+;   DGRAM_DSIZE
 ; This routine DMAs the data into RAM and hand-shakes and interrupt
 ; with the driver.
 	
@@ -418,7 +418,7 @@ COPY_DATAGRAM_TO_HOST1
 	.endl
 
 	;; Set BLOCK_SIZE, in bytes
-	MOVE	X:DGRAM_SIZE,A
+	MOVE	X:DGRAM_DSIZE,A
 	ASL	#2,A,A
 	NOP
 	MOVE	A1,X0
@@ -470,9 +470,9 @@ PROCESS_REPLY
 ; put some data in the payload.
 	;; Mark the packet type and size
 	MOVE	#>DG_TYPE_DSP_REP,A1
-	MOVE	#>(RB_REP_SIZE/2),X1
+	MOVE	#>RB_REP_DSIZE,X1
 	MOVE	A1,X:DGRAM_TYPE
-	MOVE	X1,X:DGRAM_SIZE
+	MOVE	X1,X:DGRAM_DSIZE
 	
 	;; Copy
 	JSR	COPY_DATAGRAM_TO_HOST
@@ -509,9 +509,9 @@ PROCESS_MCE_REPLY
 	
 	;; Mark the packet type and size
 	MOVE	#>DG_TYPE_MCE_REP,A1
-	MOVE	#>(RB_MCE_SIZE/2),X1 ; size in 32-bit words.
+	MOVE	#>RB_MCE_DSIZE,X1 ; size in 32-bit words.
 	MOVE	A1,X:DGRAM_TYPE
-	MOVE	X1,X:DGRAM_SIZE
+	MOVE	X1,X:DGRAM_DSIZE
 	
 	;; Copy
 	JSR	COPY_DATAGRAM_TO_HOST
@@ -697,9 +697,9 @@ SEND_BUF_INFO
 	
 	;; Mark the packet type and size
 	MOVE	#>DG_TYPE_BUF_INF,A1
-	MOVE	#>(RB_INF_SIZE/2),X1 ; size in 32-bit words.
+	MOVE	#>RB_INF_DSIZE,X1 ; size in 32-bit words.
 	MOVE	A1,X:DGRAM_TYPE
-	MOVE	X1,X:DGRAM_SIZE
+	MOVE	X1,X:DGRAM_DSIZE
 	
 	JSR	COPY_DATAGRAM_TO_HOST
 	
