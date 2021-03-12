@@ -1,0 +1,223 @@
+ To do
+-------
+
+- Enforce maximum packet size!  Should be writable by application and
+  correspond to buffer granularity so that data is safe.
+
+- Use memory leases for multi-frame bursts
+
+
+ Documents
+-----------
+
+Abbrev.  Filename                      Description
+DSP-FM   DSP56300FM-Family-Manual.pdf  Features common to all 563xx parts
+301-M    dsp56301um06-HI32.pdf         Features specific to 56301
+AN1780   DSP563xx-HI32-PCI_AN1780.pdf  App. note for PCI interface
+AN1788   DSP563xx-HI32-PCI_AN1788.pdf  App. note for PCI interface
+APR23	 APR23.pdf                     Description of DMA controller
+
+DSP56Xxx
+DSPASMRM.pdf
+
+
+ PCI Bursts
+------------
+
+A PCI burst is when a bus master (e.g. a PCI card) obtains access to
+the PCI bus and writes some data to some target.  In PC language this
+is sometimes called DMA.  Since our DSP also has internal DMA, we
+won't call a PCI burst DMA.  We'll call it a PCI burst.
+
+The details of how to perform a PCI burst are given in AN1780.
+Basically, you write some words into the HTXR register (the HI32's PCI
+transmit fifo) and then write some control words to PCI burst
+registers.  Once this is done, the DSP's PCI stuff will try to get
+access to the bus and initiate a burst transfer of the data in the
+fifo.
+
+ +------------------- DSP ---------------------+        +----PC---+
+ |                                             |        |         |
+ | (Buffer) -----DMA-----> (PCI module FIFO) -----PCI-----> (RAM) |
+ |                                             |        |         |
+ +---------------------------------------------+        +---------+
+
+The maximum size of a PCI burst is 256 bytes; the typical unit of
+measurement is a dword or 32 bit word.
+
+Bursts can fail; this is part of the bus arbitration process.  There
+is a well-defined (but a bit difficult to track down) procedure for
+recovering from such failures.
+
+
+ DMA + PCI Burst
+-----------------
+
+DMA can be used to transfer the burst data from some location in DSP
+memory to the HTXR (PCI module transmit fifo).  This is separate from
+the PCI burst, so if the PCI burst fails it is NOT necessary to
+restart the DMA.  If you do restart the DMA, make sure you have
+cleared the HTXR fifo first!
+
+
+ Procedure for DMA + PCI Burst  --  see AN1780
+-----------------------------------------------
+
+1. Initiate DMA from source buffer to the HTXR.
+
+2. Initiate a PCI burst to some destination address in PC main memory.
+
+3. Wait for the burst to complete.  If it was successful, exit.  If not:
+
+4. Check if the error was of type "restart" or "resume".  If restart,
+   simply reinitiate the burst with the same setting; i.e. goto 2.
+   If resume:
+
+5. Part of the burst succeeded.  Update the PC main memory destination
+   address and the burst length to reflect this, and goto 2.
+
+
+ Current code
+--------------
+
+The original SDSU code does not follow this prescription.  On error,
+it both restarts the DMA and reinitiates the PCI burst.  It does not
+distinguish between "resume" and "restart" errors.
+
+
+ Code modifications
+--------------------
+
+Existing code has separate blocks for transferring chunks of 1024, 64,
+and 2 bytes.  This has been replaced with generic code that will
+transfer any size (with the caveat that each transfer is rounded up to
+a multiple of 32 bytes! -- so it's ok to break a frame of size 5424
+into smaller blocks, as long as every block except the last is a
+multiple of 32... so you can wait for the fibre fifo to be 1/2 full
+(1024 bytes) and send that off for PCI, then get another block, and
+then transfer the last 304 bytes).  Your destination buffers should be
+aligned on 32 byte boundaries and should not cross a $10000 boundary.
+(All of these restrictions could be relaxed fairly easily; but they
+haven't yet.)
+
+The current model in version 1.05A is:
+
+ 1. Buffer the entire packet into Y memory, including that any data
+    above 4kB goes into off-chip SRAM.
+
+ 2. Load the PCI dest'n address and transfer size and source address
+    into special variables
+
+ 3. Call the BLOCK_TRANSFER function to do the whole packet.
+
+Bear in mind that PCI bursts are limited to 256 bytes, so the packet
+will be naturally broken up into things that big or smaller.
+
+
+ Latency timers, 2.6 kernels, and PCI data rates
+--------------------------------------------------
+
+The theoretical peak data rate for the PCI bus is 133 MB/s.  This is
+obtained by multiplying the bus clock rate (33 MHz) times the bus
+width (32 bits).  A single(four) card packet of size 1488(5424) should
+then, ideally, transfer in 11(41) us.
+
+In order to give other devices access (or the option to access) the
+bus, the bus controller can interrupt a bus master during a burst.
+The frequency with which this may happen is determined by a number
+called the "latency timer", which is assigned to each device by the
+operating system.  Numbers like 32 are not uncommon; that indicates
+that if the device hogs the bus for longer than 32 clock cycles, the
+controller is allowed to interrupt it.
+
+On the DSP, these interruptions are seen as TO errors.
+
+In kernel 2.4, bus errors seem caused only by contention.  On 2.6, we
+see TO errors quite regularly if we try to DMA blocks larger than or
+equal to 32 dwords.  Inspection of the PCI configuration block for the
+DSP card shows that the latency timer (byte 0xd in
+/proc/bus/pci/06/01.0, see LDD...) is set to 32.
+
+The question arises as to whether there is still a speed advantage to
+transferring larger blocks; the penalty to resume a transfer may be
+smaller than the overhead of using smaller blocks.  Here are some
+timings, for different block sizes.  Note that ~100 us of these times
+are likely due to the packet buffering and not related to the DMA
+transfer.
+
+ block (bytes)   bus errors    time (us)
+------------------------------------------
+ 0x100              18           172
+ 0x080              12           170
+ 0x040               0           168
+ 0x020               0           204
+ 0x010               0           261
+
+From which we conclude that larger blocks are better, regardless of
+bus errors, and that ideally we set the block size to be one half of
+the latency timer value to avoid bus errors.
+
+
+ Assembler notes
+-----------------
+
+Details are in the DSP-FM.  A few caveats:
+
+Words are 24 bits.  Most registers are 24 bits, and memory is 24 bits
+wide.  Little 24 bit registers are X0,X1,Y0,Y1.
+
+The big, 56 bit accumulator registers are called A and B, and are
+broken up into, e.g.
+
+	A2:A1:A0
+
+with A1 and A0 each 24 bits, and A2 the most significant eight bits.
+
+Many literal operations act only on A or B.  When this is the case,
+they take effect in bits 47:24 of the chosen accumulator, i.e. A1, and
+are zero extended to the rest of A.
+
+This includes: OR, AND, ADD, SUB, CMP, MOVE.  e.g.
+
+     MOVE      X:VARIABLE,A
+
+will put the 24 bits of data at location VARIABLE in X memory into A1,
+zeroing (or maybe sign-extending) A2 and A0.
+
+     AND       #$00ffff,A
+
+will do "AND #$00ffff,A1" and "AND 0,A0" and probably something else.
+Watch for it.
+
+A notable exception is the INC instruction, which acts on the entirety
+of A.  I.e., if A=0, INC A will make A0=1 and A1=0.
+
+Flags and comparisons:
+
+As usual, the CMP A,B instruction performs a subtraction B-A and sets
+the flags.  The relevant flags on the DSP are Z, N, and V.  Z
+indicates a zero result, N indicates a negative result, and V
+indicates an overflow (result exceeds 48 bits).  The relevant "carry"
+quantity is N ^ V; consider 0x80 - 0x01 = -129 = 0x7f with V=1; since
+N=0 we get N^V = 1 indicating that -128 < -1, as expected.
+
+Anyway, the moral of the story is that CMP A,B asks "how does B relate
+to A?" and gives answers like "B is less than A".
+
+   CMP A,B
+   JLE skip_factory
+   ** handle the case that B > A **
+skip_factory
+
+
+Literals:
+
+MOVES ARE MESSED UP!  e.g. MOVE #$0100,A puts $100 in A but MOVE
+#$0040,A puts $400000 in A!!  You must force short (8bit) or long
+(24bit) literals like this: MOVE #>$40,B will treat $40 as 24 bits and
+store it in B1.
+
+Wide accumulators:
+
+MOVE A,B doesn't copy all 48 bits all the time.  A better approach is
+  ASL #0,A,B

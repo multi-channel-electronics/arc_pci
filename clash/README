@@ -1,0 +1,23 @@
+Aides for assembling DSP56300 code under Linux.
+
+ scripts: wrappers for wine + CLAS
+
+ srec: simple library for handling srec files and a lod2s converter.
+
+To make these available to everyone on the system, run
+  make
+  sudo make install
+
+In order to run the assembler, you will need 1) the assembler and 2)
+WINE.  Those can be obtained by:
+
+  wget http://e-mode.phas.ubc.ca/~mhasse/mhasse/arc_pci/clas563.zip
+  sudo apt-get install wine
+
+Once wine is installed, unzip that code to your "C: drive";
+  cd ~/.wine/drive_c/
+  unzip ~/clas563.zip
+
+or whatever.  The scripts look for the assembler in that folder.
+Sorry.
+

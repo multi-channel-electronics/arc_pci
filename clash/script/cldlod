@@ -1,0 +1,4 @@
+#!/bin/bash
+
+[ "$CLAS_BIN" == "" ] && CLAS_BIN=~/.wine/drive_c/CLAS563/BIN/
+wine ${CLAS_BIN}/CLDLOD.EXE $@

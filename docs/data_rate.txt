@@ -1,0 +1,37 @@
+MFH, May 2009
+
+The ARC-64 board is clocked at 250 MHz but process instructions at 50
+MHz.  External reads and writes take two clock cycles, limiting many
+MOV operations to 25 MHz even when pipe-lined.
+
+The MCE fibre is 8/10 250 Mbit/s, giving 50 MB/s transfer rates.  The
+MCE takes full advantage of this rate.
+
+By setting up a 50 MHz timer on the PCI card DSP, we have been able to
+time various operations that the code performs.
+
+Action                   Time (us)
+Half-fifo fill time       40      (25 MB/s)
+Half-fifo -> Y mem time   26      (39 MB/s; 16-bit words at 20 MW/s)
+Y mem -> PCI bus          40      Approximate           
+Single byte fifo time      0.12   (8.3 MB/s; i.e. words at 4 MW/s
+Half-fifo @ single rate  120      (slow!)
+Reply/data pre-process     4
+Burst MCE cmd to Y        17      (~15 MB/s)
+MCE cmd Y -> FO out       21      (~12 MB/s)
+
+The transfer of commands from PC RAM to the MCE takes on order the
+amount of time it takes for the FIFO to become half-full.  We can't
+beat this by parallelizing or making the process more direct, because
+we are limited by the fact that we need to split the 16-bit words
+(which are themselves split versions of 32-bit PCI words) into bytes
+before writing to the fibre output register.  Even if we constructed
+DMA for the transfer, the splitting procedure is expensive.  If we
+_wrote_ the command as bytes (pre-split), we'd double the PCI time.
+
+
+# MFH, Jan 2010 - issues resolved.
+
+i.e. MCE commanding PCI+FO time is 38 us, while half-fifo fill time is
+40 us, leaving little wiggle room.  U0105 relieves this by splitting
+the PCI and FO steps of the MCE commanding.

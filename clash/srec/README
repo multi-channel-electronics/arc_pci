@@ -1,0 +1,4 @@
+Holy, this actually works.
+
+This version outputs line feeds AND carriage returns.  If you need to eliminate this DOSsy thing, do
+   sed -i 's/\r//' file.s
