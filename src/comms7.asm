@@ -444,6 +444,8 @@ COPY_DATAGRAM_TO_HOST2
 	;; Bail out if host disables us
 	JCLR	#DSR_HF2,X:DSR,COPY_DATAGRAM_TO_HOST__BAIL
 	
+	JSR	CHECK_FOR_DATA	; Host handshakes are sometimes slow, so we check often
+
 	;; Loop until host handshake up
 	JCLR	#DSR_HF0,X:DSR,COPY_DATAGRAM_TO_HOST2
 	
@@ -454,6 +456,8 @@ COPY_DATAGRAM_TO_HOST3
 	;; Bail out if host disables us
 	JCLR	#DSR_HF2,X:DSR,COPY_DATAGRAM_TO_HOST__BAIL
 	
+	JSR	CHECK_FOR_DATA	; Host handshakes are sometimes slow, so we check often
+
 	;; Loop until host handshake down
 	JSET	#DSR_HF0,X:DSR,COPY_DATAGRAM_TO_HOST3
 	RTS
