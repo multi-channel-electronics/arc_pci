@@ -181,6 +181,7 @@ COMM_TFR_YMEM		EQU	14 ; PCI burst is coming from Y mem, not X mem.
 FIFO_FAILS		DC	0
 PTYPE_FAILS		DC	0
 DA_COUNT		DC	0
+CHECKSUM_FAILS	DC	0	; Only used if MODE_VERIFY_CHECKSUM is set
 	
 ;;; WORD and SIZE must be adjacent like this.
 CMD_SIZE		DC	0
@@ -334,6 +335,7 @@ MODE_MCE		EQU	1   ; process packets from MCE (!choke)
 MODE_QT			EQU	2   ; Quiet transfer for data packets (QT mode)
 MODE_RP_BUFFER		EQU     3   ; Quiet transfer for reply packets (Quiet-RP)
 MODE_C7_ACTIVE		EQU	4   ; Alternative (U0107+) protocol is active.
+MODE_VERIFY_CHECKSUM	EQU	5	; Verify MCE data packet checksums (slower, so only enable for debugging)
 
 
 ;;; END OF VARIABLE TABLE
