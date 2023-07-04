@@ -444,6 +444,8 @@ COPY_DATAGRAM_TO_HOST2
 	;; Bail out if host disables us
 	JCLR	#DSR_HF2,X:DSR,COPY_DATAGRAM_TO_HOST__BAIL
 	
+	JSR	CHECK_FOR_DATA	; Host handshakes are sometimes slow, so we check often
+
 	;; Loop until host handshake up
 	JCLR	#DSR_HF0,X:DSR,COPY_DATAGRAM_TO_HOST2
 	
@@ -454,6 +456,8 @@ COPY_DATAGRAM_TO_HOST3
 	;; Bail out if host disables us
 	JCLR	#DSR_HF2,X:DSR,COPY_DATAGRAM_TO_HOST__BAIL
 	
+	JSR	CHECK_FOR_DATA	; Host handshakes are sometimes slow, so we check often
+
 	;; Loop until host handshake down
 	JSET	#DSR_HF0,X:DSR,COPY_DATAGRAM_TO_HOST3
 	RTS
@@ -1265,8 +1269,16 @@ CHECK_FOR_DATA__BUFFER_DATA1
 	;; Packet size in dwords -> X0
 	MOVE	X:MCEHDR_SIZE,X0
 	
+	JCLR	#MODE_VERIFY_CHECKSUM,X:MODE,CHECK_FOR_DATA__BUFFER_DATA2
+	;; Empty FIFO using slower method that verifies packet checksums
+	JSR	CHECK_FOR_DATA__BUFFER__CHECKSUM
+	JMP	CHECK_FOR_DATA__BUFFER_DATA3
+
+CHECK_FOR_DATA__BUFFER_DATA2
+	;; Regular, fast routine for emptying FIFO
 	JSR	CHECK_FOR_DATA__BUFFER_LARGE
 	
+CHECK_FOR_DATA__BUFFER_DATA3
 	;; End marker for debugging; not a protocol signifier.
 	MOVE	#$af000,X0
 	MOVE	X0,Y:(R4)
@@ -1299,6 +1311,57 @@ CHECK_FOR_DATA__BUFFER
 
 	RTS
 
+
+CHECK_FOR_DATA__BUFFER__CHECKSUM
+	;; Buffer a set number of words from the FIFO using slow method
+	;; Verifies packet checksum
+	;;
+	;; In:  X0 is the packet size in 32-bit words
+	;;      R4 is the pointer into Y memory.
+	;;
+	;; Out: fills the buffer and advances R4.  Probably trashes some stuff.
+	;;      CHECKSUM_FAILS is incremented if there's a checksum error
+
+	CLR	A
+	CLR	B
+
+	.loop	X0
+	JCLR	#EF,X:PDRD,*
+	MOVEP	Y:RDFIFO,X0
+	NOP
+	MOVE	X0,Y:(R4)+
+	EOR	X0,A
+
+	JCLR	#EF,X:PDRD,*
+	MOVEP	Y:RDFIFO,X0
+	NOP
+	MOVE	X0,Y:(R4)+
+	EOR	X0,B
+	.endl
+
+	;; End marker for debugging; not a protocol signifier.
+	MOVE	#$ff1111,X0
+	MOVE	X0,Y:(R4)
+
+	;; Make sure checksum is zero
+	AND	#>$00ffff,A
+	AND	#>$00ffff,B
+	CMP	A,B
+	JNE	CHECK_FOR_DATA__BUFFER__CHECKSUM__FAIL
+	CLR	A
+	CMP	A,B
+	JEQ	CHECK_FOR_DATA__BUFFER__CHECKSUM__EXIT
+
+CHECK_FOR_DATA__BUFFER__CHECKSUM__FAIL
+	;; Increment checksum error counter
+	MOVE	X:CHECKSUM_FAILS,A0
+	INC	A
+	NOP
+	MOVE	A0,X:CHECKSUM_FAILS
+
+CHECK_FOR_DATA__BUFFER__CHECKSUM__EXIT
+
+	RTS
 
 	
 ;----------------------------------------------
